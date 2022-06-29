@@ -15,10 +15,18 @@ description: Please see the README on GitHub at <https://github.com/ejconlon/dah
 
 dependencies:
 - base >= 4.12 && < 5
+- bytestring >= 0.10 && < 0.11
+- containers >= 0.6 && < 0.7
+- data-default >= 0.7 && < 0.8
+- free >= 5.1 && < 5.2
+- mtl >= 2.2 && < 2.3
+- primitive >= 0.7 && < 0.8
+- transformers >= 0.5 && < 0.6
 
 default-extensions:
 - BangPatterns
 - ConstraintKinds
+- DataKinds
 - DeriveFunctor
 - DeriveFoldable
 - DeriveGeneric
@@ -55,17 +63,6 @@ ghc-options:
 
 library:
   source-dirs: src
-
-executables:
-  dahdit-exe:
-    main:                Main.hs
-    source-dirs:         exe
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - dahdit
 
 tests:
   dahdit-test:

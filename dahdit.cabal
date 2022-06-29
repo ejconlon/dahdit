@@ -25,6 +25,16 @@ source-repository head
 library
   exposed-modules:
       Dahdit
+      Dahdit.Binary
+      Dahdit.BinaryRep
+      Dahdit.Fancy
+      Dahdit.Free
+      Dahdit.Funs
+      Dahdit.Generic
+      Dahdit.Nums
+      Dahdit.Proxy
+      Dahdit.Run
+      Dahdit.Sizes
   other-modules:
       Paths_dahdit
   hs-source-dirs:
@@ -32,6 +42,7 @@ library
   default-extensions:
       BangPatterns
       ConstraintKinds
+      DataKinds
       DeriveFunctor
       DeriveFoldable
       DeriveGeneric
@@ -56,42 +67,13 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie
   build-depends:
       base >=4.12 && <5
-  default-language: Haskell2010
-
-executable dahdit-exe
-  main-is: Main.hs
-  other-modules:
-      Paths_dahdit
-  hs-source-dirs:
-      exe
-  default-extensions:
-      BangPatterns
-      ConstraintKinds
-      DeriveFunctor
-      DeriveFoldable
-      DeriveGeneric
-      DeriveTraversable
-      DerivingStrategies
-      DerivingVia
-      FlexibleContexts
-      FlexibleInstances
-      FunctionalDependencies
-      GADTs
-      GeneralizedNewtypeDeriving
-      LambdaCase
-      KindSignatures
-      MultiParamTypeClasses
-      Rank2Types
-      ScopedTypeVariables
-      StandaloneDeriving
-      TupleSections
-      TypeApplications
-      TypeOperators
-      TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      base >=4.12 && <5
-    , dahdit
+    , bytestring ==0.10.*
+    , containers ==0.6.*
+    , data-default ==0.7.*
+    , free ==5.1.*
+    , mtl ==2.2.*
+    , primitive ==0.7.*
+    , transformers ==0.5.*
   default-language: Haskell2010
 
 test-suite dahdit-test
@@ -104,6 +86,7 @@ test-suite dahdit-test
   default-extensions:
       BangPatterns
       ConstraintKinds
+      DataKinds
       DeriveFunctor
       DeriveFoldable
       DeriveGeneric
@@ -128,7 +111,14 @@ test-suite dahdit-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
+    , bytestring ==0.10.*
+    , containers ==0.6.*
     , dahdit
+    , data-default ==0.7.*
+    , free ==5.1.*
+    , mtl ==2.2.*
+    , primitive ==0.7.*
     , tasty
     , tasty-hunit
+    , transformers ==0.5.*
   default-language: Haskell2010
