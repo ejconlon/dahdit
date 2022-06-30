@@ -12,7 +12,7 @@ import Dahdit.Free (Get)
 import Dahdit.Funs (getByteString, getStaticArray, getStaticSeq, getWord8, putByteString, putFixedString, putWord8,
                     unsafePutStaticArrayN, unsafePutStaticSeqN)
 import Dahdit.Proxy (Proxy (..))
-import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..), staticByteSizeFoldable)
+import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Default (Default (..))
@@ -91,18 +91,12 @@ newtype StaticSeq (n :: Nat) a = StaticSeq { unStaticSeq :: Seq a }
 instance (KnownNat n, Default a) => Default (StaticSeq n a) where
   def = StaticSeq (Seq.replicate (fromIntegral (natVal (Proxy :: Proxy n))) def)
 
-instance (StaticByteSized a) => StaticByteSized (StaticSeq n a) where
-  staticByteSize _ = staticByteSizeFoldable (Proxy :: Proxy a)
+instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticSeq n a) where
+  staticByteSize _ = fromIntegral (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
 
 instance (KnownNat n, Binary a, StaticByteSized a, Default a) => Binary (StaticSeq n a) where
   get = fmap StaticSeq (getStaticSeq (fromIntegral (natVal (Proxy :: Proxy n))) get)
   put = unsafePutStaticSeqN (fromIntegral (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
-  -- put (StaticSeq s) =
-  --   let !n = fromIntegral (natVal (Proxy :: Proxy n))
-  --       !e = fromIntegral (Seq.length s)
-  --   in if n > e
-  --     then error ("Wrong number of elements to put static seq (have " ++ show (unElementCount e) ++ ", need " ++ show (unElementCount n) ++ ")")
-  --     else unsafePutStaticSeqN n put s
 
 newtype StaticArray (n :: Nat) a = StaticArray { unStaticArray :: PrimArray a }
   deriving stock (Show)
@@ -118,11 +112,6 @@ instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) wh
 instance (KnownNat n, Prim a, StaticByteSized a, Default a) => Binary (StaticArray n a) where
   get = fmap StaticArray (getStaticArray (fromIntegral (natVal (Proxy :: Proxy n))))
   put = unsafePutStaticArrayN (fromIntegral (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
-    -- let !n = fromIntegral (natVal (Proxy :: Proxy n))
-    --     !e = fromIntegral (sizeofPrimArray a)
-    -- in if n > e
-    --   then error ("Wrong number of elements to put static array (have " ++ show (unElementCount e) ++ ", need " ++ show (unElementCount n) ++ ")")
-    --   else putStaticArrayN n a
 
 newtype BoolByte = BoolByte { unBoolByte :: Bool }
   deriving stock (Show)

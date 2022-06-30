@@ -13,3 +13,5 @@ This differs from `binary` in a few ways:
 7. Provides several additional types representing fixed-length strings or sequences (using `TypeLits`).
 
 This generally works but should be considered experimental.
+
+(dahs and dits are signal durations in Morse code)
