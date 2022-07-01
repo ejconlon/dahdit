@@ -19,6 +19,10 @@ class ByteSized a => Binary a where
 byteSizeViaPut :: Binary a => a -> ByteCount
 byteSizeViaPut = runCount . put
 
+instance Binary () where
+  get = pure ()
+  put _ = pure ()
+
 instance Binary Word8 where
   get = getWord8
   put = putWord8
