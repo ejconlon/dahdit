@@ -27,20 +27,11 @@ newtype ByteCount = ByteCount { unByteCount :: Word64 }
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bounded, Default)
 
-class ByteSized a => StaticByteSized a where
-  staticByteSize :: Proxy a -> ByteCount
-
-byteSizeViaStatic :: StaticByteSized a => a -> ByteCount
-byteSizeViaStatic = staticByteSize . proxyFor
-
-instance StaticByteSized Word8 where
-  staticByteSize _ = 1
-
-instance StaticByteSized Int8 where
-  staticByteSize _ = 1
-
 class ByteSized a where
   byteSize :: a -> ByteCount
+
+instance ByteSized () where
+  byteSize _ = 0
 
 instance ByteSized Word8 where
   byteSize _ = 1
@@ -56,6 +47,21 @@ instance (StaticByteSized a, Prim a) => ByteSized (PrimArray a) where
     let !elen = staticByteSize (Proxy :: Proxy a)
         !alen = fromIntegral (sizeofPrimArray pa)
     in elen * alen
+
+class ByteSized a => StaticByteSized a where
+  staticByteSize :: Proxy a -> ByteCount
+
+byteSizeViaStatic :: StaticByteSized a => a -> ByteCount
+byteSizeViaStatic = staticByteSize . proxyFor
+
+instance StaticByteSized () where
+  staticByteSize _ = 0
+
+instance StaticByteSized Word8 where
+  staticByteSize _ = 1
+
+instance StaticByteSized Int8 where
+  staticByteSize _ = 1
 
 newtype ViaStaticByteSized a = ViaStaticByteSized { unViaStaticByteSized :: a }
 

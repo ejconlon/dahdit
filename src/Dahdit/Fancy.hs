@@ -4,15 +4,17 @@ module Dahdit.Fancy
   , StaticSeq (..)
   , StaticArray (..)
   , BoolByte (..)
+  , ExactBytes (..)
   ) where
 
 import Control.Monad (unless)
 import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get)
-import Dahdit.Funs (getByteString, getStaticArray, getStaticSeq, getWord8, putByteString, putFixedString, putWord8,
-                    unsafePutStaticArrayN, unsafePutStaticSeqN)
+import Dahdit.Funs (getByteString, getExpect, getStaticArray, getStaticSeq, getWord8, putByteString, putFixedString,
+                    putWord8, unsafePutStaticArrayN, unsafePutStaticSeqN)
 import Dahdit.Proxy (Proxy (..))
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
+import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Default (Default (..))
@@ -23,7 +25,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.String (IsString)
 import Data.Word (Word8)
-import GHC.TypeLits (KnownNat, Nat, natVal)
+import GHC.TypeLits (KnownNat, KnownSymbol, Nat, Symbol, natVal, symbolVal)
 
 getUntilNull :: Get (Int, [Word8])
 getUntilNull = go 0 [] where
@@ -127,3 +129,25 @@ instance StaticByteSized BoolByte where
 instance Binary BoolByte where
   get = fmap (BoolByte . (/= 0)) getWord8
   put (BoolByte b) = putWord8 (if b then 1 else 0)
+
+newtype ExactBytes (s :: Symbol) = ExactBytes { unExactBytes :: () }
+  deriving stock (Show)
+  deriving newtype (Eq)
+  deriving (ByteSized) via (ViaStaticByteSized (ExactBytes s))
+
+instance Default (ExactBytes s) where
+  def = ExactBytes ()
+
+instance KnownSymbol s => StaticByteSized (ExactBytes s) where
+  staticByteSize _ = fromIntegral (length (symbolVal (Proxy :: Proxy s)))
+
+instance KnownSymbol s => Binary (ExactBytes s) where
+  get = do
+    let !s = symbolVal (Proxy :: Proxy s)
+        !bc = fromIntegral (length s)
+        !bs = BSS.pack (fmap c2w s)
+    getExpect s (getByteString bc) bs
+    pure $! ExactBytes ()
+  put _ = do
+    let !s = symbolVal (Proxy :: Proxy s)
+    putByteString (BSS.pack (fmap c2w s))

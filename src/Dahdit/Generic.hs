@@ -12,7 +12,7 @@ import Dahdit.Funs (putStaticHint)
 import Dahdit.Proxy (Proxy (..))
 import Dahdit.Sizes (ByteCount, ByteSized (..), StaticByteSized (..))
 import Data.Kind (Type)
-import GHC.Generics ((:*:) (..), Generic (..), K1 (..), M1 (..), U1 (..), V1)
+import GHC.Generics ((:*:) (..), Generic (..), K1 (..), M1 (..), U1 (..))
 
 -- | Use: deriving (ByteSized, Binary) via (ViaGeneric Foo)
 newtype ViaGeneric a = ViaGeneric { unViaGeneric :: a }
@@ -24,10 +24,6 @@ newtype ViaStaticGeneric a = ViaStaticGeneric { unViaStaticGeneric :: a }
 
 class GByteSized f where
   gbyteSize :: f a -> ByteCount
-
--- Void
-instance GByteSized V1 where
-  gbyteSize _ = 0
 
 -- Unit
 instance GByteSized U1 where
@@ -55,9 +51,6 @@ instance (Generic t, GByteSized (Rep t)) => ByteSized (ViaStaticGeneric t) where
 
 class GByteSized f => GStaticByteSized (f :: Type -> Type) where
   gstaticByteSize :: Proxy f -> ByteCount
-
-instance GStaticByteSized V1 where
-  gstaticByteSize _ = 0
 
 instance GStaticByteSized U1 where
   gstaticByteSize _ = 0
