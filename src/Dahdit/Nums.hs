@@ -88,19 +88,13 @@ instance StaticByteSized Int16LE where
 
 newtype Word24LE = Word24LE { unWord24LE :: Word24 }
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
-
-instance Default Word24LE where
-  def = 0
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
 
 -- TODO add prim instance
 
 newtype Int24LE = Int24LE { unInt24LE :: Int24 }
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
-
-instance Default Int24LE where
-  def = 0
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
 
 -- TODO add prim instance
 

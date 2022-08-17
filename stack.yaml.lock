@@ -10,11 +10,11 @@ packages:
     git: git@github.com:ejconlon/data-sword.git
     pantry-tree:
       size: 644
-      sha256: 4332ff8dc18e28515d9313ff8666be256e03150bbd481aaf86cce6fb20cc9181
-    commit: 652d0cf3a569e9cfc1db9f44ec5e2c826e3ce200
+      sha256: c19c6cbd87ce6ce7d46a15b28f74f47ab1e65d1b830e4afa9eaf27b0daea2536
+    commit: 4a3efca54b337820446c7682bf3623d607f0365f
   original:
     git: git@github.com:ejconlon/data-sword.git
-    commit: 652d0cf3a569e9cfc1db9f44ec5e2c826e3ce200
+    commit: 4a3efca54b337820446c7682bf3623d607f0365f
 snapshots:
 - completed:
     size: 619170

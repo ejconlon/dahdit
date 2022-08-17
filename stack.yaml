@@ -8,4 +8,4 @@ packages:
 
 extra-deps:
 - git: git@github.com:ejconlon/data-sword.git
-  commit: 652d0cf3a569e9cfc1db9f44ec5e2c826e3ce200
+  commit: 4a3efca54b337820446c7682bf3623d607f0365f
