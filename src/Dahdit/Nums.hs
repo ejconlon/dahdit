@@ -11,6 +11,10 @@ module Dahdit.Nums
   , Word32LE (..)
   , Int32LE (..)
   , FloatLE (..)
+  , Word16BE (..)
+  , Int16BE (..)
+  , Word32BE (..)
+  , Int32BE (..)
   ) where
 
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
@@ -19,10 +23,10 @@ import Data.Default (Default (..))
 import Data.Int (Int16, Int32)
 import Data.Primitive.ByteArray (indexByteArray, writeByteArray)
 import Data.Primitive.Types (Prim (..))
-import Data.Word (Word16, Word32, Word8)
-import GHC.Float (castFloatToWord32, castWord32ToFloat)
+import Data.Word (Word16, Word32)
 import Data.ShortWord (Int24, Word24)
-import Dahdit.LiftedPrim (LiftedPrim (..), ViaFromIntegral (..))
+import Dahdit.LiftedPrim (LiftedPrim (..))
+import Dahdit.Internal (ViaFromIntegral (..), mkWord16LE, unMkWord16LE, mkWord24LE, unMkWord24LE, mkWord32LE, unMkWord32LE, unMkFloatLE, mkFloatLE)
 
 newtype Word16LE = Word16LE { unWord16LE :: Word16 }
   deriving stock (Show)
@@ -34,27 +38,16 @@ instance ByteSized Word16LE where
 instance StaticByteSized Word16LE where
   staticByteSize _ = 2
 
-mkWord16LE :: Word8 -> Word8 -> Word16LE
-mkWord16LE b0 b1 =
-  let !w = (fromIntegral b1 `unsafeShiftL` 8) .|. fromIntegral b0
-  in Word16LE w
-
-unMkWord16LE :: Word16LE -> (Word8, Word8)
-unMkWord16LE (Word16LE w) =
-  let !b0 = fromIntegral w
-      !b1 = fromIntegral (w `shiftR` 8)
-  in (b0, b1)
-
 instance LiftedPrim Word16LE where
   elemSizeLifted _ = 2
 
   indexByteArrayLiftedInBytes arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
-    in mkWord16LE b0 b1
+    in Word16LE (mkWord16LE b0 b1)
 
   writeByteArrayLiftedInBytes w arr pos =
-    let !(b0, b1) = unMkWord16LE w
+    let !(b0, b1) = unMkWord16LE (unWord16LE w)
     in writeByteArray arr pos b0 *> writeByteArray arr (pos + 1) b1
 
 newtype Int16LE = Int16LE { unInt16LE :: Int16 }
@@ -72,16 +65,11 @@ newtype Word24LE = Word24LE { unWord24LE :: Word24 }
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
 
-mkWord24LE :: Word8 -> Word8 -> Word8 -> Word24LE
-mkWord24LE b0 b1 b2 =
-  let !(Word32LE w) = mkWord32LE b0 b1 b2 0
-  in Word24LE (fromIntegral w)
+instance ByteSized Word24LE where
+  byteSize _ = 3
 
-unMkWord24LE :: Word24LE -> (Word8, Word8, Word8)
-unMkWord24LE (Word24LE w) =
-  let !v = fromIntegral w
-      (b0, b1, b2, _) = unMkWord32LE (Word32LE v)
-  in (b0, b1, b2)
+instance StaticByteSized Word24LE where
+  staticByteSize _ = 3
 
 instance LiftedPrim Word24LE where
   elemSizeLifted _ = 3
@@ -90,10 +78,10 @@ instance LiftedPrim Word24LE where
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
-    in mkWord24LE b0 b1 b2
+    in Word24LE (mkWord24LE b0 b1 b2)
 
-  writeByteArrayLiftedInBytes f arr pos = do
-    let !(b0, b1, b2) = unMkWord24LE f
+  writeByteArrayLiftedInBytes w arr pos = do
+    let !(b0, b1, b2) = unMkWord24LE (unWord24LE w)
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1
     writeByteArray arr (pos + 2) b2
@@ -102,6 +90,12 @@ newtype Int24LE = Int24LE { unInt24LE :: Int24 }
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaFromIntegral Word24LE Int24LE)
+
+instance ByteSized Int24LE where
+  byteSize _ = 3
+
+instance StaticByteSized Int24LE where
+  staticByteSize _ = 3
 
 newtype Word32LE = Word32LE { unWord32LE :: Word32 }
   deriving stock (Show)
@@ -113,20 +107,6 @@ instance ByteSized Word32LE where
 instance StaticByteSized Word32LE where
   staticByteSize _ = 4
 
-mkWord32LE :: Word8 -> Word8 -> Word8 -> Word8 -> Word32LE
-mkWord32LE b0 b1 b2 b3 =
-  let !w = (fromIntegral b3 `unsafeShiftL` 24) .|. (fromIntegral b2 `unsafeShiftL` 16) .|.
-            (fromIntegral b1 `unsafeShiftL` 8) .|. fromIntegral b0
-  in Word32LE w
-
-unMkWord32LE :: Word32LE -> (Word8, Word8, Word8, Word8)
-unMkWord32LE (Word32LE w) =
-  let !b0 = fromIntegral w
-      !b1 = fromIntegral (w `shiftR` 8)
-      !b2 = fromIntegral (w `shiftR` 16)
-      !b3 = fromIntegral (w `shiftR` 24)
-  in (b0, b1, b2, b3)
-
 instance LiftedPrim Word32LE where
   elemSizeLifted _ = 4
 
@@ -135,10 +115,10 @@ instance LiftedPrim Word32LE where
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
         !b3 = indexByteArray arr (pos + 3)
-    in mkWord32LE b0 b1 b2 b3
+    in Word32LE (mkWord32LE b0 b1 b2 b3)
 
   writeByteArrayLiftedInBytes w arr pos = do
-    let !(b0, b1, b2, b3) = unMkWord32LE w
+    let !(b0, b1, b2, b3) = unMkWord32LE (unWord32LE w)
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1
     writeByteArray arr (pos + 2) b2
@@ -165,17 +145,6 @@ instance ByteSized FloatLE where
 instance StaticByteSized FloatLE where
   staticByteSize _ = 4
 
-mkFloatLE :: Word8 -> Word8 -> Word8 -> Word8 -> FloatLE
-mkFloatLE b0 b1 b2 b3 =
-  let !(Word32LE w) = mkWord32LE b0 b1 b2 b3
-      !f = castWord32ToFloat w
-  in FloatLE f
-
-unMkFloatLE :: FloatLE -> (Word8, Word8, Word8, Word8)
-unMkFloatLE (FloatLE f) =
-  let !w = castFloatToWord32 f
-  in unMkWord32LE (Word32LE w)
-
 instance LiftedPrim FloatLE where
   elemSizeLifted _ = 4
 
@@ -184,11 +153,51 @@ instance LiftedPrim FloatLE where
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
         !b3 = indexByteArray arr (pos + 3)
-    in mkFloatLE b0 b1 b2 b3
+    in FloatLE (mkFloatLE b0 b1 b2 b3)
 
   writeByteArrayLiftedInBytes f arr pos = do
-    let !(b0, b1, b2, b3) = unMkFloatLE f
+    let !(b0, b1, b2, b3) = unMkFloatLE (unFloatLE f)
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1
     writeByteArray arr (pos + 2) b2
     writeByteArray arr (pos + 3) b3
+
+newtype Word16BE = Word16BE { unWord16BE :: Word16 }
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+
+instance ByteSized Word16BE where
+  byteSize _ = 2
+
+instance StaticByteSized Word16BE where
+  staticByteSize _ = 2
+
+newtype Int16BE = Int16BE { unInt16BE :: Int16 }
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+
+instance ByteSized Int16BE where
+  byteSize _ = 2
+
+instance StaticByteSized Int16BE where
+  staticByteSize _ = 2
+
+newtype Word32BE = Word32BE { unWord32BE :: Word32 }
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+
+instance ByteSized Word32BE where
+  byteSize _ = 4
+
+instance StaticByteSized Word32BE where
+  staticByteSize _ = 4
+
+newtype Int32BE = Int32BE { unInt32BE :: Int32 }
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+
+instance ByteSized Int32BE where
+  byteSize _ = 4
+
+instance StaticByteSized Int32BE where
+  staticByteSize _ = 4

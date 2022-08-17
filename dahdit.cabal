@@ -31,6 +31,7 @@ library
       Dahdit.Free
       Dahdit.Funs
       Dahdit.Generic
+      Dahdit.Internal
       Dahdit.LiftedPrim
       Dahdit.Nums
       Dahdit.Proxy

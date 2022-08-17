@@ -1,6 +1,5 @@
 module Dahdit.LiftedPrim
-  ( ViaFromIntegral (..)
-  , LiftedPrim (..)
+  ( LiftedPrim (..)
   , PrimArrayLifted (..)
   , MutablePrimArrayLifted (..)
   , indexPrimArrayLifted
@@ -14,14 +13,13 @@ module Dahdit.LiftedPrim
 
 import Data.Primitive.ByteArray (MutableByteArray, ByteArray, indexByteArray, writeByteArray, freezeByteArray, thawByteArray, unsafeFreezeByteArray, unsafeThawByteArray, newByteArray, runByteArray)
 import Control.Monad.Primitive (PrimMonad(..))
-import Data.Word (Word8)
 import Data.Int (Int8)
 import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
 import Data.Foldable (for_)
 import Dahdit.Proxy (proxyForF)
-
-newtype ViaFromIntegral x y = ViaFromIntegral { unViaFromIntegral :: y }
+import Dahdit.Internal (ViaFromIntegral (..))
+import Data.Word (Word8)
 
 class LiftedPrim a where
   elemSizeLifted :: Proxy a -> Int
