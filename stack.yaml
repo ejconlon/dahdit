@@ -1,7 +1,11 @@
-resolver: lts-19.13
+resolver: lts-19.19
 
 ghc-options:
   "$everything": -haddock
 
 packages:
 - .
+
+extra-deps:
+- git: git@github.com:ejconlon/data-sword.git
+  commit: 652d0cf3a569e9cfc1db9f44ec5e2c826e3ce200

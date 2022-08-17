@@ -18,6 +18,7 @@ dependencies:
 - bytestring >= 0.10 && < 0.11
 - containers >= 0.6 && < 0.7
 - data-default >= 0.7 && < 0.8
+- data-sword >= 0.3 && < 0.4
 - free >= 5.1 && < 5.2
 - mtl >= 2.2 && < 2.3
 - primitive >= 0.7 && < 0.8

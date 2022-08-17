@@ -70,6 +70,7 @@ library
     , bytestring ==0.10.*
     , containers ==0.6.*
     , data-default ==0.7.*
+    , data-sword ==0.3.*
     , free ==5.1.*
     , mtl ==2.2.*
     , primitive ==0.7.*
@@ -115,6 +116,7 @@ test-suite dahdit-test
     , containers ==0.6.*
     , dahdit
     , data-default ==0.7.*
+    , data-sword ==0.3.*
     , free ==5.1.*
     , mtl ==2.2.*
     , primitive ==0.7.*

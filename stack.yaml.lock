@@ -3,10 +3,21 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    name: data-sword
+    version: 0.3.0.0
+    git: git@github.com:ejconlon/data-sword.git
+    pantry-tree:
+      size: 644
+      sha256: 4332ff8dc18e28515d9313ff8666be256e03150bbd481aaf86cce6fb20cc9181
+    commit: 652d0cf3a569e9cfc1db9f44ec5e2c826e3ce200
+  original:
+    git: git@github.com:ejconlon/data-sword.git
+    commit: 652d0cf3a569e9cfc1db9f44ec5e2c826e3ce200
 snapshots:
 - completed:
-    size: 618740
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/13.yaml
-    sha256: ef98d70e4018bf01feb00ccdcd33ab26d056dbb71b38057c78fdd0d1ec671c85
-  original: lts-19.13
+    size: 619170
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/19.yaml
+    sha256: a95a93bcb7132bf5f8ad3356998e223947852f57d4da63e0e145870ea90d9d18
+  original: lts-19.19

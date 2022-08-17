@@ -6,6 +6,8 @@
 module Dahdit.Nums
   ( Word16LE (..)
   , Int16LE (..)
+  , Word24LE (..)
+  , Int24LE (..)
   , Word32LE (..)
   , Int32LE (..)
   , FloatLE (..)
@@ -15,12 +17,13 @@ module Dahdit.Nums
 import Control.Monad.Primitive (PrimMonad (..))
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
 import Data.Bits (Bits (..))
-import Data.Default (Default)
+import Data.Default (Default (..))
 import Data.Int (Int16, Int32, Int8)
 import Data.Primitive.ByteArray (ByteArray, MutableByteArray, indexByteArray, writeByteArray)
 import Data.Primitive.Types (Prim (..))
 import Data.Word (Word16, Word32, Word8)
 import GHC.Float (castFloatToWord32, castWord32ToFloat)
+import Data.ShortWord (Int24, Word24)
 
 newtype ViaFromIntegral x y = ViaFromIntegral { unViaFromIntegral :: y }
 
@@ -82,6 +85,24 @@ instance ByteSized Int16LE where
 
 instance StaticByteSized Int16LE where
   staticByteSize _ = 2
+
+newtype Word24LE = Word24LE { unWord24LE :: Word24 }
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
+
+instance Default Word24LE where
+  def = 0
+
+-- TODO add prim instance
+
+newtype Int24LE = Int24LE { unInt24LE :: Int24 }
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
+
+instance Default Int24LE where
+  def = 0
+
+-- TODO add prim instance
 
 newtype Word32LE = Word32LE { unWord32LE :: Word32 }
   deriving stock (Show)
