@@ -1,6 +1,5 @@
 module Dahdit.Proxy
-  ( Proxy (..)
-  , proxyFor
+  ( proxyFor
   , proxyForF
   , proxyForFun
   ) where

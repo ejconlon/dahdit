@@ -12,7 +12,7 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get)
 import Dahdit.Funs (getByteString, getExpect, getStaticArray, getStaticSeq, getWord8, putByteString, putFixedString,
                     putWord8, unsafePutStaticArrayN, unsafePutStaticSeqN)
-import Dahdit.Proxy (Proxy (..))
+import Data.Proxy (Proxy (..))
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
 import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS

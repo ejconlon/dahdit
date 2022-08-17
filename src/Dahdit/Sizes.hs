@@ -9,7 +9,8 @@ module Dahdit.Sizes
   , staticByteSizeFoldable
   ) where
 
-import Dahdit.Proxy (Proxy (..), proxyFor, proxyForF)
+import Data.Proxy (Proxy (..))
+import Dahdit.Proxy (proxyFor, proxyForF)
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Default (Default)

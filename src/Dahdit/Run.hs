@@ -22,7 +22,7 @@ import Control.Monad.Trans.Maybe (MaybeT (..))
 import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), GetStaticArrayF (..), GetStaticSeqF (..),
                     Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
                     ScopeMode (..))
-import Dahdit.Nums (FloatLE, Int16LE (..), Int32LE, LiftedPrim (..), Word16LE (..), Word32LE)
+import Dahdit.Nums (FloatLE, Int16LE (..), Int32LE, Word16LE (..), Word32LE, Int24LE, Word24LE)
 import Dahdit.Proxy (proxyForF)
 import Dahdit.Sizes (ByteCount (..), staticByteSize)
 import qualified Data.ByteString.Short as BSS
@@ -36,6 +36,7 @@ import Data.Primitive.PrimArray (PrimArray (..), sizeofPrimArray)
 import qualified Data.Sequence as Seq
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import Data.Word (Word8)
+import Dahdit.LiftedPrim (LiftedPrim(..))
 
 -- Sizes:
 
@@ -174,16 +175,21 @@ execGetRun :: GetF (GetEff s a) -> GetEff s a
 execGetRun = \case
   GetFWord8 k -> readBytes "Word8" 1 (indexByteArray @Word8) >>= k
   GetFInt8 k -> readBytes "Int8" 1 (indexByteArray @Int8) >>= k
-  GetFWord16LE k -> readBytes "Word16LE" 2 (indexByteArrayLifted @Word16LE) >>= k
-  GetFInt16LE k -> readBytes "Int16LE" 2 (indexByteArrayLifted @Int16LE) >>= k
-  GetFWord32LE k -> readBytes "Word32LE" 4 (indexByteArrayLifted @Word32LE) >>= k
-  GetFInt32LE k -> readBytes "Int32LE" 4 (indexByteArrayLifted @Int32LE) >>= k
-  GetFFloatLE k -> readBytes "FloatLE" 4 (indexByteArrayLifted @FloatLE) >>= k
+  GetFWord16LE k -> readBytes "Word16LE" 2 (indexByteArrayLiftedInBytes @Word16LE) >>= k
+  GetFInt16LE k -> readBytes "Int16LE" 2 (indexByteArrayLiftedInBytes @Int16LE) >>= k
+  GetFWord24LE k -> readBytes "Word24LE" 3 (indexByteArrayLiftedInBytes @Word24LE) >>= k
+  GetFInt24LE k -> readBytes "Int24LE" 3 (indexByteArrayLiftedInBytes @Int24LE) >>= k
+  GetFWord32LE k -> readBytes "Word32LE" 4 (indexByteArrayLiftedInBytes @Word32LE) >>= k
+  GetFInt32LE k -> readBytes "Int32LE" 4 (indexByteArrayLiftedInBytes @Int32LE) >>= k
+  GetFFloatLE k -> readBytes "FloatLE" 4 (indexByteArrayLiftedInBytes @FloatLE) >>= k
   GetFShortByteString bc k ->
     let !len = fromIntegral bc
     in readBytes "ShortByteString" len (readShortByteString len) >>= k
   GetFStaticSeq gss -> readStaticSeq gss
   GetFStaticArray gsa -> readStaticArray gsa
+  GetFByteArray bc k ->
+    let !len = fromIntegral bc
+    in readBytes "ByteArray" len (\arr pos -> cloneByteArray arr pos len) >>= k
   GetFScope gs -> readScope gs
   GetFSkip bc k -> readBytes "skip" (fromIntegral bc) (\_ _ -> ()) *> k
   GetFLookAhead gla -> readLookAhead gla
@@ -285,16 +291,21 @@ execPutRun :: PutF (PutEff s a) -> PutEff s a
 execPutRun = \case
   PutFWord8 x k -> writeBytes 1 (\arr pos -> writeByteArray arr pos x) *> k
   PutFInt8 x k -> writeBytes 1 (\arr pos -> writeByteArray arr pos x) *> k
-  PutFWord16LE x k -> writeBytes 2 (writeByteArrayLifted x) *> k
-  PutFInt16LE x k -> writeBytes 2 (writeByteArrayLifted x) *> k
-  PutFWord32LE x k -> writeBytes 4 (writeByteArrayLifted x) *> k
-  PutFInt32LE x k -> writeBytes 4 (writeByteArrayLifted x) *> k
-  PutFFloatLE x k -> writeBytes 4 (writeByteArrayLifted x) *> k
+  PutFWord16LE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
+  PutFInt16LE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
+  PutFWord24LE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
+  PutFInt24LE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
+  PutFWord32LE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
+  PutFInt32LE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
+  PutFFloatLE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
   PutFShortByteString bc sbs k ->
     let !len = fromIntegral bc
     in writeBytes len (writeShortByteString sbs len) *> k
   PutFStaticSeq pss -> writeStaticSeq pss
   PutFStaticArray psa -> writeStaticArray psa
+  PutFByteArray bc barr k ->
+    let !len = fromIntegral bc
+    in writeBytes len (\arr pos -> copyByteArray arr pos barr 0 len) *> k
   PutFStaticHint (PutStaticHintF _ p k) -> mkPutEff p *> k
 
 runPutRun :: PutRun s a -> PutEnv s -> ST s a
@@ -337,6 +348,8 @@ execCountRun = \case
   PutFInt8 _ k -> State.modify' (1+) *> k
   PutFWord16LE _ k -> State.modify' (2+) *> k
   PutFInt16LE _ k -> State.modify' (2+) *> k
+  PutFWord24LE _ k -> State.modify' (3+) *> k
+  PutFInt24LE _ k -> State.modify' (3+) *> k
   PutFWord32LE _ k -> State.modify' (4+) *> k
   PutFInt32LE _ k -> State.modify' (4+) *> k
   PutFFloatLE _ k -> State.modify' (4+) *> k
@@ -348,6 +361,9 @@ execCountRun = \case
     in State.modify' (len+) *> k
   PutFStaticArray psv@(PutStaticArrayF _ _ _ k) ->
     let !len = putStaticArraySize psv
+    in State.modify' (len+) *> k
+  PutFByteArray bc _ k ->
+    let !len = fromIntegral bc
     in State.modify' (len+) *> k
   PutFStaticHint (PutStaticHintF bc _ k) ->
     let !len = fromIntegral bc

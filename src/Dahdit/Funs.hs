@@ -3,6 +3,8 @@ module Dahdit.Funs
   , getInt8
   , getWord16LE
   , getInt16LE
+  , getWord24LE
+  , getInt24LE
   , getWord32LE
   , getInt32LE
   , getFloatLE
@@ -13,6 +15,8 @@ module Dahdit.Funs
   , getSeq
   , getStaticSeq
   , getStaticArray
+  , getByteArray
+  , getPrimArrayLifted
   , getExpect
   , getLookAhead
   , getRemainingSize
@@ -25,6 +29,8 @@ module Dahdit.Funs
   , putInt8
   , putWord16LE
   , putInt16LE
+  , putWord24LE
+  , putInt24LE
   , putWord32LE
   , putInt32LE
   , putFloatLE
@@ -35,6 +41,8 @@ module Dahdit.Funs
   , unsafePutStaticSeqN
   , putStaticArray
   , unsafePutStaticArrayN
+  , putByteArray
+  , putPrimArrayLifted
   , putStaticHint
   ) where
 
@@ -43,18 +51,21 @@ import Control.Monad.Free.Church (F (..))
 import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), GetStaticArrayF (..), GetStaticSeqF (..),
                     Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
                     ScopeMode (..))
-import Dahdit.Nums (FloatLE, Int16LE, Int32LE, Word16LE, Word32LE)
-import Dahdit.Proxy (Proxy (..), proxyForF, proxyForFun)
+import Dahdit.Nums (FloatLE, Int16LE, Int32LE, Word16LE, Word32LE, Word24LE, Int24LE)
+import Data.Proxy (Proxy (..))
+import Dahdit.Proxy (proxyForF, proxyForFun)
 import Dahdit.Sizes (ByteCount (..), ElementCount (..), StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Foldable (traverse_)
 import Data.Int (Int8)
-import Data.Primitive (Prim, sizeofPrimArray)
+import Data.Primitive (Prim, sizeofPrimArray, sizeofByteArray)
 import Data.Primitive.PrimArray (PrimArray)
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Word (Word8)
+import Data.Primitive.ByteArray (ByteArray)
+import Dahdit.LiftedPrim (PrimArrayLifted (..), LiftedPrim (..))
 
 getWord8 :: Get Word8
 getWord8 = Get (F (\x y -> y (GetFWord8 x)))
@@ -67,6 +78,12 @@ getWord16LE = Get (F (\x y -> y (GetFWord16LE x)))
 
 getInt16LE :: Get Int16LE
 getInt16LE = Get (F (\x y -> y (GetFInt16LE x)))
+
+getWord24LE :: Get Word24LE
+getWord24LE = Get (F (\x y -> y (GetFWord24LE x)))
+
+getInt24LE :: Get Int24LE
+getInt24LE = Get (F (\x y -> y (GetFInt24LE x)))
 
 getWord32LE :: Get Word32LE
 getWord32LE = Get (F (\x y -> y (GetFWord32LE x)))
@@ -91,9 +108,9 @@ getWithin bc g = Get (F (\x y -> y (GetFScope (GetScopeF ScopeModeWithin bc g x)
 
 -- | Get Seq of dynamically-sized elements
 getSeq :: ElementCount -> Get a -> Get (Seq a)
-getSeq n g = go Empty 0 where
+getSeq ec g = go Empty 0 where
   go !acc i =
-    if i == n
+    if i == ec
       then pure acc
       else do
         x <- g
@@ -106,6 +123,14 @@ getStaticSeq n g = Get (F (\x y -> y (GetFStaticSeq (GetStaticSeqF n g x))))
 -- | Get PrimArray of statically-sized elements
 getStaticArray :: (StaticByteSized a, Prim a) => ElementCount -> Get (PrimArray a)
 getStaticArray n = Get (F (\x y -> y (GetFStaticArray (GetStaticArrayF n (Proxy :: Proxy a) x))))
+
+getByteArray :: ByteCount -> Get ByteArray
+getByteArray bc = Get (F (\x y -> y (GetFByteArray bc x)))
+
+getPrimArrayLifted :: LiftedPrim a => Proxy a -> ElementCount -> Get (PrimArrayLifted a)
+getPrimArrayLifted prox ec =
+  let !bc = fromIntegral (elemSizeLifted prox * fromIntegral ec)
+  in fmap PrimArrayLifted (getByteArray bc)
 
 getLookAhead :: Get a -> Get a
 getLookAhead g = Get (F (\x y -> y (GetFLookAhead (GetLookAheadF g x))))
@@ -172,6 +197,12 @@ putWord16LE d = PutM (F (\x y -> y (PutFWord16LE d (x ()))))
 putInt16LE :: Int16LE -> Put
 putInt16LE d = PutM (F (\x y -> y (PutFInt16LE d (x ()))))
 
+putWord24LE :: Word24LE -> Put
+putWord24LE d = PutM (F (\x y -> y (PutFWord24LE d (x ()))))
+
+putInt24LE :: Int24LE -> Put
+putInt24LE d = PutM (F (\x y -> y (PutFInt24LE d (x ()))))
+
 putWord32LE :: Word32LE -> Put
 putWord32LE d = PutM (F (\x y -> y (PutFWord32LE d (x ()))))
 
@@ -218,6 +249,14 @@ putStaticArray a =
 
 unsafePutStaticArrayN :: (StaticByteSized a, Prim a) => ElementCount -> Maybe a -> PrimArray a -> Put
 unsafePutStaticArrayN n mz a = PutM (F (\x y -> y (PutFStaticArray (PutStaticArrayF n mz a (x ())))))
+
+putByteArray :: ByteArray -> Put
+putByteArray arr =
+  let !bc = fromIntegral (sizeofByteArray arr)
+  in PutM (F (\x y -> y (PutFByteArray bc arr (x ()))))
+
+putPrimArrayLifted :: PrimArrayLifted a -> Put
+putPrimArrayLifted = putByteArray . unPrimArrayLifted
 
 putStaticHint :: StaticByteSized a => (a -> Put) -> a -> Put
 putStaticHint p =

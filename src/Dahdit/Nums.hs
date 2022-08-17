@@ -11,38 +11,18 @@ module Dahdit.Nums
   , Word32LE (..)
   , Int32LE (..)
   , FloatLE (..)
-  , LiftedPrim (..)
   ) where
 
-import Control.Monad.Primitive (PrimMonad (..))
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
 import Data.Bits (Bits (..))
 import Data.Default (Default (..))
-import Data.Int (Int16, Int32, Int8)
-import Data.Primitive.ByteArray (ByteArray, MutableByteArray, indexByteArray, writeByteArray)
+import Data.Int (Int16, Int32)
+import Data.Primitive.ByteArray (indexByteArray, writeByteArray)
 import Data.Primitive.Types (Prim (..))
 import Data.Word (Word16, Word32, Word8)
 import GHC.Float (castFloatToWord32, castWord32ToFloat)
 import Data.ShortWord (Int24, Word24)
-
-newtype ViaFromIntegral x y = ViaFromIntegral { unViaFromIntegral :: y }
-
--- Indices here are in bytes, not elements
-class LiftedPrim w where
-  indexByteArrayLifted :: ByteArray -> Int -> w
-  writeByteArrayLifted :: PrimMonad m => w -> MutableByteArray (PrimState m) -> Int -> m ()
-
-instance LiftedPrim Word8 where
-  indexByteArrayLifted = indexByteArray
-  writeByteArrayLifted val arr pos = writeByteArray arr pos val
-
-instance LiftedPrim Int8 where
-  indexByteArrayLifted = indexByteArray
-  writeByteArrayLifted val arr pos = writeByteArray arr pos val
-
-instance (Num x, Integral x, LiftedPrim x, Num y, Integral y) => LiftedPrim (ViaFromIntegral x y) where
-  indexByteArrayLifted arr pos = ViaFromIntegral (fromIntegral (indexByteArrayLifted arr pos :: x))
-  writeByteArrayLifted val arr pos = let !x = fromIntegral (unViaFromIntegral val) :: x in writeByteArrayLifted x arr pos
+import Dahdit.LiftedPrim (LiftedPrim (..), ViaFromIntegral (..))
 
 newtype Word16LE = Word16LE { unWord16LE :: Word16 }
   deriving stock (Show)
@@ -66,12 +46,14 @@ unMkWord16LE (Word16LE w) =
   in (b0, b1)
 
 instance LiftedPrim Word16LE where
-  indexByteArrayLifted arr pos =
+  elemSizeLifted _ = 2
+
+  indexByteArrayLiftedInBytes arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
     in mkWord16LE b0 b1
 
-  writeByteArrayLifted w arr pos =
+  writeByteArrayLiftedInBytes w arr pos =
     let !(b0, b1) = unMkWord16LE w
     in writeByteArray arr pos b0 *> writeByteArray arr (pos + 1) b1
 
@@ -90,13 +72,36 @@ newtype Word24LE = Word24LE { unWord24LE :: Word24 }
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
 
--- TODO add prim instance
+mkWord24LE :: Word8 -> Word8 -> Word8 -> Word24LE
+mkWord24LE b0 b1 b2 =
+  let !(Word32LE w) = mkWord32LE b0 b1 b2 0
+  in Word24LE (fromIntegral w)
+
+unMkWord24LE :: Word24LE -> (Word8, Word8, Word8)
+unMkWord24LE (Word24LE w) =
+  let !v = fromIntegral w
+      (b0, b1, b2, _) = unMkWord32LE (Word32LE v)
+  in (b0, b1, b2)
+
+instance LiftedPrim Word24LE where
+  elemSizeLifted _ = 3
+
+  indexByteArrayLiftedInBytes arr pos =
+    let !b0 = indexByteArray arr pos
+        !b1 = indexByteArray arr (pos + 1)
+        !b2 = indexByteArray arr (pos + 2)
+    in mkWord24LE b0 b1 b2
+
+  writeByteArrayLiftedInBytes f arr pos = do
+    let !(b0, b1, b2) = unMkWord24LE f
+    writeByteArray arr pos b0
+    writeByteArray arr (pos + 1) b1
+    writeByteArray arr (pos + 2) b2
 
 newtype Int24LE = Int24LE { unInt24LE :: Int24 }
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
-
--- TODO add prim instance
+  deriving (LiftedPrim) via (ViaFromIntegral Word24LE Int24LE)
 
 newtype Word32LE = Word32LE { unWord32LE :: Word32 }
   deriving stock (Show)
@@ -123,14 +128,16 @@ unMkWord32LE (Word32LE w) =
   in (b0, b1, b2, b3)
 
 instance LiftedPrim Word32LE where
-  indexByteArrayLifted arr pos =
+  elemSizeLifted _ = 4
+
+  indexByteArrayLiftedInBytes arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
         !b3 = indexByteArray arr (pos + 3)
     in mkWord32LE b0 b1 b2 b3
 
-  writeByteArrayLifted w arr pos = do
+  writeByteArrayLiftedInBytes w arr pos = do
     let !(b0, b1, b2, b3) = unMkWord32LE w
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1
@@ -170,14 +177,16 @@ unMkFloatLE (FloatLE f) =
   in unMkWord32LE (Word32LE w)
 
 instance LiftedPrim FloatLE where
-  indexByteArrayLifted arr pos =
+  elemSizeLifted _ = 4
+
+  indexByteArrayLiftedInBytes arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
         !b3 = indexByteArray arr (pos + 3)
     in mkFloatLE b0 b1 b2 b3
 
-  writeByteArrayLifted f arr pos = do
+  writeByteArrayLiftedInBytes f arr pos = do
     let !(b0, b1, b2, b3) = unMkFloatLE f
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1

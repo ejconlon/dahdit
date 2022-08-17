@@ -15,12 +15,12 @@ module Dahdit.Free
   ) where
 
 import Control.Monad.Free.Church (F (..))
-import Dahdit.Nums (FloatLE, Int16LE, Int32LE, Word16LE, Word32LE)
-import Dahdit.Proxy (Proxy (..))
+import Dahdit.Nums (FloatLE, Int16LE, Int32LE, Word16LE, Word32LE, Int24LE, Word24LE)
+import Data.Proxy (Proxy (..))
 import Dahdit.Sizes (ByteCount, ElementCount, StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import Data.Int (Int8)
-import Data.Primitive (Prim)
+import Data.Primitive (Prim, ByteArray)
 import Data.Primitive.PrimArray (PrimArray)
 import Data.Sequence (Seq)
 import Data.Word (Word8)
@@ -59,12 +59,15 @@ data GetF a =
   | GetFInt8 (Int8 -> a)
   | GetFWord16LE (Word16LE -> a)
   | GetFInt16LE (Int16LE -> a)
+  | GetFWord24LE (Word24LE -> a)
+  | GetFInt24LE (Int24LE -> a)
   | GetFWord32LE (Word32LE -> a)
   | GetFInt32LE (Int32LE -> a)
   | GetFFloatLE (FloatLE -> a)
   | GetFShortByteString !ByteCount (ShortByteString -> a)
   | GetFStaticSeq !(GetStaticSeqF a)
   | GetFStaticArray !(GetStaticArrayF a)
+  | GetFByteArray !ByteCount (ByteArray -> a)
   | GetFScope !(GetScopeF a)
   | GetFSkip !ByteCount a
   | GetFLookAhead !(GetLookAheadF a)
@@ -101,12 +104,15 @@ data PutF a =
   | PutFInt8 !Int8 a
   | PutFWord16LE !Word16LE a
   | PutFInt16LE !Int16LE a
+  | PutFWord24LE !Word24LE a
+  | PutFInt24LE !Int24LE a
   | PutFWord32LE !Word32LE a
   | PutFInt32LE !Int32LE a
   | PutFFloatLE !FloatLE a
   | PutFShortByteString !ByteCount !ShortByteString a
   | PutFStaticSeq !(PutStaticSeqF a)
   | PutFStaticArray !(PutStaticArrayF a)
+  | PutFByteArray !ByteCount !ByteArray a
   | PutFStaticHint !(PutStaticHintF a)
   deriving stock (Functor)
 
