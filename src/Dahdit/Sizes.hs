@@ -9,6 +9,7 @@ module Dahdit.Sizes
   , staticByteSizeFoldable
   ) where
 
+import Dahdit.LiftedPrim (LiftedPrim, LiftedPrimArray, sizeofLiftedPrimArray)
 import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE,
                     Word24BE, Word24LE, Word32BE, Word32LE)
 import Dahdit.Proxy (proxyFor, proxyForF)
@@ -110,6 +111,12 @@ instance (StaticByteSized a, Prim a) => ByteSized (PrimArray a) where
   byteSize pa =
     let !elen = staticByteSize (Proxy :: Proxy a)
         !alen = fromIntegral (sizeofPrimArray pa)
+    in elen * alen
+
+instance (StaticByteSized a, LiftedPrim a) => ByteSized (LiftedPrimArray a) where
+  byteSize pa =
+    let !elen = staticByteSize (Proxy :: Proxy a)
+        !alen = fromIntegral (sizeofLiftedPrimArray pa)
     in elen * alen
 
 class ByteSized a => StaticByteSized a where

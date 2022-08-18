@@ -2,6 +2,7 @@ module Dahdit.LiftedPrim
   ( LiftedPrim (..)
   , LiftedPrimArray (..)
   , MutableLiftedPrimArray (..)
+  , emptyLiftedPrimArray
   , indexLiftedPrimArray
   , writeLiftedPrimArray
   , freezeLiftedPrimArray
@@ -19,8 +20,8 @@ import Dahdit.Internal (ViaFromIntegral (..))
 import Dahdit.Proxy (proxyForF)
 import Data.Foldable (for_)
 import Data.Int (Int8)
-import Data.Primitive.ByteArray (ByteArray, MutableByteArray, freezeByteArray, indexByteArray, newByteArray,
-                                 runByteArray, sizeofByteArray, thawByteArray, unsafeFreezeByteArray,
+import Data.Primitive.ByteArray (ByteArray, MutableByteArray, emptyByteArray, freezeByteArray, indexByteArray,
+                                 newByteArray, runByteArray, sizeofByteArray, thawByteArray, unsafeFreezeByteArray,
                                  unsafeThawByteArray, writeByteArray)
 import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
@@ -65,6 +66,9 @@ newtype LiftedPrimArray a = LiftedPrimArray { unLiftedPrimArray :: ByteArray }
 
 newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray { unMutableLiftedPrimArray :: MutableByteArray m }
   deriving newtype (Eq)
+
+emptyLiftedPrimArray :: LiftedPrimArray a
+emptyLiftedPrimArray = LiftedPrimArray emptyByteArray
 
 indexLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int -> a
 indexLiftedPrimArray (LiftedPrimArray arr) = indexByteArrayLiftedInElems arr

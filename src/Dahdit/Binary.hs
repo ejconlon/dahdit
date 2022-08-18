@@ -4,10 +4,12 @@ module Dahdit.Binary
   ) where
 
 import Dahdit.Free (Get, Put)
-import Dahdit.Funs (getFloatLE, getInt16LE, getInt24LE, getInt32LE, getInt8, getWord16LE, getWord24LE, getWord32LE,
-                    getWord8, putFloatLE, putInt16LE, putInt24LE, putInt32LE, putInt8, putWord16LE, putWord24LE,
-                    putWord32LE, putWord8)
-import Dahdit.Nums (FloatLE, Int16LE, Int24LE, Int32LE, Word16LE, Word24LE, Word32LE)
+import Dahdit.Funs (getFloatBE, getFloatLE, getInt16BE, getInt16LE, getInt24BE, getInt24LE, getInt32BE, getInt32LE,
+                    getInt8, getWord16BE, getWord16LE, getWord24BE, getWord24LE, getWord32BE, getWord32LE, getWord8,
+                    putFloatBE, putFloatLE, putInt16BE, putInt16LE, putInt24BE, putInt24LE, putInt32BE, putInt32LE,
+                    putInt8, putWord16BE, putWord16LE, putWord24BE, putWord24LE, putWord32BE, putWord32LE, putWord8)
+import Dahdit.Nums (FloatBE (..), FloatLE, Int16BE (..), Int16LE, Int24BE (..), Int24LE, Int32BE (..), Int32LE,
+                    Word16BE (..), Word16LE, Word24BE (..), Word24LE, Word32BE (..), Word32LE)
 import Dahdit.Run (runCount)
 import Dahdit.Sizes (ByteCount, ByteSized)
 import Data.Int (Int8)
@@ -60,30 +62,30 @@ instance Binary FloatLE where
   get = getFloatLE
   put = putFloatLE
 
--- instance Binary Word16BE where
---   get = getWord16BE
---   put = putWord16BE
+instance Binary Word16BE where
+  get = getWord16BE
+  put = putWord16BE
 
--- instance Binary Int16BE where
---   get = getInt16BE
---   put = putInt16BE
+instance Binary Int16BE where
+  get = getInt16BE
+  put = putInt16BE
 
--- instance Binary Word24BE where
---   get = getWord24BE
---   put = putWord24BE
+instance Binary Word24BE where
+  get = getWord24BE
+  put = putWord24BE
 
--- instance Binary Int24BE where
---   get = getInt24BE
---   put = putInt24BE
+instance Binary Int24BE where
+  get = getInt24BE
+  put = putInt24BE
 
--- instance Binary Word32BE where
---   get = getWord32BE
---   put = putWord32BE
+instance Binary Word32BE where
+  get = getWord32BE
+  put = putWord32BE
 
--- instance Binary Int32BE where
---   get = getInt32BE
---   put = putInt32BE
+instance Binary Int32BE where
+  get = getInt32BE
+  put = putInt32BE
 
--- instance Binary FloatBE where
---   get = getFloatBE
---   put = putFloatBE
+instance Binary FloatBE where
+  get = getFloatBE
+  put = putFloatBE
