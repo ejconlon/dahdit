@@ -18,6 +18,7 @@ module Dahdit.LiftedPrim
 import Control.Monad.Primitive (PrimMonad (..))
 import Dahdit.Internal (ViaFromIntegral (..))
 import Dahdit.Proxy (proxyForF)
+import Data.Default (Default (..))
 import Data.Foldable (for_)
 import Data.Int (Int8)
 import Data.Primitive.ByteArray (ByteArray, MutableByteArray, emptyByteArray, freezeByteArray, indexByteArray,
@@ -62,7 +63,10 @@ instance (Num x, Integral x, LiftedPrim x, Num y, Integral y) => LiftedPrim (Via
 
 newtype LiftedPrimArray a = LiftedPrimArray { unLiftedPrimArray :: ByteArray }
   deriving stock (Show)
-  deriving newtype (Eq)
+  deriving newtype (Eq, Semigroup, Monoid)
+
+instance Default (LiftedPrimArray a) where
+  def = emptyLiftedPrimArray
 
 newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray { unMutableLiftedPrimArray :: MutableByteArray m }
   deriving newtype (Eq)
