@@ -4,9 +4,10 @@ module Dahdit.Binary
   ) where
 
 import Dahdit.Free (Get, Put)
-import Dahdit.Funs (getFloatLE, getInt16LE, getInt32LE, getInt8, getWord16LE, getWord32LE, getWord8, putFloatLE,
-                    putInt16LE, putInt32LE, putInt8, putWord16LE, putWord32LE, putWord8, getWord24LE, putWord24LE, getInt24LE, putInt24LE)
-import Dahdit.Nums (FloatLE, Int16LE, Int32LE, Word16LE, Word32LE, Int24LE, Word24LE)
+import Dahdit.Funs (getFloatLE, getInt16LE, getInt24LE, getInt32LE, getInt8, getWord16LE, getWord24LE, getWord32LE,
+                    getWord8, putFloatLE, putInt16LE, putInt24LE, putInt32LE, putInt8, putWord16LE, putWord24LE,
+                    putWord32LE, putWord8)
+import Dahdit.Nums (FloatLE, Int16LE, Int24LE, Int32LE, Word16LE, Word24LE, Word32LE)
 import Dahdit.Run (runCount)
 import Dahdit.Sizes (ByteCount, ByteSized)
 import Data.Int (Int8)

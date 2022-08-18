@@ -51,21 +51,21 @@ import Control.Monad.Free.Church (F (..))
 import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), GetStaticArrayF (..), GetStaticSeqF (..),
                     Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
                     ScopeMode (..))
-import Dahdit.Nums (FloatLE, Int16LE, Int32LE, Word16LE, Word32LE, Word24LE, Int24LE)
-import Data.Proxy (Proxy (..))
+import Dahdit.LiftedPrim (LiftedPrim (..), PrimArrayLifted (..))
+import Dahdit.Nums (FloatLE, Int16LE, Int24LE, Int32LE, Word16LE, Word24LE, Word32LE)
 import Dahdit.Proxy (proxyForF, proxyForFun)
 import Dahdit.Sizes (ByteCount (..), ElementCount (..), StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Foldable (traverse_)
 import Data.Int (Int8)
-import Data.Primitive (Prim, sizeofPrimArray, sizeofByteArray)
+import Data.Primitive (Prim, sizeofByteArray, sizeofPrimArray)
+import Data.Primitive.ByteArray (ByteArray)
 import Data.Primitive.PrimArray (PrimArray)
+import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Word (Word8)
-import Data.Primitive.ByteArray (ByteArray)
-import Dahdit.LiftedPrim (PrimArrayLifted (..), LiftedPrim (..))
 
 getWord8 :: Get Word8
 getWord8 = Get (F (\x y -> y (GetFWord8 x)))

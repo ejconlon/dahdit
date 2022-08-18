@@ -7,8 +7,8 @@ module Dahdit.BinaryRep
   ) where
 
 import Dahdit.Binary (Binary (..))
-import Data.Proxy (Proxy (..))
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
+import Data.Proxy (Proxy (..))
 
 class Binary x => BinaryRep x a | a -> x where
   fromBinaryRep :: x -> Either String a

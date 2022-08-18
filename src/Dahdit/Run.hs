@@ -22,7 +22,8 @@ import Control.Monad.Trans.Maybe (MaybeT (..))
 import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), GetStaticArrayF (..), GetStaticSeqF (..),
                     Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
                     ScopeMode (..))
-import Dahdit.Nums (FloatLE, Int16LE (..), Int32LE, Word16LE (..), Word32LE, Int24LE, Word24LE)
+import Dahdit.LiftedPrim (LiftedPrim (..))
+import Dahdit.Nums (FloatLE, Int16LE (..), Int24LE, Int32LE, Word16LE (..), Word24LE, Word32LE)
 import Dahdit.Proxy (proxyForF)
 import Dahdit.Sizes (ByteCount (..), staticByteSize)
 import qualified Data.ByteString.Short as BSS
@@ -36,7 +37,6 @@ import Data.Primitive.PrimArray (PrimArray (..), sizeofPrimArray)
 import qualified Data.Sequence as Seq
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import Data.Word (Word8)
-import Dahdit.LiftedPrim (LiftedPrim(..))
 
 -- Sizes:
 

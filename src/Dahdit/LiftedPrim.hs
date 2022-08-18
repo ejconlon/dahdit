@@ -11,14 +11,16 @@ module Dahdit.LiftedPrim
   , primArrayLiftedFromList
   ) where
 
-import Data.Primitive.ByteArray (MutableByteArray, ByteArray, indexByteArray, writeByteArray, freezeByteArray, thawByteArray, unsafeFreezeByteArray, unsafeThawByteArray, newByteArray, runByteArray)
-import Control.Monad.Primitive (PrimMonad(..))
+import Control.Monad.Primitive (PrimMonad (..))
+import Dahdit.Internal (ViaFromIntegral (..))
+import Dahdit.Proxy (proxyForF)
+import Data.Foldable (for_)
 import Data.Int (Int8)
+import Data.Primitive.ByteArray (ByteArray, MutableByteArray, freezeByteArray, indexByteArray, newByteArray,
+                                 runByteArray, thawByteArray, unsafeFreezeByteArray, unsafeThawByteArray,
+                                 writeByteArray)
 import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
-import Data.Foldable (for_)
-import Dahdit.Proxy (proxyForF)
-import Dahdit.Internal (ViaFromIntegral (..))
 import Data.Word (Word8)
 
 class LiftedPrim a where

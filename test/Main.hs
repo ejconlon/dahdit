@@ -2,11 +2,12 @@ module Main (main) where
 
 import Dahdit (Binary (..), BoolByte (BoolByte), ByteCount, ByteSized (..), FloatLE (..), Generic, Get, Int16LE,
                Int32LE, Int8, Proxy (..), Put, ShortByteString, StaticByteSized (..), ViaGeneric (..),
-               ViaStaticGeneric (..), Word16LE, Word32LE, Word8, getByteString, getExact, getFloatLE, getInt16LE,
-               getInt32LE, getInt8, getLookAhead, getRemainingSize, getSeq, getSkip, getStaticArray, getStaticSeq,
-               getWithin, getWord16LE, getWord32LE, getWord8, putByteString, putFloatLE, putInt16LE, putInt32LE,
-               putInt8, putSeq, putStaticArray, putStaticSeq, putWord16LE, putWord32LE, putWord8, runCount, runGet,
-               runPut, getWord24LE, getInt24LE, putWord24LE, putInt24LE, getByteArray, putByteArray, primArrayLiftedFromList, putPrimArrayLifted, getPrimArrayLifted)
+               ViaStaticGeneric (..), Word16LE, Word32LE, Word8, getByteArray, getByteString, getExact, getFloatLE,
+               getInt16LE, getInt24LE, getInt32LE, getInt8, getLookAhead, getPrimArrayLifted, getRemainingSize, getSeq,
+               getSkip, getStaticArray, getStaticSeq, getWithin, getWord16LE, getWord24LE, getWord32LE, getWord8,
+               primArrayLiftedFromList, putByteArray, putByteString, putFloatLE, putInt16LE, putInt24LE, putInt32LE,
+               putInt8, putPrimArrayLifted, putSeq, putStaticArray, putStaticSeq, putWord16LE, putWord24LE, putWord32LE,
+               putWord8, runCount, runGet, runPut)
 import qualified Data.ByteString.Short as BSS
 import Data.Primitive.ByteArray (byteArrayFromList)
 import Data.Primitive.PrimArray (primArrayFromList)

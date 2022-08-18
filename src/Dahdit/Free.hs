@@ -15,13 +15,13 @@ module Dahdit.Free
   ) where
 
 import Control.Monad.Free.Church (F (..))
-import Dahdit.Nums (FloatLE, Int16LE, Int32LE, Word16LE, Word32LE, Int24LE, Word24LE)
-import Data.Proxy (Proxy (..))
+import Dahdit.Nums (FloatLE, Int16LE, Int24LE, Int32LE, Word16LE, Word24LE, Word32LE)
 import Dahdit.Sizes (ByteCount, ElementCount, StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import Data.Int (Int8)
-import Data.Primitive (Prim, ByteArray)
+import Data.Primitive (ByteArray, Prim)
 import Data.Primitive.PrimArray (PrimArray)
+import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq)
 import Data.Word (Word8)
 
