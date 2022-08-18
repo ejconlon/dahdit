@@ -31,6 +31,8 @@ module Dahdit.Funs
   , getRemainingSeq
   , getRemainingStaticSeq
   , getRemainingStaticArray
+  , getRemainingByteArray
+  , getRemainingPrimArrayLifted
   , getUnfold
   , putWord8
   , putInt8
@@ -208,6 +210,20 @@ getRemainingStaticArray prox = do
       let !ec = fromIntegral (div bc ebc)
       getStaticArray ec
     else fail ("Leftover bytes for remaining static array (have " ++ show (unByteCount left) ++ ", need " ++ show (unByteCount ebc) ++ ")")
+
+getRemainingByteArray :: Get ByteArray
+getRemainingByteArray = getRemainingSize >>= getByteArray
+
+getRemainingPrimArrayLifted :: (LiftedPrim a) => Proxy a -> Get (PrimArrayLifted a)
+getRemainingPrimArrayLifted prox = do
+  let !ebc = fromIntegral (elemSizeLifted prox)
+  bc <- getRemainingSize
+  let !left = rem bc ebc
+  if left == 0
+    then do
+      let !ec = fromIntegral (div bc ebc)
+      getPrimArrayLifted prox ec
+    else fail ("Leftover bytes for remaining lifted prim array (have " ++ show (unByteCount left) ++ ", need " ++ show (unByteCount ebc) ++ ")")
 
 getExpect :: (Eq a, Show a) => String -> Get a -> a -> Get ()
 getExpect typ getter expec = do
