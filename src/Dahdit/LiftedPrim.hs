@@ -8,7 +8,10 @@ module Dahdit.LiftedPrim
   , thawPrimArrayLifted
   , unsafeFreezePrimArrayLifted
   , unsafeThawPrimArrayLifted
+  , primArrayLiftedFromListN
   , primArrayLiftedFromList
+  , generatePrimArrayLifted
+  , sizeofPrimArrayLifted
   ) where
 
 import Control.Monad.Primitive (PrimMonad (..))
@@ -17,8 +20,8 @@ import Dahdit.Proxy (proxyForF)
 import Data.Foldable (for_)
 import Data.Int (Int8)
 import Data.Primitive.ByteArray (ByteArray, MutableByteArray, freezeByteArray, indexByteArray, newByteArray,
-                                 runByteArray, thawByteArray, unsafeFreezeByteArray, unsafeThawByteArray,
-                                 writeByteArray)
+                                 runByteArray, sizeofByteArray, thawByteArray, unsafeFreezeByteArray,
+                                 unsafeThawByteArray, writeByteArray)
 import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
 import Data.Word (Word8)
@@ -79,10 +82,10 @@ thawPrimArrayLifted (PrimArrayLifted arr) off len = fmap MutablePrimArrayLifted 
 unsafeThawPrimArrayLifted :: PrimMonad m => PrimArrayLifted a -> m (MutablePrimArrayLifted (PrimState m) a)
 unsafeThawPrimArrayLifted (PrimArrayLifted arr) = fmap MutablePrimArrayLifted (unsafeThawByteArray arr)
 
-primArrayLiftedFromList :: LiftedPrim a => [a] -> PrimArrayLifted a
-primArrayLiftedFromList xs = PrimArrayLifted $ runByteArray $ do
+primArrayLiftedFromListN :: LiftedPrim a => Int -> [a] -> PrimArrayLifted a
+primArrayLiftedFromListN n xs = PrimArrayLifted $ runByteArray $ do
   let !elemSize = elemSizeLifted (proxyForF xs)
-      !len = length xs * elemSize
+      !len = n * elemSize
   arr <- newByteArray len
   offRef <- newSTRef 0
   for_ xs $ \x -> do
@@ -90,3 +93,15 @@ primArrayLiftedFromList xs = PrimArrayLifted $ runByteArray $ do
     writeByteArrayLiftedInBytes x arr off
     modifySTRef' offRef (elemSize+)
   pure arr
+
+primArrayLiftedFromList :: LiftedPrim a => [a] -> PrimArrayLifted a
+primArrayLiftedFromList xs = primArrayLiftedFromListN (length xs) xs
+
+generatePrimArrayLifted :: LiftedPrim a => Int -> (Int -> a) -> PrimArrayLifted a
+generatePrimArrayLifted n f = primArrayLiftedFromListN n (fmap f [0 .. n - 1])
+
+sizeofPrimArrayLifted :: LiftedPrim a => PrimArrayLifted a -> Int
+sizeofPrimArrayLifted pa@(PrimArrayLifted arr) =
+  let !elemSize = elemSizeLifted (proxyForF pa)
+      !arrSize = sizeofByteArray arr
+  in div arrSize elemSize
