@@ -23,7 +23,7 @@ module Dahdit.Funs
   , getStaticSeq
   , getStaticArray
   , getByteArray
-  , getPrimArrayLifted
+  , getLiftedPrimArray
   , getExpect
   , getLookAhead
   , getRemainingSize
@@ -32,7 +32,7 @@ module Dahdit.Funs
   , getRemainingStaticSeq
   , getRemainingStaticArray
   , getRemainingByteArray
-  , getRemainingPrimArrayLifted
+  , getRemainingLiftedPrimArray
   , getUnfold
   , putWord8
   , putInt8
@@ -58,7 +58,7 @@ module Dahdit.Funs
   , putStaticArray
   , unsafePutStaticArrayN
   , putByteArray
-  , putPrimArrayLifted
+  , putLiftedPrimArray
   , putStaticHint
   ) where
 
@@ -67,7 +67,7 @@ import Control.Monad.Free.Church (F (..))
 import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), GetStaticArrayF (..), GetStaticSeqF (..),
                     Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
                     ScopeMode (..))
-import Dahdit.LiftedPrim (LiftedPrim (..), PrimArrayLifted (..))
+import Dahdit.LiftedPrim (LiftedPrim (..), LiftedPrimArray (..))
 import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE,
                     Word24BE, Word24LE, Word32BE, Word32LE)
 import Dahdit.Proxy (proxyForF, proxyForFun)
@@ -165,10 +165,10 @@ getStaticArray n = Get (F (\x y -> y (GetFStaticArray (GetStaticArrayF n (Proxy 
 getByteArray :: ByteCount -> Get ByteArray
 getByteArray bc = Get (F (\x y -> y (GetFByteArray bc x)))
 
-getPrimArrayLifted :: LiftedPrim a => Proxy a -> ElementCount -> Get (PrimArrayLifted a)
-getPrimArrayLifted prox ec =
+getLiftedPrimArray :: LiftedPrim a => Proxy a -> ElementCount -> Get (LiftedPrimArray a)
+getLiftedPrimArray prox ec =
   let !bc = fromIntegral (elemSizeLifted prox * fromIntegral ec)
-  in fmap PrimArrayLifted (getByteArray bc)
+  in fmap LiftedPrimArray (getByteArray bc)
 
 getLookAhead :: Get a -> Get a
 getLookAhead g = Get (F (\x y -> y (GetFLookAhead (GetLookAheadF g x))))
@@ -214,15 +214,15 @@ getRemainingStaticArray prox = do
 getRemainingByteArray :: Get ByteArray
 getRemainingByteArray = getRemainingSize >>= getByteArray
 
-getRemainingPrimArrayLifted :: (LiftedPrim a) => Proxy a -> Get (PrimArrayLifted a)
-getRemainingPrimArrayLifted prox = do
+getRemainingLiftedPrimArray :: (LiftedPrim a) => Proxy a -> Get (LiftedPrimArray a)
+getRemainingLiftedPrimArray prox = do
   let !ebc = fromIntegral (elemSizeLifted prox)
   bc <- getRemainingSize
   let !left = rem bc ebc
   if left == 0
     then do
       let !ec = fromIntegral (div bc ebc)
-      getPrimArrayLifted prox ec
+      getLiftedPrimArray prox ec
     else fail ("Leftover bytes for remaining lifted prim array (have " ++ show (unByteCount left) ++ ", need " ++ show (unByteCount ebc) ++ ")")
 
 getExpect :: (Eq a, Show a) => String -> Get a -> a -> Get ()
@@ -328,8 +328,8 @@ putByteArray arr =
   let !bc = fromIntegral (sizeofByteArray arr)
   in PutM (F (\x y -> y (PutFByteArray bc arr (x ()))))
 
-putPrimArrayLifted :: PrimArrayLifted a -> Put
-putPrimArrayLifted = putByteArray . unPrimArrayLifted
+putLiftedPrimArray :: LiftedPrimArray a -> Put
+putLiftedPrimArray = putByteArray . unLiftedPrimArray
 
 putStaticHint :: StaticByteSized a => (a -> Put) -> a -> Put
 putStaticHint p =

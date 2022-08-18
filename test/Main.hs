@@ -4,10 +4,10 @@ import Dahdit (Binary (..), BoolByte (BoolByte), ByteCount, ByteSized (..), Floa
                Int16LE, Int32LE, Int8, Proxy (..), Put, ShortByteString, StaticByteSized (..), ViaGeneric (..),
                ViaStaticGeneric (..), Word16LE, Word32LE, Word8, getByteArray, getByteString, getExact, getFloatBE,
                getFloatLE, getInt16BE, getInt16LE, getInt24BE, getInt24LE, getInt32BE, getInt32LE, getInt8,
-               getLookAhead, getPrimArrayLifted, getRemainingSize, getSeq, getSkip, getStaticArray, getStaticSeq,
+               getLiftedPrimArray, getLookAhead, getRemainingSize, getSeq, getSkip, getStaticArray, getStaticSeq,
                getWithin, getWord16BE, getWord16LE, getWord24BE, getWord24LE, getWord32BE, getWord32LE, getWord8,
-               primArrayLiftedFromList, putByteArray, putByteString, putFloatBE, putFloatLE, putInt16BE, putInt16LE,
-               putInt24BE, putInt24LE, putInt32BE, putInt32LE, putInt8, putPrimArrayLifted, putSeq, putStaticArray,
+               liftedPrimArrayFromList, putByteArray, putByteString, putFloatBE, putFloatLE, putInt16BE, putInt16LE,
+               putInt24BE, putInt24LE, putInt32BE, putInt32LE, putInt8, putLiftedPrimArray, putSeq, putStaticArray,
                putStaticSeq, putWord16BE, putWord16LE, putWord24BE, putWord24LE, putWord32BE, putWord32LE, putWord8,
                runCount, runGet, runPut)
 import qualified Data.ByteString.Short as BSS
@@ -120,7 +120,7 @@ testDahditGet = testGroup "get"
   , testCase "BoolByte True" (runGetCase (get @BoolByte) (Just (1, 0, BoolByte True)) [0x01])
   , testCase "BoolByte False" (runGetCase (get @BoolByte) (Just (1, 0, BoolByte False)) [0x00])
   , testCase "getByteArray" (runGetCase (getByteArray 3) (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC, 0x5D])
-  , testCase "getPrimArrayLifted" (runGetCase (getPrimArrayLifted (Proxy :: Proxy Word16LE) 3) (Just (6, 1, primArrayLiftedFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D])
+  , testCase "getLiftedPrimArray" (runGetCase (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D])
   ]
 
 testDahditPut :: TestTree
@@ -152,7 +152,7 @@ testDahditPut = testGroup "put"
   , testCase "BoolByte True" (runPutCase (put (BoolByte True)) [0x01])
   , testCase "BoolByte False" (runPutCase (put (BoolByte False)) [0x00])
   , testCase "putByteArray" (runPutCase (putByteArray (byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC])
-  , testCase "putPrimArrayLifted" (runPutCase (putPrimArrayLifted (primArrayLiftedFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00])
+  , testCase "putLiftedPrimArray" (runPutCase (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00])
   ]
 
 testDahdit :: TestTree

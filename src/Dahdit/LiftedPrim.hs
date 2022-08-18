@@ -1,17 +1,17 @@
 module Dahdit.LiftedPrim
   ( LiftedPrim (..)
-  , PrimArrayLifted (..)
-  , MutablePrimArrayLifted (..)
-  , indexPrimArrayLifted
-  , writePrimArrayLifted
-  , freezePrimArrayLifted
-  , thawPrimArrayLifted
-  , unsafeFreezePrimArrayLifted
-  , unsafeThawPrimArrayLifted
-  , primArrayLiftedFromListN
-  , primArrayLiftedFromList
-  , generatePrimArrayLifted
-  , sizeofPrimArrayLifted
+  , LiftedPrimArray (..)
+  , MutableLiftedPrimArray (..)
+  , indexLiftedPrimArray
+  , writeLiftedPrimArray
+  , freezeLiftedPrimArray
+  , thawLiftedPrimArray
+  , unsafeFreezeLiftedPrimArray
+  , unsafeThawLiftedPrimArray
+  , liftedPrimArrayFromListN
+  , liftedPrimArrayFromList
+  , generateLiftedPrimArray
+  , sizeofLiftedPrimArray
   ) where
 
 import Control.Monad.Primitive (PrimMonad (..))
@@ -26,6 +26,8 @@ import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
 import Data.Word (Word8)
 
+-- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
+-- It's all about reading and writing structures from byte arrays.
 class LiftedPrim a where
   elemSizeLifted :: Proxy a -> Int
   indexByteArrayLiftedInBytes :: ByteArray -> Int -> a
@@ -57,33 +59,33 @@ instance (Num x, Integral x, LiftedPrim x, Num y, Integral y) => LiftedPrim (Via
   indexByteArrayLiftedInBytes arr pos = ViaFromIntegral (fromIntegral (indexByteArrayLiftedInBytes arr pos :: x))
   writeByteArrayLiftedInBytes val arr pos = let !x = fromIntegral (unViaFromIntegral val) :: x in writeByteArrayLiftedInBytes x arr pos
 
-newtype PrimArrayLifted a = PrimArrayLifted { unPrimArrayLifted :: ByteArray }
+newtype LiftedPrimArray a = LiftedPrimArray { unLiftedPrimArray :: ByteArray }
   deriving stock (Show)
   deriving newtype (Eq)
 
-newtype MutablePrimArrayLifted m a = MutablePrimArrayLifted { unMutablePrimArrayLifted :: MutableByteArray m }
+newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray { unMutableLiftedPrimArray :: MutableByteArray m }
   deriving newtype (Eq)
 
-indexPrimArrayLifted :: LiftedPrim a => PrimArrayLifted a -> Int -> a
-indexPrimArrayLifted (PrimArrayLifted arr) = indexByteArrayLiftedInElems arr
+indexLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int -> a
+indexLiftedPrimArray (LiftedPrimArray arr) = indexByteArrayLiftedInElems arr
 
-writePrimArrayLifted :: (LiftedPrim a, PrimMonad m) => a -> MutablePrimArrayLifted (PrimState m) a -> Int -> m ()
-writePrimArrayLifted val (MutablePrimArrayLifted arr) = writeByteArrayLiftedInElems val arr
+writeLiftedPrimArray :: (LiftedPrim a, PrimMonad m) => a -> MutableLiftedPrimArray (PrimState m) a -> Int -> m ()
+writeLiftedPrimArray val (MutableLiftedPrimArray arr) = writeByteArrayLiftedInElems val arr
 
-freezePrimArrayLifted :: PrimMonad m => MutablePrimArrayLifted (PrimState m) a -> Int -> Int -> m (PrimArrayLifted a)
-freezePrimArrayLifted (MutablePrimArrayLifted arr) off len = fmap PrimArrayLifted (freezeByteArray arr off len)
+freezeLiftedPrimArray :: PrimMonad m => MutableLiftedPrimArray (PrimState m) a -> Int -> Int -> m (LiftedPrimArray a)
+freezeLiftedPrimArray (MutableLiftedPrimArray arr) off len = fmap LiftedPrimArray (freezeByteArray arr off len)
 
-unsafeFreezePrimArrayLifted :: PrimMonad m => MutablePrimArrayLifted (PrimState m) a -> m (PrimArrayLifted a)
-unsafeFreezePrimArrayLifted (MutablePrimArrayLifted arr) = fmap PrimArrayLifted (unsafeFreezeByteArray arr)
+unsafeFreezeLiftedPrimArray :: PrimMonad m => MutableLiftedPrimArray (PrimState m) a -> m (LiftedPrimArray a)
+unsafeFreezeLiftedPrimArray (MutableLiftedPrimArray arr) = fmap LiftedPrimArray (unsafeFreezeByteArray arr)
 
-thawPrimArrayLifted :: PrimMonad m => PrimArrayLifted a -> Int -> Int -> m (MutablePrimArrayLifted (PrimState m) a)
-thawPrimArrayLifted (PrimArrayLifted arr) off len = fmap MutablePrimArrayLifted (thawByteArray arr off len)
+thawLiftedPrimArray :: PrimMonad m => LiftedPrimArray a -> Int -> Int -> m (MutableLiftedPrimArray (PrimState m) a)
+thawLiftedPrimArray (LiftedPrimArray arr) off len = fmap MutableLiftedPrimArray (thawByteArray arr off len)
 
-unsafeThawPrimArrayLifted :: PrimMonad m => PrimArrayLifted a -> m (MutablePrimArrayLifted (PrimState m) a)
-unsafeThawPrimArrayLifted (PrimArrayLifted arr) = fmap MutablePrimArrayLifted (unsafeThawByteArray arr)
+unsafeThawLiftedPrimArray :: PrimMonad m => LiftedPrimArray a -> m (MutableLiftedPrimArray (PrimState m) a)
+unsafeThawLiftedPrimArray (LiftedPrimArray arr) = fmap MutableLiftedPrimArray (unsafeThawByteArray arr)
 
-primArrayLiftedFromListN :: LiftedPrim a => Int -> [a] -> PrimArrayLifted a
-primArrayLiftedFromListN n xs = PrimArrayLifted $ runByteArray $ do
+liftedPrimArrayFromListN :: LiftedPrim a => Int -> [a] -> LiftedPrimArray a
+liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
   let !elemSize = elemSizeLifted (proxyForF xs)
       !len = n * elemSize
   arr <- newByteArray len
@@ -94,14 +96,14 @@ primArrayLiftedFromListN n xs = PrimArrayLifted $ runByteArray $ do
     modifySTRef' offRef (elemSize+)
   pure arr
 
-primArrayLiftedFromList :: LiftedPrim a => [a] -> PrimArrayLifted a
-primArrayLiftedFromList xs = primArrayLiftedFromListN (length xs) xs
+liftedPrimArrayFromList :: LiftedPrim a => [a] -> LiftedPrimArray a
+liftedPrimArrayFromList xs = liftedPrimArrayFromListN (length xs) xs
 
-generatePrimArrayLifted :: LiftedPrim a => Int -> (Int -> a) -> PrimArrayLifted a
-generatePrimArrayLifted n f = primArrayLiftedFromListN n (fmap f [0 .. n - 1])
+generateLiftedPrimArray :: LiftedPrim a => Int -> (Int -> a) -> LiftedPrimArray a
+generateLiftedPrimArray n f = liftedPrimArrayFromListN n (fmap f [0 .. n - 1])
 
-sizeofPrimArrayLifted :: LiftedPrim a => PrimArrayLifted a -> Int
-sizeofPrimArrayLifted pa@(PrimArrayLifted arr) =
+sizeofLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int
+sizeofLiftedPrimArray pa@(LiftedPrimArray arr) =
   let !elemSize = elemSizeLifted (proxyForF pa)
       !arrSize = sizeofByteArray arr
   in div arrSize elemSize
