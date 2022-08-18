@@ -8,6 +8,13 @@ module Dahdit.Funs
   , getWord32LE
   , getInt32LE
   , getFloatLE
+  , getWord16BE
+  , getInt16BE
+  , getWord24BE
+  , getInt24BE
+  , getWord32BE
+  , getInt32BE
+  , getFloatBE
   , getByteString
   , getSkip
   , getExact
@@ -34,6 +41,13 @@ module Dahdit.Funs
   , putWord32LE
   , putInt32LE
   , putFloatLE
+  , putWord16BE
+  , putInt16BE
+  , putWord24BE
+  , putInt24BE
+  , putWord32BE
+  , putInt32BE
+  , putFloatBE
   , putByteString
   , putFixedString
   , putSeq
@@ -52,7 +66,8 @@ import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), Get
                     Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
                     ScopeMode (..))
 import Dahdit.LiftedPrim (LiftedPrim (..), PrimArrayLifted (..))
-import Dahdit.Nums (FloatLE, Int16LE, Int24LE, Int32LE, Word16LE, Word24LE, Word32LE)
+import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE,
+                    Word24BE, Word24LE, Word32BE, Word32LE)
 import Dahdit.Proxy (proxyForF, proxyForFun)
 import Dahdit.Sizes (ByteCount (..), ElementCount (..), StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
@@ -93,6 +108,27 @@ getInt32LE = Get (F (\x y -> y (GetFInt32LE x)))
 
 getFloatLE :: Get FloatLE
 getFloatLE = Get (F (\x y -> y (GetFFloatLE x)))
+
+getWord16BE :: Get Word16BE
+getWord16BE = Get (F (\x y -> y (GetFWord16BE x)))
+
+getInt16BE :: Get Int16BE
+getInt16BE = Get (F (\x y -> y (GetFInt16BE x)))
+
+getWord24BE :: Get Word24BE
+getWord24BE = Get (F (\x y -> y (GetFWord24BE x)))
+
+getInt24BE :: Get Int24BE
+getInt24BE = Get (F (\x y -> y (GetFInt24BE x)))
+
+getWord32BE :: Get Word32BE
+getWord32BE = Get (F (\x y -> y (GetFWord32BE x)))
+
+getInt32BE :: Get Int32BE
+getInt32BE = Get (F (\x y -> y (GetFInt32BE x)))
+
+getFloatBE :: Get FloatBE
+getFloatBE = Get (F (\x y -> y (GetFFloatBE x)))
 
 getByteString :: ByteCount -> Get ShortByteString
 getByteString bc = Get (F (\x y -> y (GetFShortByteString bc x)))
@@ -211,6 +247,27 @@ putInt32LE d = PutM (F (\x y -> y (PutFInt32LE d (x ()))))
 
 putFloatLE :: FloatLE -> Put
 putFloatLE d = PutM (F (\x y -> y (PutFFloatLE d (x ()))))
+
+putWord16BE :: Word16BE -> Put
+putWord16BE d = PutM (F (\x y -> y (PutFWord16BE d (x ()))))
+
+putInt16BE :: Int16BE -> Put
+putInt16BE d = PutM (F (\x y -> y (PutFInt16BE d (x ()))))
+
+putWord24BE :: Word24BE -> Put
+putWord24BE d = PutM (F (\x y -> y (PutFWord24BE d (x ()))))
+
+putInt24BE :: Int24BE -> Put
+putInt24BE d = PutM (F (\x y -> y (PutFInt24BE d (x ()))))
+
+putWord32BE :: Word32BE -> Put
+putWord32BE d = PutM (F (\x y -> y (PutFWord32BE d (x ()))))
+
+putInt32BE :: Int32BE -> Put
+putInt32BE d = PutM (F (\x y -> y (PutFInt32BE d (x ()))))
+
+putFloatBE :: FloatBE -> Put
+putFloatBE d = PutM (F (\x y -> y (PutFFloatBE d (x ()))))
 
 putByteString :: ShortByteString -> Put
 putByteString sbs =

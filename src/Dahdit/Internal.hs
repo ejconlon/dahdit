@@ -29,8 +29,12 @@ instance SwapEndian Word16 where
 
 deriving via (ViaFromIntegral Word16 Int16) instance SwapEndian Int16
 
-deriving via (ViaFromIntegral Word32 Word24) instance SwapEndian Word24
-deriving via (ViaFromIntegral Word32 Int24) instance SwapEndian Int24
+instance SwapEndian Word24 where
+  swapEndian w =
+    let (b0, b1, b2) = unMkWord24LE w
+    in mkWord24LE b2 b1 b0
+
+deriving via (ViaFromIntegral Word24 Int24) instance SwapEndian Int24
 
 instance SwapEndian Word32 where
   swapEndian w =

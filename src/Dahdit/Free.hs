@@ -15,7 +15,8 @@ module Dahdit.Free
   ) where
 
 import Control.Monad.Free.Church (F (..))
-import Dahdit.Nums (FloatLE, Int16LE, Int24LE, Int32LE, Word16LE, Word24LE, Word32LE)
+import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE,
+                    Word24BE, Word24LE, Word32BE, Word32LE)
 import Dahdit.Sizes (ByteCount, ElementCount, StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import Data.Int (Int8)
@@ -64,6 +65,13 @@ data GetF a =
   | GetFWord32LE (Word32LE -> a)
   | GetFInt32LE (Int32LE -> a)
   | GetFFloatLE (FloatLE -> a)
+  | GetFWord16BE (Word16BE -> a)
+  | GetFInt16BE (Int16BE -> a)
+  | GetFWord24BE (Word24BE -> a)
+  | GetFInt24BE (Int24BE -> a)
+  | GetFWord32BE (Word32BE -> a)
+  | GetFInt32BE (Int32BE -> a)
+  | GetFFloatBE (FloatBE -> a)
   | GetFShortByteString !ByteCount (ShortByteString -> a)
   | GetFStaticSeq !(GetStaticSeqF a)
   | GetFStaticArray !(GetStaticArrayF a)
@@ -109,6 +117,13 @@ data PutF a =
   | PutFWord32LE !Word32LE a
   | PutFInt32LE !Int32LE a
   | PutFFloatLE !FloatLE a
+  | PutFWord16BE !Word16BE a
+  | PutFInt16BE !Int16BE a
+  | PutFWord24BE !Word24BE a
+  | PutFInt24BE !Int24BE a
+  | PutFWord32BE !Word32BE a
+  | PutFInt32BE !Int32BE a
+  | PutFFloatBE !FloatBE a
   | PutFShortByteString !ByteCount !ShortByteString a
   | PutFStaticSeq !(PutStaticSeqF a)
   | PutFStaticArray !(PutStaticArrayF a)

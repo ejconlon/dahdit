@@ -1,13 +1,15 @@
 module Main (main) where
 
-import Dahdit (Binary (..), BoolByte (BoolByte), ByteCount, ByteSized (..), FloatLE (..), Generic, Get, Int16LE,
-               Int32LE, Int8, Proxy (..), Put, ShortByteString, StaticByteSized (..), ViaGeneric (..),
-               ViaStaticGeneric (..), Word16LE, Word32LE, Word8, getByteArray, getByteString, getExact, getFloatLE,
-               getInt16LE, getInt24LE, getInt32LE, getInt8, getLookAhead, getPrimArrayLifted, getRemainingSize, getSeq,
-               getSkip, getStaticArray, getStaticSeq, getWithin, getWord16LE, getWord24LE, getWord32LE, getWord8,
-               primArrayLiftedFromList, putByteArray, putByteString, putFloatLE, putInt16LE, putInt24LE, putInt32LE,
-               putInt8, putPrimArrayLifted, putSeq, putStaticArray, putStaticSeq, putWord16LE, putWord24LE, putWord32LE,
-               putWord8, runCount, runGet, runPut)
+import Dahdit (Binary (..), BoolByte (BoolByte), ByteCount, ByteSized (..), FloatBE (..), FloatLE (..), Generic, Get,
+               Int16LE, Int32LE, Int8, Proxy (..), Put, ShortByteString, StaticByteSized (..), ViaGeneric (..),
+               ViaStaticGeneric (..), Word16LE, Word32LE, Word8, getByteArray, getByteString, getExact, getFloatBE,
+               getFloatLE, getInt16BE, getInt16LE, getInt24BE, getInt24LE, getInt32BE, getInt32LE, getInt8,
+               getLookAhead, getPrimArrayLifted, getRemainingSize, getSeq, getSkip, getStaticArray, getStaticSeq,
+               getWithin, getWord16BE, getWord16LE, getWord24BE, getWord24LE, getWord32BE, getWord32LE, getWord8,
+               primArrayLiftedFromList, putByteArray, putByteString, putFloatBE, putFloatLE, putInt16BE, putInt16LE,
+               putInt24BE, putInt24LE, putInt32BE, putInt32LE, putInt8, putPrimArrayLifted, putSeq, putStaticArray,
+               putStaticSeq, putWord16BE, putWord16LE, putWord24BE, putWord24LE, putWord32BE, putWord32LE, putWord8,
+               runCount, runGet, runPut)
 import qualified Data.ByteString.Short as BSS
 import Data.Primitive.ByteArray (byteArrayFromList)
 import Data.Primitive.PrimArray (primArrayFromList)
@@ -86,11 +88,18 @@ testDahditGet = testGroup "get"
   , testCase "Word16LE two" (runGetCase getWord16LE (Just (2, 0, 0x5DEC)) [0xEC, 0x5D])
   , testCase "Word16LE three" (runGetCase getWord16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB])
   , testCase "Int16LE" (runGetCase getInt16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB])
+  , testCase "Word16BE" (runGetCase getWord16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB])
+  , testCase "Int16BE" (runGetCase getInt16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB])
   , testCase "Word24LE" (runGetCase getWord24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
   , testCase "Int24LE" (runGetCase getInt24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
+  , testCase "Word24BE" (runGetCase getWord24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D])
+  , testCase "Int24BE" (runGetCase getInt24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D])
   , testCase "Word32LE" (runGetCase getWord32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
   , testCase "Int32LE" (runGetCase getInt32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
+  , testCase "Word32BE" (runGetCase getWord32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD])
+  , testCase "Int32BE" (runGetCase getInt32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD])
   , testCase "FloatLE" (runGetCase getFloatLE (Just (4, 0, FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D])
+  , testCase "FloatBE" (runGetCase getFloatBE (Just (4, 0, FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD])
   , testCase "ShortByteString" (runGetCase (getByteString 2) (Just (2, 1, BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D, 0xBB])
   , testCase "Two Word8" (runGetCase ((,) <$> getWord8 <*> getWord8) (Just (2, 0, (0x5D, 0xBB))) [0x5D, 0xBB])
   , testCase "Two Word16LE" (runGetCase ((,) <$> getWord16LE <*> getWord16LE) (Just (4, 0, (0x5DEC, 0x4020))) [0xEC, 0x5D, 0x20, 0x40])
@@ -120,11 +129,18 @@ testDahditPut = testGroup "put"
   , testCase "Int8" (runPutCase (putInt8 0x5D) [0x5D])
   , testCase "Word16LE" (runPutCase (putWord16LE 0x5DEC) [0xEC, 0x5D])
   , testCase "Int16LE" (runPutCase (putInt16LE 0x5DEC) [0xEC, 0x5D])
+  , testCase "Word16BE" (runPutCase (putWord16BE 0x5DEC) [0x5D, 0xEC])
+  , testCase "Int16BE" (runPutCase (putInt16BE 0x5DEC) [0x5D, 0xEC])
   , testCase "Word24LE" (runPutCase (putWord24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC])
   , testCase "Int24LE" (runPutCase (putInt24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC])
+  , testCase "Word24BE" (runPutCase (putWord24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD])
+  , testCase "Int24BE" (runPutCase (putInt24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD])
   , testCase "Word32LE" (runPutCase (putWord32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D])
   , testCase "Int32LE" (runPutCase (putInt32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D])
+  , testCase "Word32BE" (runPutCase (putWord32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD])
+  , testCase "Int32BE" (runPutCase (putInt32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD])
   , testCase "FloatLE" (runPutCase (putFloatLE (FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D])
+  , testCase "FloatBE" (runPutCase (putFloatBE (FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD])
   , testCase "ShortByteString" (runPutCase (putByteString (BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D])
   , testCase "Two Word8" (runPutCase (putWord8 0x5D *> putWord8 0xBB) [0x5D, 0xBB])
   , testCase "Two Word16LE" (runPutCase (putWord16LE 0x5DEC *> putWord16LE 0x4020) [0xEC, 0x5D, 0x20, 0x40])

@@ -23,7 +23,8 @@ import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), Get
                     Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
                     ScopeMode (..))
 import Dahdit.LiftedPrim (LiftedPrim (..))
-import Dahdit.Nums (FloatLE, Int16LE (..), Int24LE, Int32LE, Word16LE (..), Word24LE, Word32LE)
+import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE (..), Int24BE, Int24LE, Int32BE, Int32LE, Word16BE,
+                    Word16LE (..), Word24BE, Word24LE, Word32BE, Word32LE)
 import Dahdit.Proxy (proxyForF)
 import Dahdit.Sizes (ByteCount (..), staticByteSize)
 import qualified Data.ByteString.Short as BSS
@@ -182,6 +183,13 @@ execGetRun = \case
   GetFWord32LE k -> readBytes "Word32LE" 4 (indexByteArrayLiftedInBytes @Word32LE) >>= k
   GetFInt32LE k -> readBytes "Int32LE" 4 (indexByteArrayLiftedInBytes @Int32LE) >>= k
   GetFFloatLE k -> readBytes "FloatLE" 4 (indexByteArrayLiftedInBytes @FloatLE) >>= k
+  GetFWord16BE k -> readBytes "Word16BE" 2 (indexByteArrayLiftedInBytes @Word16BE) >>= k
+  GetFInt16BE k -> readBytes "Int16BE" 2 (indexByteArrayLiftedInBytes @Int16BE) >>= k
+  GetFWord24BE k -> readBytes "Word24BE" 3 (indexByteArrayLiftedInBytes @Word24BE) >>= k
+  GetFInt24BE k -> readBytes "Int24BE" 3 (indexByteArrayLiftedInBytes @Int24BE) >>= k
+  GetFWord32BE k -> readBytes "Word32BE" 4 (indexByteArrayLiftedInBytes @Word32BE) >>= k
+  GetFInt32BE k -> readBytes "Int32BE" 4 (indexByteArrayLiftedInBytes @Int32BE) >>= k
+  GetFFloatBE k -> readBytes "FloatBE" 4 (indexByteArrayLiftedInBytes @FloatBE) >>= k
   GetFShortByteString bc k ->
     let !len = fromIntegral bc
     in readBytes "ShortByteString" len (readShortByteString len) >>= k
@@ -298,6 +306,13 @@ execPutRun = \case
   PutFWord32LE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
   PutFInt32LE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
   PutFFloatLE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
+  PutFWord16BE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
+  PutFInt16BE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
+  PutFWord24BE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
+  PutFInt24BE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
+  PutFWord32BE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
+  PutFInt32BE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
+  PutFFloatBE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
   PutFShortByteString bc sbs k ->
     let !len = fromIntegral bc
     in writeBytes len (writeShortByteString sbs len) *> k
@@ -353,6 +368,13 @@ execCountRun = \case
   PutFWord32LE _ k -> State.modify' (4+) *> k
   PutFInt32LE _ k -> State.modify' (4+) *> k
   PutFFloatLE _ k -> State.modify' (4+) *> k
+  PutFWord16BE _ k -> State.modify' (2+) *> k
+  PutFInt16BE _ k -> State.modify' (2+) *> k
+  PutFWord24BE _ k -> State.modify' (3+) *> k
+  PutFInt24BE _ k -> State.modify' (3+) *> k
+  PutFWord32BE _ k -> State.modify' (4+) *> k
+  PutFInt32BE _ k -> State.modify' (4+) *> k
+  PutFFloatBE _ k -> State.modify' (4+) *> k
   PutFShortByteString bc _ k ->
     let !len = fromIntegral bc
     in State.modify' (len+) *> k
