@@ -22,6 +22,8 @@ import Data.Primitive (Prim)
 import Data.Primitive.PrimArray (PrimArray, sizeofPrimArray)
 import Data.Proxy (Proxy (..))
 import Data.Semigroup (Sum (..))
+import Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import Data.Word (Word16, Word32, Word64, Word8)
 
 newtype ElementCount = ElementCount { unElementCount :: Word64 }
@@ -107,6 +109,12 @@ instance ByteSized FloatBE where
 instance ByteSized ShortByteString where
   byteSize = fromIntegral . BSS.length
 
+instance StaticByteSized a => ByteSized (Seq a) where
+  byteSize ss =
+    let !elen = staticByteSize (Proxy :: Proxy a)
+        !alen = fromIntegral (Seq.length ss)
+    in elen * alen
+
 instance (StaticByteSized a, Prim a) => ByteSized (PrimArray a) where
   byteSize pa =
     let !elen = staticByteSize (Proxy :: Proxy a)
@@ -114,9 +122,9 @@ instance (StaticByteSized a, Prim a) => ByteSized (PrimArray a) where
     in elen * alen
 
 instance (StaticByteSized a, LiftedPrim a) => ByteSized (LiftedPrimArray a) where
-  byteSize pa =
+  byteSize lpa =
     let !elen = staticByteSize (Proxy :: Proxy a)
-        !alen = fromIntegral (sizeofLiftedPrimArray pa)
+        !alen = fromIntegral (sizeofLiftedPrimArray lpa)
     in elen * alen
 
 class ByteSized a => StaticByteSized a where
