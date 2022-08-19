@@ -3,6 +3,7 @@ module Dahdit.Run
   , prettyGetError
   , runGet
   , runGetIO
+  , runGetFile
   , runCount
   , runPut
   ) where
@@ -27,6 +28,7 @@ import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE (..), Int24BE, Int24LE, I
                     Word16LE (..), Word24BE, Word24LE, Word32BE, Word32LE)
 import Dahdit.Proxy (proxyForF)
 import Dahdit.Sizes (ByteCount (..), staticByteSize)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Foldable (for_, toList)
@@ -234,6 +236,12 @@ runGetIO m bs =
   in case ea of
     Left e -> throwIO e
     Right a -> pure (a, bc)
+
+runGetFile :: Get a -> FilePath -> IO (a, ByteCount)
+runGetFile m fp = do
+  bs <- BS.readFile fp
+  let !bss = BSS.toShort bs
+  runGetIO m bss
 
 -- Put unsafe:
 
