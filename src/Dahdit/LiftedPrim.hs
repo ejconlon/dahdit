@@ -13,6 +13,7 @@ module Dahdit.LiftedPrim
   , liftedPrimArrayFromList
   , generateLiftedPrimArray
   , sizeofLiftedPrimArray
+  , cloneLiftedPrimArray
   ) where
 
 import Control.Monad.Primitive (PrimMonad (..))
@@ -21,9 +22,9 @@ import Dahdit.Proxy (proxyForF)
 import Data.Default (Default (..))
 import Data.Foldable (for_)
 import Data.Int (Int8)
-import Data.Primitive.ByteArray (ByteArray, MutableByteArray, emptyByteArray, freezeByteArray, indexByteArray,
-                                 newByteArray, runByteArray, sizeofByteArray, thawByteArray, unsafeFreezeByteArray,
-                                 unsafeThawByteArray, writeByteArray)
+import Data.Primitive.ByteArray (ByteArray, MutableByteArray, cloneByteArray, emptyByteArray, freezeByteArray,
+                                 indexByteArray, newByteArray, runByteArray, sizeofByteArray, thawByteArray,
+                                 unsafeFreezeByteArray, unsafeThawByteArray, writeByteArray)
 import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
 import Data.Word (Word8)
@@ -115,3 +116,11 @@ sizeofLiftedPrimArray pa@(LiftedPrimArray arr) =
   let !elemSize = elemSizeLifted (proxyForF pa)
       !arrSize = sizeofByteArray arr
   in div arrSize elemSize
+
+cloneLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int -> Int -> LiftedPrimArray a
+cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
+  let !elemSize = elemSizeLifted (proxyForF pa)
+      !byteOff = off * elemSize
+      !byteLen = len * elemSize
+      !arr' = cloneByteArray arr byteOff byteLen
+  in LiftedPrimArray arr'
