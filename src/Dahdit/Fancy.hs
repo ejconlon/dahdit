@@ -2,6 +2,7 @@ module Dahdit.Fancy
   ( TermBytes (..)
   , StaticBytes (..)
   , mkStaticBytes
+  , normStaticBytes
   , StaticSeq (..)
   , StaticArray (..)
   , BoolByte (..)
@@ -28,6 +29,7 @@ import Data.String (IsString)
 import Data.Word (Word8)
 import GHC.TypeLits (KnownNat, KnownSymbol, Nat, Symbol, natVal, symbolVal)
 import qualified Data.ByteString as BS
+import Dahdit.Proxy (proxyForNatF)
 
 getUntilNull :: Get (Int, [Word8])
 getUntilNull = go 0 [] where
@@ -74,19 +76,37 @@ instance Binary TermBytes where
 -- | A fixed-length bytestring (truncated or zero-padded on put if length does not match).
 newtype StaticBytes (n :: Nat) = StaticBytes { unStaticBytes :: ShortByteString }
   deriving stock (Show)
-  deriving newtype (Eq, Ord, IsString)
+  deriving newtype (IsString)
   deriving (ByteSized) via (ViaStaticByteSized (StaticBytes n))
 
 mkStaticBytes :: KnownNat n => Proxy n -> ShortByteString -> StaticBytes n
 mkStaticBytes prox sbs =
   -- TODO replace with the Short versions when the lib is updated to 0.11
   let n = fromInteger (natVal prox)
-      bs = BSS.fromShort sbs
-      x1 = BS.take n bs
-      l = BS.length x1
-  in StaticBytes $ BSS.toShort $ if l == n
-    then x1
-    else x1 <> BS.replicate (n - l) 0
+  in if BSS.length sbs == n
+    then StaticBytes sbs
+    else
+      let bs = BSS.fromShort sbs
+          x1 = BS.take n bs
+          l = BS.length x1
+      in StaticBytes $ BSS.toShort $ if l == n
+        then x1
+        else x1 <> BS.replicate (n - l) 0
+
+normStaticBytes :: KnownNat n => StaticBytes n -> StaticBytes n
+normStaticBytes sb@(StaticBytes sbs) = mkStaticBytes (proxyForNatF sb) sbs
+
+instance KnownNat n => Eq (StaticBytes n) where
+  x == y =
+    let StaticBytes x' = normStaticBytes x
+        StaticBytes y' = normStaticBytes y
+    in x' == y'
+
+instance KnownNat n => Ord (StaticBytes n) where
+  compare x y =
+    let StaticBytes x' = normStaticBytes x
+        StaticBytes y' = normStaticBytes y
+    in compare x' y'
 
 instance Default (StaticBytes n) where
   def = StaticBytes BSS.empty
