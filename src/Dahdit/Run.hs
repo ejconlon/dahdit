@@ -6,6 +6,7 @@ module Dahdit.Run
   , runGetFile
   , runCount
   , runPut
+  , runPutFile
   ) where
 
 import Control.Applicative (Alternative (..))
@@ -421,3 +422,11 @@ runCount m =
 
 runPut :: Put -> ShortByteString
 runPut m = let !bc = runCount m in runPutUnsafe m bc
+
+-- Put file:
+
+runPutFile :: FilePath -> Put -> IO ()
+runPutFile fp m =
+  let !bs = runPut m
+      !bs' = BSS.fromShort bs
+  in BS.writeFile fp bs'
