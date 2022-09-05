@@ -14,7 +14,9 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get)
 import Dahdit.Funs (getByteString, getExpect, getStaticArray, getStaticSeq, getWord8, putByteString, putFixedString,
                     putWord8, unsafePutStaticArrayN, unsafePutStaticSeqN)
+import Dahdit.Proxy (proxyForNatF)
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
+import qualified Data.ByteString as BS
 import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
@@ -28,8 +30,6 @@ import qualified Data.Sequence as Seq
 import Data.String (IsString)
 import Data.Word (Word8)
 import GHC.TypeLits (KnownNat, KnownSymbol, Nat, Symbol, natVal, symbolVal)
-import qualified Data.ByteString as BS
-import Dahdit.Proxy (proxyForNatF)
 
 getUntilNull :: Get (Int, [Word8])
 getUntilNull = go 0 [] where
