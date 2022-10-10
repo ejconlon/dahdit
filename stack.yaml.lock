@@ -5,19 +5,15 @@
 
 packages:
 - completed:
-    name: data-sword
-    version: 0.3.0.0
-    git: git@github.com:ejconlon/data-sword.git
+    hackage: data-sword-0.2.0.3@sha256:953cca4b4533a388df0ef17e06ac5530652d1d73decfe8b656242ccdf4b40999,1568
     pantry-tree:
-      size: 644
-      sha256: c19c6cbd87ce6ce7d46a15b28f74f47ab1e65d1b830e4afa9eaf27b0daea2536
-    commit: 4a3efca54b337820446c7682bf3623d607f0365f
+      sha256: 60a104a3d3cbba2e099a9e7ce561322b2884f5323cf74fd876dfb59f265d803c
+      size: 439
   original:
-    git: git@github.com:ejconlon/data-sword.git
-    commit: 4a3efca54b337820446c7682bf3623d607f0365f
+    hackage: data-sword-0.2.0.3
 snapshots:
 - completed:
-    size: 619399
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/22.yaml
-    sha256: 5098594e71bdefe0c13e9e6236f12e3414ef91a2b89b029fd30e8fc8087f3a07
-  original: lts-19.22
+    sha256: 7f4393ad659c579944d12202cffb12d8e4b8114566b015f77bbc303a24cff934
+    size: 619405
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/28.yaml
+  original: lts-19.28
