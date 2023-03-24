@@ -1,4 +1,4 @@
-resolver: lts-19.28
+resolver: lts-20.15
 
 ghc-options:
   "$everything": -haddock
