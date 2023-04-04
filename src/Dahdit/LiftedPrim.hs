@@ -57,7 +57,7 @@ instance LiftedPrim Int8 where
   writeByteArrayLiftedInElems val arr pos = writeByteArray arr pos val
 
 -- | NOTE: Relies on same byte width of both types!
-instance (Num x, Integral x, LiftedPrim x, Num y, Integral y) => LiftedPrim (ViaFromIntegral x y) where
+instance (Integral x, LiftedPrim x, Integral y) => LiftedPrim (ViaFromIntegral x y) where
   elemSizeLifted _ = elemSizeLifted (Proxy :: Proxy x)
   indexByteArrayLiftedInBytes arr pos = ViaFromIntegral (fromIntegral (indexByteArrayLiftedInBytes arr pos :: x))
   writeByteArrayLiftedInBytes val arr pos = let !x = fromIntegral (unViaFromIntegral val) :: x in writeByteArrayLiftedInBytes x arr pos
