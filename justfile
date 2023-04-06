@@ -27,7 +27,7 @@ docs:
 
 # Install tool deps
 deps:
-  stack build --copy-compiler-tool hlint fourmolu
+  stack build --copy-compiler-tool hlint fourmolu apply-refact
 
 # Format with fourmolu
 format:
@@ -37,6 +37,7 @@ format:
 lint:
   stack exec -- hlint {{ src_dirs }}
 
-# Run the executable
-exe:
-  {{ stack_build }} --test --no-run-tests --exec dahdit-exe
+# Apply hlint suggestions
+lint-apply:
+  find {{ src_dirs }} -name '*.hs' | xargs -t -I % stack exec -- hlint % --refactor --refactor-options="--inplace"
+

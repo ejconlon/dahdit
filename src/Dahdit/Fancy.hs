@@ -56,10 +56,9 @@ getUntilNull = go 0 []
 mkSBS :: Int -> [Word8] -> ShortByteString
 mkSBS n bs = let !(ByteArray ba) = byteArrayFromListN n bs in SBS ba
 
-{- | Bytes terminated with null byte.
- NOTE: Terminated with TWO null bytes if the string is even length
- to align to Word16 boundaries, as required for RIFF format, for example.
--}
+-- | Bytes terminated with null byte.
+-- NOTE: Terminated with TWO null bytes if the string is even length
+-- to align to Word16 boundaries, as required for RIFF format, for example.
 newtype TermBytes = TermBytes {unTermBytes :: ShortByteString}
   deriving stock (Show)
   deriving newtype (Eq, Ord, IsString)

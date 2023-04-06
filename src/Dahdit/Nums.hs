@@ -1,9 +1,8 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{- | Derived instances rely on the host system being little-endian.
- If it's not, well... some CPP is in order.
--}
+-- | Derived instances rely on the host system being little-endian.
+-- If it's not, well... some CPP is in order.
 module Dahdit.Nums
   ( EndianPair (..)
   , Word16LE (..)
