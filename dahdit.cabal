@@ -17,6 +17,8 @@ copyright:      (c) 2022 Eric Conlon
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
+tested-with:
+    GHC == 9.2.7
 extra-source-files:
     README.md
 

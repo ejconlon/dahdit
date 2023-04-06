@@ -12,11 +12,26 @@ module Dahdit.Free
   , PutF (..)
   , PutM (..)
   , Put
-  ) where
+  )
+where
 
 import Control.Monad.Free.Church (F (..))
-import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE,
-                    Word24BE, Word24LE, Word32BE, Word32LE)
+import Dahdit.Nums
+  ( FloatBE
+  , FloatLE
+  , Int16BE
+  , Int16LE
+  , Int24BE
+  , Int24LE
+  , Int32BE
+  , Int32LE
+  , Word16BE
+  , Word16LE
+  , Word24BE
+  , Word24LE
+  , Word32BE
+  , Word32LE
+  )
 import Dahdit.Sizes (ByteCount, ElementCount, StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import Data.Int (Int8)
@@ -50,13 +65,13 @@ data GetScopeF a where
 instance Functor GetScopeF where
   fmap f (GetScopeF sm bc g k) = GetScopeF sm bc g (f . k)
 
-data ScopeMode =
-    ScopeModeExact
+data ScopeMode
+  = ScopeModeExact
   | ScopeModeWithin
   deriving stock (Eq, Show)
 
-data GetF a =
-    GetFWord8 (Word8 -> a)
+data GetF a
+  = GetFWord8 (Word8 -> a)
   | GetFInt8 (Int8 -> a)
   | GetFWord16LE (Word16LE -> a)
   | GetFInt16LE (Int16LE -> a)
@@ -83,7 +98,7 @@ data GetF a =
   | GetFFail !String
   deriving stock (Functor)
 
-newtype Get a = Get { unGet :: F GetF a }
+newtype Get a = Get {unGet :: F GetF a}
   deriving newtype (Functor, Applicative, Monad)
 
 instance MonadFail Get where
@@ -107,8 +122,8 @@ data PutStaticHintF a where
 instance Functor PutStaticHintF where
   fmap f (PutStaticHintF n p k) = PutStaticHintF n p (f k)
 
-data PutF a =
-    PutFWord8 !Word8 a
+data PutF a
+  = PutFWord8 !Word8 a
   | PutFInt8 !Int8 a
   | PutFWord16LE !Word16LE a
   | PutFInt16LE !Int16LE a
@@ -131,7 +146,7 @@ data PutF a =
   | PutFStaticHint !(PutStaticHintF a)
   deriving stock (Functor)
 
-newtype PutM a = PutM { unPutM :: F PutF a }
+newtype PutM a = PutM {unPutM :: F PutF a}
   deriving newtype (Functor, Applicative, Monad)
 
 instance Semigroup (PutM ()) where

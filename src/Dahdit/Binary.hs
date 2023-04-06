@@ -1,15 +1,60 @@
 module Dahdit.Binary
   ( Binary (..)
   , byteSizeViaPut
-  ) where
+  )
+where
 
 import Dahdit.Free (Get, Put)
-import Dahdit.Funs (getFloatBE, getFloatLE, getInt16BE, getInt16LE, getInt24BE, getInt24LE, getInt32BE, getInt32LE,
-                    getInt8, getWord16BE, getWord16LE, getWord24BE, getWord24LE, getWord32BE, getWord32LE, getWord8,
-                    putFloatBE, putFloatLE, putInt16BE, putInt16LE, putInt24BE, putInt24LE, putInt32BE, putInt32LE,
-                    putInt8, putWord16BE, putWord16LE, putWord24BE, putWord24LE, putWord32BE, putWord32LE, putWord8)
-import Dahdit.Nums (FloatBE (..), FloatLE, Int16BE (..), Int16LE, Int24BE (..), Int24LE, Int32BE (..), Int32LE,
-                    Word16BE (..), Word16LE, Word24BE (..), Word24LE, Word32BE (..), Word32LE)
+import Dahdit.Funs
+  ( getFloatBE
+  , getFloatLE
+  , getInt16BE
+  , getInt16LE
+  , getInt24BE
+  , getInt24LE
+  , getInt32BE
+  , getInt32LE
+  , getInt8
+  , getWord16BE
+  , getWord16LE
+  , getWord24BE
+  , getWord24LE
+  , getWord32BE
+  , getWord32LE
+  , getWord8
+  , putFloatBE
+  , putFloatLE
+  , putInt16BE
+  , putInt16LE
+  , putInt24BE
+  , putInt24LE
+  , putInt32BE
+  , putInt32LE
+  , putInt8
+  , putWord16BE
+  , putWord16LE
+  , putWord24BE
+  , putWord24LE
+  , putWord32BE
+  , putWord32LE
+  , putWord8
+  )
+import Dahdit.Nums
+  ( FloatBE (..)
+  , FloatLE
+  , Int16BE (..)
+  , Int16LE
+  , Int24BE (..)
+  , Int24LE
+  , Int32BE (..)
+  , Int32LE
+  , Word16BE (..)
+  , Word16LE
+  , Word24BE (..)
+  , Word24LE
+  , Word32BE (..)
+  , Word32LE
+  )
 import Dahdit.Run (runCount)
 import Dahdit.Sizes (ByteCount, ByteSized)
 import Data.Int (Int8)

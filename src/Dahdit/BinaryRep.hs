@@ -4,7 +4,8 @@ module Dahdit.BinaryRep
   ( BinaryRep (..)
   , ViaBoundedEnum (..)
   , ViaBinaryRep (..)
-  ) where
+  )
+where
 
 import Dahdit.Binary (Binary (..))
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
@@ -14,17 +15,17 @@ class Binary x => BinaryRep x a | a -> x where
   fromBinaryRep :: x -> Either String a
   toBinaryRep :: a -> x
 
-newtype ViaBoundedEnum x a = ViaBoundedEnum { unViaBoundedEnum :: a }
+newtype ViaBoundedEnum x a = ViaBoundedEnum {unViaBoundedEnum :: a}
 
 instance (Binary x, Integral x, Bounded a, Enum a) => BinaryRep x (ViaBoundedEnum x a) where
   fromBinaryRep x =
     let i = fromIntegral x
-    in if i < fromEnum (minBound :: a) || i > fromEnum (maxBound :: a)
-      then Left ("Invalid enum value: " ++ show i)
-      else Right (ViaBoundedEnum (toEnum i))
+    in  if i < fromEnum (minBound :: a) || i > fromEnum (maxBound :: a)
+          then Left ("Invalid enum value: " ++ show i)
+          else Right (ViaBoundedEnum (toEnum i))
   toBinaryRep = fromIntegral . fromEnum . unViaBoundedEnum
 
-newtype ViaBinaryRep a = ViaBinaryRep { unViaBinaryRep :: a }
+newtype ViaBinaryRep a = ViaBinaryRep {unViaBinaryRep :: a}
 
 instance BinaryRep x a => ByteSized (ViaBinaryRep a) where
   byteSize = byteSize . toBinaryRep . unViaBinaryRep

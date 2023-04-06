@@ -7,11 +7,26 @@ module Dahdit.Sizes
   , ViaStaticByteSized (..)
   , byteSizeFoldable
   , staticByteSizeFoldable
-  ) where
+  )
+where
 
 import Dahdit.LiftedPrim (LiftedPrim, LiftedPrimArray, sizeofLiftedPrimArray)
-import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE,
-                    Word24BE, Word24LE, Word32BE, Word32LE)
+import Dahdit.Nums
+  ( FloatBE
+  , FloatLE
+  , Int16BE
+  , Int16LE
+  , Int24BE
+  , Int24LE
+  , Int32BE
+  , Int32LE
+  , Word16BE
+  , Word16LE
+  , Word24BE
+  , Word24LE
+  , Word32BE
+  , Word32LE
+  )
 import Dahdit.Proxy (proxyFor, proxyForF)
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
@@ -26,11 +41,11 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Word (Word16, Word32, Word64, Word8)
 
-newtype ElementCount = ElementCount { unElementCount :: Word64 }
+newtype ElementCount = ElementCount {unElementCount :: Word64}
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bounded, Default)
 
-newtype ByteCount = ByteCount { unByteCount :: Word64 }
+newtype ByteCount = ByteCount {unByteCount :: Word64}
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bounded, Default)
 
@@ -113,19 +128,19 @@ instance StaticByteSized a => ByteSized (Seq a) where
   byteSize ss =
     let !elen = staticByteSize (Proxy :: Proxy a)
         !alen = fromIntegral (Seq.length ss)
-    in elen * alen
+    in  elen * alen
 
 instance (StaticByteSized a, Prim a) => ByteSized (PrimArray a) where
   byteSize pa =
     let !elen = staticByteSize (Proxy :: Proxy a)
         !alen = fromIntegral (sizeofPrimArray pa)
-    in elen * alen
+    in  elen * alen
 
 instance (StaticByteSized a, LiftedPrim a) => ByteSized (LiftedPrimArray a) where
   byteSize lpa =
     let !elen = staticByteSize (Proxy :: Proxy a)
         !alen = fromIntegral (sizeofLiftedPrimArray lpa)
-    in elen * alen
+    in  elen * alen
 
 class ByteSized a => StaticByteSized a where
   staticByteSize :: Proxy a -> ByteCount
@@ -202,7 +217,7 @@ instance StaticByteSized Int32BE where
 instance StaticByteSized FloatBE where
   staticByteSize _ = 4
 
-newtype ViaStaticByteSized a = ViaStaticByteSized { unViaStaticByteSized :: a }
+newtype ViaStaticByteSized a = ViaStaticByteSized {unViaStaticByteSized :: a}
 
 instance StaticByteSized a => ByteSized (ViaStaticByteSized a) where
   byteSize _ = staticByteSize (Proxy :: Proxy a)

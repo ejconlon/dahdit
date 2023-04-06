@@ -3,7 +3,8 @@ module Dahdit.Proxy
   , proxyForF
   , proxyForFun
   , proxyForNatF
-  ) where
+  )
+where
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (Nat)

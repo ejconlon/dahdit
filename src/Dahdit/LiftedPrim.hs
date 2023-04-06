@@ -14,7 +14,8 @@ module Dahdit.LiftedPrim
   , generateLiftedPrimArray
   , sizeofLiftedPrimArray
   , cloneLiftedPrimArray
-  ) where
+  )
+where
 
 import Control.Monad.Primitive (PrimMonad (..))
 import Dahdit.Internal (ViaFromIntegral (..))
@@ -22,27 +23,40 @@ import Dahdit.Proxy (proxyForF)
 import Data.Default (Default (..))
 import Data.Foldable (for_)
 import Data.Int (Int8)
-import Data.Primitive.ByteArray (ByteArray, MutableByteArray, cloneByteArray, emptyByteArray, freezeByteArray,
-                                 indexByteArray, newByteArray, runByteArray, sizeofByteArray, thawByteArray,
-                                 unsafeFreezeByteArray, unsafeThawByteArray, writeByteArray)
+import Data.Primitive.ByteArray
+  ( ByteArray
+  , MutableByteArray
+  , cloneByteArray
+  , emptyByteArray
+  , freezeByteArray
+  , indexByteArray
+  , newByteArray
+  , runByteArray
+  , sizeofByteArray
+  , thawByteArray
+  , unsafeFreezeByteArray
+  , unsafeThawByteArray
+  , writeByteArray
+  )
 import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
 import Data.Word (Word8)
 
--- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
--- It's all about reading and writing structures from byte arrays.
+{- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
+ It's all about reading and writing structures from byte arrays.
+-}
 class LiftedPrim a where
   elemSizeLifted :: Proxy a -> Int
   indexByteArrayLiftedInBytes :: ByteArray -> Int -> a
   indexByteArrayLiftedInElems :: ByteArray -> Int -> a
   indexByteArrayLiftedInElems arr pos =
     let !sz = elemSizeLifted (Proxy :: Proxy a)
-    in indexByteArrayLiftedInBytes arr (pos * sz)
+    in  indexByteArrayLiftedInBytes arr (pos * sz)
   writeByteArrayLiftedInBytes :: PrimMonad m => a -> MutableByteArray (PrimState m) -> Int -> m ()
   writeByteArrayLiftedInElems :: PrimMonad m => a -> MutableByteArray (PrimState m) -> Int -> m ()
   writeByteArrayLiftedInElems val arr pos =
     let !sz = elemSizeLifted (Proxy :: Proxy a)
-    in writeByteArrayLiftedInBytes val arr (pos * sz)
+    in  writeByteArrayLiftedInBytes val arr (pos * sz)
 
 instance LiftedPrim Word8 where
   elemSizeLifted _ = 1
@@ -62,14 +76,14 @@ instance (Integral x, LiftedPrim x, Integral y) => LiftedPrim (ViaFromIntegral x
   indexByteArrayLiftedInBytes arr pos = ViaFromIntegral (fromIntegral (indexByteArrayLiftedInBytes arr pos :: x))
   writeByteArrayLiftedInBytes val arr pos = let !x = fromIntegral (unViaFromIntegral val) :: x in writeByteArrayLiftedInBytes x arr pos
 
-newtype LiftedPrimArray a = LiftedPrimArray { unLiftedPrimArray :: ByteArray }
+newtype LiftedPrimArray a = LiftedPrimArray {unLiftedPrimArray :: ByteArray}
   deriving stock (Show)
   deriving newtype (Eq, Semigroup, Monoid)
 
 instance Default (LiftedPrimArray a) where
   def = emptyLiftedPrimArray
 
-newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray { unMutableLiftedPrimArray :: MutableByteArray m }
+newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray {unMutableLiftedPrimArray :: MutableByteArray m}
   deriving newtype (Eq)
 
 emptyLiftedPrimArray :: LiftedPrimArray a
@@ -102,7 +116,7 @@ liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
   for_ xs $ \x -> do
     off <- readSTRef offRef
     writeByteArrayLiftedInBytes x arr off
-    modifySTRef' offRef (elemSize+)
+    modifySTRef' offRef (elemSize +)
   pure arr
 
 liftedPrimArrayFromList :: LiftedPrim a => [a] -> LiftedPrimArray a
@@ -115,7 +129,7 @@ sizeofLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int
 sizeofLiftedPrimArray pa@(LiftedPrimArray arr) =
   let !elemSize = elemSizeLifted (proxyForF pa)
       !arrSize = sizeofByteArray arr
-  in div arrSize elemSize
+  in  div arrSize elemSize
 
 cloneLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int -> Int -> LiftedPrimArray a
 cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
@@ -123,4 +137,4 @@ cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
       !byteOff = off * elemSize
       !byteLen = len * elemSize
       !arr' = cloneByteArray arr byteOff byteLen
-  in LiftedPrimArray arr'
+  in  LiftedPrimArray arr'

@@ -3,7 +3,8 @@
 module Dahdit.Generic
   ( ViaGeneric (..)
   , ViaStaticGeneric (..)
-  ) where
+  )
+where
 
 import Control.Applicative (liftA2)
 import Dahdit.Binary (Binary (..))
@@ -12,13 +13,13 @@ import Dahdit.Funs (putStaticHint)
 import Dahdit.Sizes (ByteCount, ByteSized (..), StaticByteSized (..))
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
-import GHC.Generics ((:*:) (..), Generic (..), K1 (..), M1 (..), U1 (..))
+import GHC.Generics (Generic (..), K1 (..), M1 (..), U1 (..), (:*:) (..))
 
 -- | Use: deriving (ByteSized, Binary) via (ViaGeneric Foo)
-newtype ViaGeneric a = ViaGeneric { unViaGeneric :: a }
+newtype ViaGeneric a = ViaGeneric {unViaGeneric :: a}
 
 -- | Use: deriving (ByteSized, StaticByteSized, Binary) via (ViaStaticGeneric Foo)
-newtype ViaStaticGeneric a = ViaStaticGeneric { unViaStaticGeneric :: a }
+newtype ViaStaticGeneric a = ViaStaticGeneric {unViaStaticGeneric :: a}
 
 -- ByteSized:
 

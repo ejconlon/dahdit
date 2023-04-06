@@ -7,6 +7,7 @@ maintainer:          "ejconlon@gmail.com"
 copyright:           "(c) 2022 Eric Conlon"
 category:            Data
 synopsis:            Binary parsing and serialization with integrated size
+tested-with:         GHC == 9.2.7
 
 extra-source-files:
 - README.md

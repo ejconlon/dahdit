@@ -60,16 +60,43 @@ module Dahdit.Funs
   , putByteArray
   , putLiftedPrimArray
   , putStaticHint
-  ) where
+  )
+where
 
 import Control.Monad (replicateM_, unless)
 import Control.Monad.Free.Church (F (..))
-import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), GetStaticArrayF (..), GetStaticSeqF (..),
-                    Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
-                    ScopeMode (..))
+import Dahdit.Free
+  ( Get (..)
+  , GetF (..)
+  , GetLookAheadF (..)
+  , GetScopeF (..)
+  , GetStaticArrayF (..)
+  , GetStaticSeqF (..)
+  , Put
+  , PutF (..)
+  , PutM (..)
+  , PutStaticArrayF (..)
+  , PutStaticHintF (..)
+  , PutStaticSeqF (..)
+  , ScopeMode (..)
+  )
 import Dahdit.LiftedPrim (LiftedPrim (..), LiftedPrimArray (..))
-import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE,
-                    Word24BE, Word24LE, Word32BE, Word32LE)
+import Dahdit.Nums
+  ( FloatBE
+  , FloatLE
+  , Int16BE
+  , Int16LE
+  , Int24BE
+  , Int24LE
+  , Int32BE
+  , Int32LE
+  , Word16BE
+  , Word16LE
+  , Word24BE
+  , Word24LE
+  , Word32BE
+  , Word32LE
+  )
 import Dahdit.Proxy (proxyForF, proxyForFun)
 import Dahdit.Sizes (ByteCount (..), ElementCount (..), StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
@@ -146,7 +173,8 @@ getWithin bc g = Get (F (\x y -> y (GetFScope (GetScopeF ScopeModeWithin bc g x)
 
 -- | Get Seq of dynamically-sized elements
 getSeq :: ElementCount -> Get a -> Get (Seq a)
-getSeq ec g = go Empty 0 where
+getSeq ec g = go Empty 0
+ where
   go !acc i =
     if i == ec
       then pure acc
@@ -168,7 +196,7 @@ getByteArray bc = Get (F (\x y -> y (GetFByteArray bc x)))
 getLiftedPrimArray :: LiftedPrim a => Proxy a -> ElementCount -> Get (LiftedPrimArray a)
 getLiftedPrimArray prox ec =
   let !bc = fromIntegral (elemSizeLifted prox * fromIntegral ec)
-  in fmap LiftedPrimArray (getByteArray bc)
+  in  fmap LiftedPrimArray (getByteArray bc)
 
 getLookAhead :: Get a -> Get a
 getLookAhead g = Get (F (\x y -> y (GetFLookAhead (GetLookAheadF g x))))
@@ -180,7 +208,8 @@ getRemainingString :: Get ShortByteString
 getRemainingString = getRemainingSize >>= getByteString
 
 getRemainingSeq :: Get a -> Get (Seq a)
-getRemainingSeq g = go Empty where
+getRemainingSeq g = go Empty
+ where
   go !acc = do
     bc <- getRemainingSize
     if bc == 0
@@ -228,11 +257,13 @@ getRemainingLiftedPrimArray prox = do
 getExpect :: (Eq a, Show a) => String -> Get a -> a -> Get ()
 getExpect typ getter expec = do
   actual <- getter
-  unless (expec == actual)
-    (fail ("Expected " ++ " " ++ typ ++  " " ++ show expec ++ " but found " ++ show actual))
+  unless
+    (expec == actual)
+    (fail ("Expected " ++ " " ++ typ ++ " " ++ show expec ++ " but found " ++ show actual))
 
 getUnfold :: b -> (b -> Get (Either b a)) -> Get a
-getUnfold b0 f = go b0 where
+getUnfold b0 f = go b0
+ where
   go !b = do
     eba <- f b
     either go pure eba
@@ -288,7 +319,7 @@ putFloatBE d = PutM (F (\x y -> y (PutFFloatBE d (x ()))))
 putByteString :: ShortByteString -> Put
 putByteString sbs =
   let !bc = fromIntegral (BSS.length sbs)
-  in PutM (F (\x y -> y (PutFShortByteString bc sbs (x ()))))
+  in  PutM (F (\x y -> y (PutFShortByteString bc sbs (x ()))))
 
 putFixedString :: Word8 -> ByteCount -> ShortByteString -> Put
 putFixedString pad bc sbs = do
@@ -309,7 +340,7 @@ putSeq = traverse_
 putStaticSeq :: StaticByteSized a => (a -> Put) -> Seq a -> Put
 putStaticSeq p s =
   let !n = fromIntegral (Seq.length s)
-  in unsafePutStaticSeqN n Nothing p s
+  in  unsafePutStaticSeqN n Nothing p s
 
 unsafePutStaticSeqN :: StaticByteSized a => ElementCount -> Maybe a -> (a -> Put) -> Seq a -> Put
 unsafePutStaticSeqN n mz p s = PutM (F (\x y -> y (PutFStaticSeq (PutStaticSeqF n mz p s (x ())))))
@@ -318,7 +349,7 @@ unsafePutStaticSeqN n mz p s = PutM (F (\x y -> y (PutFStaticSeq (PutStaticSeqF 
 putStaticArray :: (StaticByteSized a, Prim a) => PrimArray a -> Put
 putStaticArray a =
   let !n = fromIntegral (sizeofPrimArray a)
-  in unsafePutStaticArrayN n Nothing a
+  in  unsafePutStaticArrayN n Nothing a
 
 unsafePutStaticArrayN :: (StaticByteSized a, Prim a) => ElementCount -> Maybe a -> PrimArray a -> Put
 unsafePutStaticArrayN n mz a = PutM (F (\x y -> y (PutFStaticArray (PutStaticArrayF n mz a (x ())))))
@@ -326,7 +357,7 @@ unsafePutStaticArrayN n mz a = PutM (F (\x y -> y (PutFStaticArray (PutStaticArr
 putByteArray :: ByteArray -> Put
 putByteArray arr =
   let !bc = fromIntegral (sizeofByteArray arr)
-  in PutM (F (\x y -> y (PutFByteArray bc arr (x ()))))
+  in  PutM (F (\x y -> y (PutFByteArray bc arr (x ()))))
 
 putLiftedPrimArray :: LiftedPrimArray a -> Put
 putLiftedPrimArray = putByteArray . unLiftedPrimArray
@@ -334,4 +365,4 @@ putLiftedPrimArray = putByteArray . unLiftedPrimArray
 putStaticHint :: StaticByteSized a => (a -> Put) -> a -> Put
 putStaticHint p =
   let !bc = staticByteSize (proxyForFun p)
-  in \a -> PutM (F (\x y -> y (PutFStaticHint (PutStaticHintF bc (p a) (x ())))))
+  in  \a -> PutM (F (\x y -> y (PutFStaticHint (PutStaticHintF bc (p a) (x ())))))

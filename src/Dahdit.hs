@@ -20,7 +20,8 @@ module Dahdit
   , module Dahdit.Proxy
   , module Dahdit.Run
   , module Dahdit.Sizes
-   ) where
+  )
+where
 
 import Dahdit.Binary
 import Dahdit.BinaryRep

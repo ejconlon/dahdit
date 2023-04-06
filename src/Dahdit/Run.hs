@@ -7,7 +7,8 @@ module Dahdit.Run
   , runCount
   , runPut
   , runPutFile
-  ) where
+  )
+where
 
 import Control.Applicative (Alternative (..))
 import Control.Exception (Exception (..), throwIO)
@@ -21,12 +22,38 @@ import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Free (FreeT (..), iterT, wrap)
 import Control.Monad.Trans.Maybe (MaybeT (..))
-import Dahdit.Free (Get (..), GetF (..), GetLookAheadF (..), GetScopeF (..), GetStaticArrayF (..), GetStaticSeqF (..),
-                    Put, PutF (..), PutM (..), PutStaticArrayF (..), PutStaticHintF (..), PutStaticSeqF (..),
-                    ScopeMode (..))
+import Dahdit.Free
+  ( Get (..)
+  , GetF (..)
+  , GetLookAheadF (..)
+  , GetScopeF (..)
+  , GetStaticArrayF (..)
+  , GetStaticSeqF (..)
+  , Put
+  , PutF (..)
+  , PutM (..)
+  , PutStaticArrayF (..)
+  , PutStaticHintF (..)
+  , PutStaticSeqF (..)
+  , ScopeMode (..)
+  )
 import Dahdit.LiftedPrim (LiftedPrim (..))
-import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE (..), Int24BE, Int24LE, Int32BE, Int32LE, Word16BE,
-                    Word16LE (..), Word24BE, Word24LE, Word32BE, Word32LE)
+import Dahdit.Nums
+  ( FloatBE
+  , FloatLE
+  , Int16BE
+  , Int16LE (..)
+  , Int24BE
+  , Int24LE
+  , Int32BE
+  , Int32LE
+  , Word16BE
+  , Word16LE (..)
+  , Word24BE
+  , Word24LE
+  , Word32BE
+  , Word32LE
+  )
 import Dahdit.Proxy (proxyForF)
 import Dahdit.Sizes (ByteCount (..), staticByteSize)
 import qualified Data.ByteString as BS
@@ -35,11 +62,20 @@ import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Foldable (for_, toList)
 import Data.Int (Int8)
 import Data.Maybe (fromJust)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, indexByteArray,
-                                 newByteArray, setByteArray, unsafeFreezeByteArray, writeByteArray)
+import Data.Primitive.ByteArray
+  ( ByteArray (..)
+  , MutableByteArray
+  , cloneByteArray
+  , copyByteArray
+  , indexByteArray
+  , newByteArray
+  , setByteArray
+  , unsafeFreezeByteArray
+  , writeByteArray
+  )
 import Data.Primitive.PrimArray (PrimArray (..), sizeofPrimArray)
-import qualified Data.Sequence as Seq
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
+import qualified Data.Sequence as Seq
 import Data.Word (Word8)
 
 -- Sizes:
@@ -47,17 +83,17 @@ import Data.Word (Word8)
 getStaticSeqSize :: GetStaticSeqF a -> Int
 getStaticSeqSize (GetStaticSeqF ec g _) =
   let !z = fromIntegral (staticByteSize (proxyForF g))
-  in z * fromIntegral ec
+  in  z * fromIntegral ec
 
 getStaticArraySize :: GetStaticArrayF a -> Int
 getStaticArraySize (GetStaticArrayF n prox _) =
   let !z = fromIntegral (staticByteSize prox)
-  in z * fromIntegral n
+  in  z * fromIntegral n
 
 putStaticSeqSize :: PutStaticSeqF a -> Int
 putStaticSeqSize (PutStaticSeqF n _ _ s _) =
   let !z = fromIntegral (staticByteSize (proxyForF s))
-  in z * fromIntegral n
+  in  z * fromIntegral n
 
 putStaticArrayElemSize :: PutStaticArrayF a -> Int
 putStaticArrayElemSize (PutStaticArrayF _ _ a _) =
@@ -66,12 +102,12 @@ putStaticArrayElemSize (PutStaticArrayF _ _ a _) =
 putStaticArraySize :: PutStaticArrayF a -> Int
 putStaticArraySize (PutStaticArrayF n _ a _) =
   let !z = fromIntegral (staticByteSize (proxyForF a))
-  in z * fromIntegral n
+  in  z * fromIntegral n
 
 -- Get:
 
-data GetError =
-    GetErrorParseNeed !String !ByteCount !ByteCount
+data GetError
+  = GetErrorParseNeed !String !ByteCount !ByteCount
   | GetErrorScopedMismatch !ByteCount !ByteCount
   | GetErrorFail !String
   deriving stock (Eq, Show)
@@ -97,7 +133,7 @@ newGetEnv sbs@(SBS arr) = do
   pos <- newSTRef 0
   pure $! GetEnv len pos (ByteArray arr)
 
-newtype GetEff s a = GetEff { unGetEff :: ReaderT (GetEnv s) (ExceptT GetError (ST s)) a }
+newtype GetEff s a = GetEff {unGetEff :: ReaderT (GetEnv s) (ExceptT GetError (ST s)) a}
   deriving newtype (Functor, Applicative, Monad, MonadReader (GetEnv s), MonadError GetError)
 
 runGetEff :: GetEff s a -> GetEnv s -> ST s (Either GetError a)
@@ -109,7 +145,7 @@ instance MonadFail (GetEff s) where
 stGetEff :: ST s a -> GetEff s a
 stGetEff = GetEff . lift . lift
 
-newtype GetRun s a = GetRun { unGetRun :: FreeT GetF (GetEff s) a }
+newtype GetRun s a = GetRun {unGetRun :: FreeT GetF (GetEff s) a}
   deriving newtype (Functor, Applicative, Monad)
 
 guardReadBytes :: String -> Int -> GetEff s Int
@@ -144,7 +180,7 @@ readScope (GetScopeF sm bc g k) = do
     then throwError (GetErrorParseNeed "scope" (fromIntegral oldAvail) bc)
     else do
       let !newLen = oldPos + intBc
-      a <- local (\ge -> ge { geLen = newLen }) (mkGetEff g)
+      a <- local (\ge -> ge {geLen = newLen}) (mkGetEff g)
       case sm of
         ScopeModeWithin -> k a
         ScopeModeExact -> do
@@ -195,12 +231,12 @@ execGetRun = \case
   GetFFloatBE k -> readBytes "FloatBE" 4 (indexByteArrayLiftedInBytes @FloatBE) >>= k
   GetFShortByteString bc k ->
     let !len = fromIntegral bc
-    in readBytes "ShortByteString" len (readShortByteString len) >>= k
+    in  readBytes "ShortByteString" len (readShortByteString len) >>= k
   GetFStaticSeq gss -> readStaticSeq gss
   GetFStaticArray gsa -> readStaticArray gsa
   GetFByteArray bc k ->
     let !len = fromIntegral bc
-    in readBytes "ByteArray" len (\arr pos -> cloneByteArray arr pos len) >>= k
+    in  readBytes "ByteArray" len (\arr pos -> cloneByteArray arr pos len) >>= k
   GetFScope gs -> readScope gs
   GetFSkip bc k -> readBytes "skip" (fromIntegral bc) (\_ _ -> ()) *> k
   GetFLookAhead gla -> readLookAhead gla
@@ -234,9 +270,9 @@ runGet m bs = runST $ do
 runGetIO :: Get a -> ShortByteString -> IO (a, ByteCount)
 runGetIO m bs =
   let (!ea, !bc) = runGet m bs
-  in case ea of
-    Left e -> throwIO e
-    Right a -> pure (a, bc)
+  in  case ea of
+        Left e -> throwIO e
+        Right a -> pure (a, bc)
 
 runGetFile :: Get a -> FilePath -> IO (a, ByteCount)
 runGetFile m fp = do
@@ -255,7 +291,7 @@ data PutEnv s = PutEnv
 newPutEnv :: Int -> ST s (PutEnv s)
 newPutEnv len = PutEnv len <$> newSTRef 0 <*> newByteArray len
 
-newtype PutEff s a = PutEff { unPutEff :: ReaderT (PutEnv s) (ST s) a }
+newtype PutEff s a = PutEff {unPutEff :: ReaderT (PutEnv s) (ST s) a}
   deriving newtype (Functor, Applicative, Monad, MonadReader (PutEnv s))
 
 runPutEff :: PutEff s a -> PutEnv s -> ST s a
@@ -264,7 +300,7 @@ runPutEff m = runReaderT (unPutEff m)
 stPutEff :: ST s a -> PutEff s a
 stPutEff = PutEff . lift
 
-newtype PutRun s a = PutRun { unPutRun :: FreeT PutF (PutEff s) a }
+newtype PutRun s a = PutRun {unPutRun :: FreeT PutF (PutEff s) a}
   deriving newtype (Functor, Applicative, Monad)
 
 writeBytes :: Int -> (MutableByteArray s -> Int -> ST s ()) -> PutEff s ()
@@ -324,12 +360,12 @@ execPutRun = \case
   PutFFloatBE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
   PutFShortByteString bc sbs k ->
     let !len = fromIntegral bc
-    in writeBytes len (writeShortByteString sbs len) *> k
+    in  writeBytes len (writeShortByteString sbs len) *> k
   PutFStaticSeq pss -> writeStaticSeq pss
   PutFStaticArray psa -> writeStaticArray psa
   PutFByteArray bc barr k ->
     let !len = fromIntegral bc
-    in writeBytes len (\arr pos -> copyByteArray arr pos barr 0 len) *> k
+    in  writeBytes len (\arr pos -> copyByteArray arr pos barr 0 len) *> k
   PutFStaticHint (PutStaticHintF _ p k) -> mkPutEff p *> k
 
 runPutRun :: PutRun s a -> PutEnv s -> ST s a
@@ -357,48 +393,48 @@ runPutUnsafe m bc = runST $ do
 
 -- Count:
 
-newtype CountEff a = CountEff { unCountEff :: MaybeT (State Int) a }
+newtype CountEff a = CountEff {unCountEff :: MaybeT (State Int) a}
   deriving newtype (Functor, Applicative, Monad, Alternative, MonadState Int)
 
 runCountEff :: CountEff a -> Int -> (Maybe a, Int)
 runCountEff m = runState (runMaybeT (unCountEff m))
 
-newtype CountRun a = CountRun { unCountRun :: FreeT PutF CountEff a }
+newtype CountRun a = CountRun {unCountRun :: FreeT PutF CountEff a}
   deriving newtype (Functor, Applicative, Monad)
 
 execCountRun :: PutF (CountEff a) -> CountEff a
 execCountRun = \case
-  PutFWord8 _ k -> State.modify' (1+) *> k
-  PutFInt8 _ k -> State.modify' (1+) *> k
-  PutFWord16LE _ k -> State.modify' (2+) *> k
-  PutFInt16LE _ k -> State.modify' (2+) *> k
-  PutFWord24LE _ k -> State.modify' (3+) *> k
-  PutFInt24LE _ k -> State.modify' (3+) *> k
-  PutFWord32LE _ k -> State.modify' (4+) *> k
-  PutFInt32LE _ k -> State.modify' (4+) *> k
-  PutFFloatLE _ k -> State.modify' (4+) *> k
-  PutFWord16BE _ k -> State.modify' (2+) *> k
-  PutFInt16BE _ k -> State.modify' (2+) *> k
-  PutFWord24BE _ k -> State.modify' (3+) *> k
-  PutFInt24BE _ k -> State.modify' (3+) *> k
-  PutFWord32BE _ k -> State.modify' (4+) *> k
-  PutFInt32BE _ k -> State.modify' (4+) *> k
-  PutFFloatBE _ k -> State.modify' (4+) *> k
+  PutFWord8 _ k -> State.modify' (1 +) *> k
+  PutFInt8 _ k -> State.modify' (1 +) *> k
+  PutFWord16LE _ k -> State.modify' (2 +) *> k
+  PutFInt16LE _ k -> State.modify' (2 +) *> k
+  PutFWord24LE _ k -> State.modify' (3 +) *> k
+  PutFInt24LE _ k -> State.modify' (3 +) *> k
+  PutFWord32LE _ k -> State.modify' (4 +) *> k
+  PutFInt32LE _ k -> State.modify' (4 +) *> k
+  PutFFloatLE _ k -> State.modify' (4 +) *> k
+  PutFWord16BE _ k -> State.modify' (2 +) *> k
+  PutFInt16BE _ k -> State.modify' (2 +) *> k
+  PutFWord24BE _ k -> State.modify' (3 +) *> k
+  PutFInt24BE _ k -> State.modify' (3 +) *> k
+  PutFWord32BE _ k -> State.modify' (4 +) *> k
+  PutFInt32BE _ k -> State.modify' (4 +) *> k
+  PutFFloatBE _ k -> State.modify' (4 +) *> k
   PutFShortByteString bc _ k ->
     let !len = fromIntegral bc
-    in State.modify' (len+) *> k
+    in  State.modify' (len +) *> k
   PutFStaticSeq pss@(PutStaticSeqF _ _ _ _ k) ->
     let !len = putStaticSeqSize pss
-    in State.modify' (len+) *> k
+    in  State.modify' (len +) *> k
   PutFStaticArray psv@(PutStaticArrayF _ _ _ k) ->
     let !len = putStaticArraySize psv
-    in State.modify' (len+) *> k
+    in  State.modify' (len +) *> k
   PutFByteArray bc _ k ->
     let !len = fromIntegral bc
-    in State.modify' (len+) *> k
+    in  State.modify' (len +) *> k
   PutFStaticHint (PutStaticHintF bc _ k) ->
     let !len = fromIntegral bc
-    in State.modify' (len+) *> k
+    in  State.modify' (len +) *> k
 
 runCountRun :: CountRun a -> Int -> (Maybe a, Int)
 runCountRun = runCountEff . iterCountRun
@@ -416,7 +452,7 @@ runCount :: Put -> ByteCount
 runCount m =
   let !n = mkCountRun m
       (_, !bc) = runCountRun n 0
-  in fromIntegral bc
+  in  fromIntegral bc
 
 -- Put safe:
 
@@ -429,4 +465,4 @@ runPutFile :: FilePath -> Put -> IO ()
 runPutFile fp m =
   let !bs = runPut m
       !bs' = BSS.fromShort bs
-  in BS.writeFile fp bs'
+  in  BS.writeFile fp bs'
