@@ -42,9 +42,8 @@ import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
 import Data.Word (Word8)
 
-{- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
- It's all about reading and writing structures from byte arrays.
--}
+-- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
+-- It's all about reading and writing structures from byte arrays.
 class LiftedPrim a where
   elemSizeLifted :: Proxy a -> Int
   indexByteArrayLiftedInBytes :: ByteArray -> Int -> a
