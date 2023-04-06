@@ -93,19 +93,16 @@ newtype StaticBytes (n :: Nat) = StaticBytes {unStaticBytes :: ShortByteString}
 
 mkStaticBytes :: KnownNat n => Proxy n -> ShortByteString -> StaticBytes n
 mkStaticBytes prox sbs =
-  -- TODO replace with the Short versions when the lib is updated to 0.11
   let n = fromInteger (natVal prox)
   in  if BSS.length sbs == n
         then StaticBytes sbs
         else
-          let bs = BSS.fromShort sbs
-              x1 = BS.take n bs
-              l = BS.length x1
+          let x1 = BSS.take n sbs
+              l = BSS.length x1
           in  StaticBytes $
-                BSS.toShort $
-                  if l == n
-                    then x1
-                    else x1 <> BS.replicate (n - l) 0
+                if l == n
+                  then x1
+                  else x1 <> BSS.replicate (n - l) 0
 
 normStaticBytes :: KnownNat n => StaticBytes n -> StaticBytes n
 normStaticBytes sb@(StaticBytes sbs) = mkStaticBytes (proxyForNatF sb) sbs
