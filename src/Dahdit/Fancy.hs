@@ -27,7 +27,6 @@ import Dahdit.Funs
   )
 import Dahdit.Proxy (proxyForNatF)
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
-import qualified Data.ByteString as BS
 import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
