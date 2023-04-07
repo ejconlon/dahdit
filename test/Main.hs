@@ -12,6 +12,7 @@ import Dahdit
   , Int16LE
   , Int32LE
   , Int8
+  , LiftedPrimArray (..)
   , Proxy (..)
   , Put
   , ShortByteString
@@ -242,8 +243,20 @@ testDahditPut =
     , testCase "StaBytes (more)" (runPutCase (put (mkStaBytes "hi!")) [0x68, 0x69])
     ]
 
+testDahditLiftedPrimArray :: TestTree
+testDahditLiftedPrimArray = testCase "liftedPrimArray" $ do
+  liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC] @?= LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00])
+
 testDahdit :: TestTree
-testDahdit = testGroup "Dahdit" [testDahditByteSize, testDahditStaticByteSize, testDahditGet, testDahditPut]
+testDahdit =
+  testGroup
+    "Dahdit"
+    [ testDahditByteSize
+    , testDahditStaticByteSize
+    , testDahditGet
+    , testDahditPut
+    , testDahditLiftedPrimArray
+    ]
 
 main :: IO ()
 main = defaultMain testDahdit

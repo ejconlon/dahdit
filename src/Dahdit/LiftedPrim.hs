@@ -22,6 +22,7 @@ where
 import Control.Monad.Primitive (PrimMonad (..))
 import Dahdit.Internal (ViaFromIntegral (..))
 import Dahdit.Proxy (proxyFor, proxyForF)
+import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Foldable (for_)
 import Data.Int (Int8)
@@ -40,55 +41,74 @@ import Data.Primitive.ByteArray
   , unsafeThawByteArray
   , writeByteArray
   )
+import Data.Primitive.Ptr (indexOffPtr, writeOffPtr)
 import Data.Proxy (Proxy (..))
 import Data.STRef (modifySTRef', newSTRef, readSTRef)
 import Data.Word (Word8)
-
--- import Foreign.Ptr (Ptr)
+import Foreign.Ptr (Ptr)
 
 -- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
 -- It's all about reading and writing structures from lifted byte arrays and pointers.
 class LiftedPrim a where
   elemSizeLifted :: Proxy a -> Int
-  indexByteArrayLifted :: ByteArray -> Int -> a
-  writeByteArrayLifted :: PrimMonad m => MutableByteArray (PrimState m) -> Int -> a -> m ()
 
-  -- readOffAddrLifted :: PrimMonad m => Ptr Word8 -> Int -> m a
-  -- writeOffAddrLifted :: PrimMonad m => Ptr Word8 -> Int -> a -> m ()
+  -- |The offset here is in bytes
+  indexArrayLiftedInBytes :: ByteArray -> Int -> a
 
-  indexByteArrayLiftedInElems :: ByteArray -> Int -> a
-  indexByteArrayLiftedInElems arr pos =
-    let !sz = elemSizeLifted (Proxy :: Proxy a)
-    in  indexByteArrayLifted arr (pos * sz)
-  writeByteArrayLiftedInElems :: PrimMonad m => MutableByteArray (PrimState m) -> Int -> a -> m ()
-  writeByteArrayLiftedInElems arr pos =
-    let !sz = elemSizeLifted (Proxy :: Proxy a)
-    in  writeByteArrayLifted arr (pos * sz)
+  -- | The offset here is in bytes
+  writeArrayLiftedInBytes :: PrimMonad m => MutableByteArray (PrimState m) -> Int -> a -> m ()
 
--- readOffAddrLiftedInElems :: PrimMonad m => Ptr Word8 -> Int -> m a
--- readOffAddrLiftedInElems ptr pos =
---   let !sz = elemSizeLifted (Proxy :: Proxy a)
---   in  readOffAddrLifted ptr (pos * sz)
--- writeOffAddrLiftedInElems :: PrimMonad m => Ptr Word8 -> Int -> a -> m ()
--- writeOffAddrLiftedInElems ptr pos =
---   let !sz = elemSizeLifted (Proxy :: Proxy a)
---   in  writeOffAddrLifted ptr (pos * sz)
+  -- | The offset here is in bytes
+  indexPtrLiftedInBytes :: Ptr x -> Int -> a
+
+  -- | The offset here is in bytes
+  writePtrLiftedInBytes :: PrimMonad m => Ptr x -> Int -> a -> m ()
+
+-- | The position here is in elems
+indexArrayLiftedInElems :: LiftedPrim a => Proxy a -> ByteArray -> Int -> a
+indexArrayLiftedInElems prox arr pos =
+  let !sz = elemSizeLifted prox
+  in  indexArrayLiftedInBytes arr (pos * sz)
+
+-- | The position here is in elems
+writeArrayLiftedInElems :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> Int -> a -> m ()
+writeArrayLiftedInElems arr pos val =
+  let !sz = elemSizeLifted (proxyFor val)
+  in  writeArrayLiftedInBytes arr (pos * sz) val
+
+-- | The position here is in elems
+indexPtrLiftedInElems :: LiftedPrim a => Proxy a -> Ptr x -> Int -> a
+indexPtrLiftedInElems prox ptr pos =
+  let !sz = elemSizeLifted prox
+  in  indexPtrLiftedInBytes ptr (pos * sz)
+
+-- | The position here is in elems
+writePtrLiftedInElems :: (PrimMonad m, LiftedPrim a) => Ptr x -> Int -> a -> m ()
+writePtrLiftedInElems ptr pos val =
+  let !sz = elemSizeLifted (proxyFor val)
+  in  writePtrLiftedInBytes ptr (pos * sz) val
 
 instance LiftedPrim Word8 where
   elemSizeLifted _ = 1
-  indexByteArrayLifted = indexByteArray
-  writeByteArrayLifted = writeByteArray
+  indexArrayLiftedInBytes = indexByteArray
+  writeArrayLiftedInBytes = writeByteArray
+  indexPtrLiftedInBytes = indexOffPtr . coerce
+  writePtrLiftedInBytes = writeOffPtr . coerce
 
 instance LiftedPrim Int8 where
   elemSizeLifted _ = 1
-  indexByteArrayLifted = indexByteArray
-  writeByteArrayLifted = writeByteArray
+  indexArrayLiftedInBytes = indexByteArray
+  writeArrayLiftedInBytes = writeByteArray
+  indexPtrLiftedInBytes = indexOffPtr . coerce
+  writePtrLiftedInBytes = writeOffPtr . coerce
 
 -- | NOTE: Relies on same byte width of both types!
 instance (Integral x, LiftedPrim x, Integral y) => LiftedPrim (ViaFromIntegral x y) where
   elemSizeLifted _ = elemSizeLifted (Proxy :: Proxy x)
-  indexByteArrayLifted arr pos = ViaFromIntegral (fromIntegral (indexByteArrayLifted arr pos :: x))
-  writeByteArrayLifted arr pos val = let !x = fromIntegral (unViaFromIntegral val) :: x in writeByteArrayLifted arr pos x
+  indexArrayLiftedInBytes arr off = ViaFromIntegral (fromIntegral (indexArrayLiftedInBytes arr off :: x))
+  writeArrayLiftedInBytes arr off val = let !x = fromIntegral (unViaFromIntegral val) :: x in writeArrayLiftedInBytes arr off x
+  indexPtrLiftedInBytes ptr = ViaFromIntegral . fromIntegral @x @y . indexPtrLiftedInBytes ptr
+  writePtrLiftedInBytes ptr off (ViaFromIntegral y) = writePtrLiftedInBytes ptr off (fromIntegral y :: x)
 
 newtype LiftedPrimArray a = LiftedPrimArray {unLiftedPrimArray :: ByteArray}
   deriving stock (Show)
@@ -104,10 +124,10 @@ emptyLiftedPrimArray :: LiftedPrimArray a
 emptyLiftedPrimArray = LiftedPrimArray emptyByteArray
 
 indexLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int -> a
-indexLiftedPrimArray (LiftedPrimArray arr) = indexByteArrayLiftedInElems arr
+indexLiftedPrimArray (LiftedPrimArray arr) = indexArrayLiftedInElems Proxy arr
 
 writeLiftedPrimArray :: (LiftedPrim a, PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> Int -> a -> m ()
-writeLiftedPrimArray (MutableLiftedPrimArray arr) = writeByteArrayLiftedInElems arr
+writeLiftedPrimArray (MutableLiftedPrimArray arr) = writeArrayLiftedInElems arr
 
 freezeLiftedPrimArray :: PrimMonad m => MutableLiftedPrimArray (PrimState m) a -> Int -> Int -> m (LiftedPrimArray a)
 freezeLiftedPrimArray (MutableLiftedPrimArray arr) off len = fmap LiftedPrimArray (freezeByteArray arr off len)
@@ -129,7 +149,7 @@ liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
   offRef <- newSTRef 0
   for_ xs $ \x -> do
     off <- readSTRef offRef
-    writeByteArrayLifted arr off x
+    writeArrayLiftedInBytes arr off x
     modifySTRef' offRef (elemSize +)
   pure arr
 
@@ -159,7 +179,7 @@ replicateLiftedPrimArray len val = LiftedPrimArray $ runByteArray $ do
       !byteLen = len * elemSize
   arr <- newByteArray byteLen
   for_ [0 .. len - 1] $ \pos ->
-    writeByteArrayLifted arr (pos * elemSize) val
+    writeArrayLiftedInBytes arr (pos * elemSize) val
   pure arr
 
 -- | Fill a byte array with the given value
@@ -168,4 +188,4 @@ setByteArrayLifted arr off len val = do
   let !elemSize = elemSizeLifted (proxyFor val)
       !elemLen = div len elemSize
   for_ [0 .. elemLen - 1] $ \pos ->
-    writeByteArrayLifted arr (off + pos * elemSize) val
+    writeArrayLiftedInBytes arr (off + pos * elemSize) val

@@ -87,7 +87,8 @@ instance Binary TermBytes where
 newtype StaticBytes (n :: Nat) = StaticBytes {unStaticBytes :: ShortByteString}
   deriving stock (Show)
   deriving newtype (IsString)
-  deriving (ByteSized) via (ViaStaticByteSized (StaticBytes n))
+
+deriving via (ViaStaticByteSized (StaticBytes n)) instance KnownNat n => ByteSized (StaticBytes n)
 
 mkStaticBytes :: KnownNat n => Proxy n -> ShortByteString -> StaticBytes n
 mkStaticBytes prox sbs =
@@ -145,7 +146,8 @@ instance (KnownNat n, Binary a, StaticByteSized a, Default a) => Binary (StaticS
 newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray a}
   deriving stock (Show)
   deriving newtype (Eq)
-  deriving (ByteSized) via (ViaStaticByteSized (StaticArray n a))
+
+deriving via (ViaStaticByteSized (StaticArray n a)) instance (KnownNat n, StaticByteSized a) => ByteSized (StaticArray n a)
 
 instance (KnownNat n, LiftedPrim a, Default a) => Default (StaticArray n a) where
   def = StaticArray (replicateLiftedPrimArray (fromIntegral (natVal (Proxy :: Proxy n))) def)

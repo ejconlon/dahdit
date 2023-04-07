@@ -68,7 +68,6 @@ import Data.Primitive.ByteArray
   , MutableByteArray
   , cloneByteArray
   , copyByteArray
-  , indexByteArray
   , newByteArray
   , unsafeFreezeByteArray
   )
@@ -121,15 +120,18 @@ prettyGetError = \case
 
 data GetEnv s = GetEnv
   { geLen :: !Int
-  , gePos :: !(STRef s Int)
+  -- ^ Remaining length of buffer segment
+  , geOff :: !(STRef s Int)
+  -- ^ Offset from buffer start (in bytes)
   , geArray :: !ByteArray
+  -- ^ Source buffer
   }
 
 newGetEnv :: ShortByteString -> ST s (GetEnv s)
 newGetEnv sbs@(SBS arr) = do
   let !len = BSS.length sbs
-  pos <- newSTRef 0
-  pure $! GetEnv len pos (ByteArray arr)
+  off <- newSTRef 0
+  pure $! GetEnv len off (ByteArray arr)
 
 newtype GetEff s a = GetEff {unGetEff :: ReaderT (GetEnv s) (ExceptT GetError (ST s)) a}
   deriving newtype (Functor, Applicative, Monad, MonadReader (GetEnv s), MonadError GetError)
@@ -148,42 +150,42 @@ newtype GetRun s a = GetRun {unGetRun :: FreeT GetF (GetEff s) a}
 
 guardReadBytes :: String -> Int -> GetEff s Int
 guardReadBytes nm bc = do
-  GetEnv l posRef _ <- ask
-  pos <- stGetEff (readSTRef posRef)
-  let !ac = l - pos
+  GetEnv l offRef _ <- ask
+  off <- stGetEff (readSTRef offRef)
+  let !ac = l - off
   if bc > ac
     then throwError (GetErrorParseNeed nm (fromIntegral ac) (fromIntegral bc))
-    else pure pos
+    else pure off
 
 readBytes :: String -> Int -> (ByteArray -> Int -> a) -> GetEff s a
 readBytes nm bc f = do
-  pos <- guardReadBytes nm bc
-  GetEnv _ posRef arr <- ask
+  off <- guardReadBytes nm bc
+  GetEnv _ offRef arr <- ask
   stGetEff $ do
-    let !a = f arr pos
-        !newPos = pos + bc
-    writeSTRef posRef newPos
+    let !a = f arr off
+        !newOff = off + bc
+    writeSTRef offRef newOff
     pure a
 
 readShortByteString :: Int -> ByteArray -> Int -> ShortByteString
-readShortByteString len arr pos = let !(ByteArray frozArr) = cloneByteArray arr pos len in SBS frozArr
+readShortByteString len arr off = let !(ByteArray frozArr) = cloneByteArray arr off len in SBS frozArr
 
 readScope :: GetScopeF (GetEff s a) -> GetEff s a
 readScope (GetScopeF sm bc g k) = do
   let intBc = fromIntegral bc
-  GetEnv oldLen posRef _ <- ask
-  oldPos <- stGetEff (readSTRef posRef)
-  let !oldAvail = oldLen - oldPos
+  GetEnv oldLen offRef _ <- ask
+  oldOff <- stGetEff (readSTRef offRef)
+  let !oldAvail = oldLen - oldOff
   if intBc > oldAvail
     then throwError (GetErrorParseNeed "scope" (fromIntegral oldAvail) bc)
     else do
-      let !newLen = oldPos + intBc
+      let !newLen = oldOff + intBc
       a <- local (\ge -> ge {geLen = newLen}) (mkGetEff g)
       case sm of
         ScopeModeWithin -> k a
         ScopeModeExact -> do
-          newPos <- stGetEff (readSTRef posRef)
-          let !actualBc = newPos - oldPos
+          newOff <- stGetEff (readSTRef offRef)
+          let !actualBc = newOff - oldOff
           if actualBc == intBc
             then k a
             else throwError (GetErrorScopedMismatch (fromIntegral actualBc) bc)
@@ -198,35 +200,35 @@ readStaticSeq gss@(GetStaticSeqF ec g k) = do
 readStaticArray :: GetStaticArrayF (GetEff s a) -> GetEff s a
 readStaticArray gsa@(GetStaticArrayF _ _ k) = do
   let !bc = getStaticArraySize gsa
-  sa <- readBytes "static vector" bc (\arr pos -> cloneByteArray arr pos bc)
+  sa <- readBytes "static vector" bc (\arr off -> cloneByteArray arr off bc)
   k (LiftedPrimArray sa)
 
 readLookAhead :: GetLookAheadF (GetEff s a) -> GetEff s a
 readLookAhead (GetLookAheadF g k) = do
-  posRef <- asks gePos
-  startPos <- stGetEff (readSTRef posRef)
+  offRef <- asks geOff
+  startOff <- stGetEff (readSTRef offRef)
   a <- mkGetEff g
-  stGetEff (writeSTRef posRef startPos)
+  stGetEff (writeSTRef offRef startOff)
   k a
 
 execGetRun :: GetF (GetEff s a) -> GetEff s a
 execGetRun = \case
-  GetFWord8 k -> readBytes "Word8" 1 (indexByteArray @Word8) >>= k
-  GetFInt8 k -> readBytes "Int8" 1 (indexByteArray @Int8) >>= k
-  GetFWord16LE k -> readBytes "Word16LE" 2 (indexByteArrayLifted @Word16LE) >>= k
-  GetFInt16LE k -> readBytes "Int16LE" 2 (indexByteArrayLifted @Int16LE) >>= k
-  GetFWord24LE k -> readBytes "Word24LE" 3 (indexByteArrayLifted @Word24LE) >>= k
-  GetFInt24LE k -> readBytes "Int24LE" 3 (indexByteArrayLifted @Int24LE) >>= k
-  GetFWord32LE k -> readBytes "Word32LE" 4 (indexByteArrayLifted @Word32LE) >>= k
-  GetFInt32LE k -> readBytes "Int32LE" 4 (indexByteArrayLifted @Int32LE) >>= k
-  GetFFloatLE k -> readBytes "FloatLE" 4 (indexByteArrayLifted @FloatLE) >>= k
-  GetFWord16BE k -> readBytes "Word16BE" 2 (indexByteArrayLifted @Word16BE) >>= k
-  GetFInt16BE k -> readBytes "Int16BE" 2 (indexByteArrayLifted @Int16BE) >>= k
-  GetFWord24BE k -> readBytes "Word24BE" 3 (indexByteArrayLifted @Word24BE) >>= k
-  GetFInt24BE k -> readBytes "Int24BE" 3 (indexByteArrayLifted @Int24BE) >>= k
-  GetFWord32BE k -> readBytes "Word32BE" 4 (indexByteArrayLifted @Word32BE) >>= k
-  GetFInt32BE k -> readBytes "Int32BE" 4 (indexByteArrayLifted @Int32BE) >>= k
-  GetFFloatBE k -> readBytes "FloatBE" 4 (indexByteArrayLifted @FloatBE) >>= k
+  GetFWord8 k -> readBytes "Word8" 1 (indexArrayLiftedInBytes @Word8) >>= k
+  GetFInt8 k -> readBytes "Int8" 1 (indexArrayLiftedInBytes @Int8) >>= k
+  GetFWord16LE k -> readBytes "Word16LE" 2 (indexArrayLiftedInBytes @Word16LE) >>= k
+  GetFInt16LE k -> readBytes "Int16LE" 2 (indexArrayLiftedInBytes @Int16LE) >>= k
+  GetFWord24LE k -> readBytes "Word24LE" 3 (indexArrayLiftedInBytes @Word24LE) >>= k
+  GetFInt24LE k -> readBytes "Int24LE" 3 (indexArrayLiftedInBytes @Int24LE) >>= k
+  GetFWord32LE k -> readBytes "Word32LE" 4 (indexArrayLiftedInBytes @Word32LE) >>= k
+  GetFInt32LE k -> readBytes "Int32LE" 4 (indexArrayLiftedInBytes @Int32LE) >>= k
+  GetFFloatLE k -> readBytes "FloatLE" 4 (indexArrayLiftedInBytes @FloatLE) >>= k
+  GetFWord16BE k -> readBytes "Word16BE" 2 (indexArrayLiftedInBytes @Word16BE) >>= k
+  GetFInt16BE k -> readBytes "Int16BE" 2 (indexArrayLiftedInBytes @Int16BE) >>= k
+  GetFWord24BE k -> readBytes "Word24BE" 3 (indexArrayLiftedInBytes @Word24BE) >>= k
+  GetFInt24BE k -> readBytes "Int24BE" 3 (indexArrayLiftedInBytes @Int24BE) >>= k
+  GetFWord32BE k -> readBytes "Word32BE" 4 (indexArrayLiftedInBytes @Word32BE) >>= k
+  GetFInt32BE k -> readBytes "Int32BE" 4 (indexArrayLiftedInBytes @Int32BE) >>= k
+  GetFFloatBE k -> readBytes "FloatBE" 4 (indexArrayLiftedInBytes @FloatBE) >>= k
   GetFShortByteString bc k ->
     let !len = fromIntegral bc
     in  readBytes "ShortByteString" len (readShortByteString len) >>= k
@@ -234,14 +236,14 @@ execGetRun = \case
   GetFStaticArray gsa -> readStaticArray gsa
   GetFByteArray bc k ->
     let !len = fromIntegral bc
-    in  readBytes "ByteArray" len (\arr pos -> cloneByteArray arr pos len) >>= k
+    in  readBytes "ByteArray" len (\arr off -> cloneByteArray arr off len) >>= k
   GetFScope gs -> readScope gs
   GetFSkip bc k -> readBytes "skip" (fromIntegral bc) (\_ _ -> ()) *> k
   GetFLookAhead gla -> readLookAhead gla
   GetFRemainingSize k -> do
-    GetEnv len posRef _ <- ask
-    pos <- stGetEff (readSTRef posRef)
-    let !bc = fromIntegral (len - pos)
+    GetEnv len offRef _ <- ask
+    off <- stGetEff (readSTRef offRef)
+    let !bc = fromIntegral (len - off)
     k bc
   GetFFail msg -> fail msg
 
@@ -262,7 +264,7 @@ runGet m bs = runST $ do
   let !n = mkGetEff m
   env <- newGetEnv bs
   ea <- runGetEff n env
-  bc <- readSTRef (gePos env)
+  bc <- readSTRef (geOff env)
   pure (ea, fromIntegral bc)
 
 runGetIO :: Get a -> ShortByteString -> IO (a, ByteCount)
@@ -282,8 +284,11 @@ runGetFile m fp = do
 
 data PutEnv s = PutEnv
   { peLen :: !Int
-  , pePos :: !(STRef s Int)
+  -- ^ Remaining capacity in buffer segment
+  , peOff :: !(STRef s Int)
+  -- ^ Offset in bytes from start of buffer
   , peArray :: !(MutableByteArray s)
+  -- ^ Destination buffer
   }
 
 newPutEnv :: Int -> ST s (PutEnv s)
@@ -303,18 +308,18 @@ newtype PutRun s a = PutRun {unPutRun :: FreeT PutF (PutEff s) a}
 
 writeBytes :: Int -> (MutableByteArray s -> Int -> ST s ()) -> PutEff s ()
 writeBytes bc f = do
-  PutEnv _ posRef arr <- ask
+  PutEnv _ offRef arr <- ask
   stPutEff $ do
-    pos <- readSTRef posRef
-    f arr pos
-    let !newPos = pos + bc
-    writeSTRef posRef newPos
+    off <- readSTRef offRef
+    f arr off
+    let !newOff = off + bc
+    writeSTRef offRef newOff
 
 writeArray :: LiftedPrim a => a -> MutableByteArray (PrimState (ST s)) -> Int -> ST s ()
-writeArray val arr pos = writeByteArrayLifted arr pos val
+writeArray val arr off = writeArrayLiftedInBytes arr off val
 
 writeShortByteString :: ShortByteString -> Int -> MutableByteArray s -> Int -> ST s ()
-writeShortByteString (SBS frozArr) len arr pos = copyByteArray arr pos (ByteArray frozArr) 0 len
+writeShortByteString (SBS frozArr) len arr off = copyByteArray arr off (ByteArray frozArr) 0 len
 
 writeStaticSeq :: PutStaticSeqF (PutEff s a) -> PutEff s a
 writeStaticSeq (PutStaticSeqF n mz p s k) = do
@@ -334,13 +339,13 @@ writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = d
       !haveElems = sizeofLiftedPrimArray a
       !useElems = min haveElems (fromIntegral needElems)
       !useBc = elemSize * useElems
-  writeBytes useBc (\arr pos -> copyByteArray arr pos ba 0 useBc)
+  writeBytes useBc (\arr off -> copyByteArray arr off ba 0 useBc)
   let !needBc = putStaticArraySize psa
   unless (useBc == needBc) $ do
     let !extraBc = needBc - useBc
     case mz of
       Nothing -> error "no default element for undersized static array"
-      Just z -> writeBytes extraBc (\arr pos -> setByteArrayLifted arr pos extraBc z)
+      Just z -> writeBytes extraBc (\arr off -> setByteArrayLifted arr off extraBc z)
   k
 
 execPutRun :: PutF (PutEff s a) -> PutEff s a
@@ -368,7 +373,7 @@ execPutRun = \case
   PutFStaticArray psa -> writeStaticArray psa
   PutFByteArray bc barr k ->
     let !len = fromIntegral bc
-    in  writeBytes len (\arr pos -> copyByteArray arr pos barr 0 len) *> k
+    in  writeBytes len (\arr off -> copyByteArray arr off barr 0 len) *> k
   PutFStaticHint (PutStaticHintF _ p k) -> mkPutEff p *> k
 
 runPutRun :: PutRun s a -> PutEnv s -> ST s a
@@ -387,10 +392,10 @@ runPutUnsafe :: Put -> ByteCount -> ShortByteString
 runPutUnsafe m bc = runST $ do
   let !len = fromIntegral bc
       !n = mkPutRun m
-  st@(PutEnv _ posRef arr) <- newPutEnv len
+  st@(PutEnv _ offRef arr) <- newPutEnv len
   runPutRun n st
-  pos <- readSTRef posRef
-  unless (pos == len) (error ("Invalid put length: (given " ++ show len ++ ", used " ++ show pos ++ ")"))
+  off <- readSTRef offRef
+  unless (off == len) (error ("Invalid put length: (given " ++ show len ++ ", used " ++ show off ++ ")"))
   ByteArray frozArr <- unsafeFreezeByteArray arr
   pure $! SBS frozArr
 
