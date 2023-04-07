@@ -15,6 +15,7 @@ import Control.Exception (Exception (..), throwIO)
 import Control.Monad (replicateM_, unless)
 import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.Free.Church (F (..))
+import Control.Monad.Primitive (PrimMonad (..))
 import Control.Monad.Reader (MonadReader (..), ReaderT (..), asks)
 import Control.Monad.ST.Strict (ST, runST)
 import Control.Monad.State.Strict (MonadState, State, runState)
@@ -37,7 +38,7 @@ import Dahdit.Free
   , PutStaticSeqF (..)
   , ScopeMode (..)
   )
-import Dahdit.LiftedPrim (LiftedPrim (..))
+import Dahdit.LiftedPrim (LiftedPrim (..), LiftedPrimArray (..), setByteArrayLifted, sizeofLiftedPrimArray)
 import Dahdit.Nums
   ( FloatBE
   , FloatLE
@@ -69,11 +70,8 @@ import Data.Primitive.ByteArray
   , copyByteArray
   , indexByteArray
   , newByteArray
-  , setByteArray
   , unsafeFreezeByteArray
-  , writeByteArray
   )
-import Data.Primitive.PrimArray (PrimArray (..), sizeofPrimArray)
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified Data.Sequence as Seq
 import Data.Word (Word8)
@@ -200,8 +198,8 @@ readStaticSeq gss@(GetStaticSeqF ec g k) = do
 readStaticArray :: GetStaticArrayF (GetEff s a) -> GetEff s a
 readStaticArray gsa@(GetStaticArrayF _ _ k) = do
   let !bc = getStaticArraySize gsa
-  sa <- readBytes "static vector" bc (\arr pos -> let !(ByteArray frozArr) = cloneByteArray arr pos bc in PrimArray frozArr)
-  k sa
+  sa <- readBytes "static vector" bc (\arr pos -> cloneByteArray arr pos bc)
+  k (LiftedPrimArray sa)
 
 readLookAhead :: GetLookAheadF (GetEff s a) -> GetEff s a
 readLookAhead (GetLookAheadF g k) = do
@@ -215,20 +213,20 @@ execGetRun :: GetF (GetEff s a) -> GetEff s a
 execGetRun = \case
   GetFWord8 k -> readBytes "Word8" 1 (indexByteArray @Word8) >>= k
   GetFInt8 k -> readBytes "Int8" 1 (indexByteArray @Int8) >>= k
-  GetFWord16LE k -> readBytes "Word16LE" 2 (indexByteArrayLiftedInBytes @Word16LE) >>= k
-  GetFInt16LE k -> readBytes "Int16LE" 2 (indexByteArrayLiftedInBytes @Int16LE) >>= k
-  GetFWord24LE k -> readBytes "Word24LE" 3 (indexByteArrayLiftedInBytes @Word24LE) >>= k
-  GetFInt24LE k -> readBytes "Int24LE" 3 (indexByteArrayLiftedInBytes @Int24LE) >>= k
-  GetFWord32LE k -> readBytes "Word32LE" 4 (indexByteArrayLiftedInBytes @Word32LE) >>= k
-  GetFInt32LE k -> readBytes "Int32LE" 4 (indexByteArrayLiftedInBytes @Int32LE) >>= k
-  GetFFloatLE k -> readBytes "FloatLE" 4 (indexByteArrayLiftedInBytes @FloatLE) >>= k
-  GetFWord16BE k -> readBytes "Word16BE" 2 (indexByteArrayLiftedInBytes @Word16BE) >>= k
-  GetFInt16BE k -> readBytes "Int16BE" 2 (indexByteArrayLiftedInBytes @Int16BE) >>= k
-  GetFWord24BE k -> readBytes "Word24BE" 3 (indexByteArrayLiftedInBytes @Word24BE) >>= k
-  GetFInt24BE k -> readBytes "Int24BE" 3 (indexByteArrayLiftedInBytes @Int24BE) >>= k
-  GetFWord32BE k -> readBytes "Word32BE" 4 (indexByteArrayLiftedInBytes @Word32BE) >>= k
-  GetFInt32BE k -> readBytes "Int32BE" 4 (indexByteArrayLiftedInBytes @Int32BE) >>= k
-  GetFFloatBE k -> readBytes "FloatBE" 4 (indexByteArrayLiftedInBytes @FloatBE) >>= k
+  GetFWord16LE k -> readBytes "Word16LE" 2 (indexByteArrayLifted @Word16LE) >>= k
+  GetFInt16LE k -> readBytes "Int16LE" 2 (indexByteArrayLifted @Int16LE) >>= k
+  GetFWord24LE k -> readBytes "Word24LE" 3 (indexByteArrayLifted @Word24LE) >>= k
+  GetFInt24LE k -> readBytes "Int24LE" 3 (indexByteArrayLifted @Int24LE) >>= k
+  GetFWord32LE k -> readBytes "Word32LE" 4 (indexByteArrayLifted @Word32LE) >>= k
+  GetFInt32LE k -> readBytes "Int32LE" 4 (indexByteArrayLifted @Int32LE) >>= k
+  GetFFloatLE k -> readBytes "FloatLE" 4 (indexByteArrayLifted @FloatLE) >>= k
+  GetFWord16BE k -> readBytes "Word16BE" 2 (indexByteArrayLifted @Word16BE) >>= k
+  GetFInt16BE k -> readBytes "Int16BE" 2 (indexByteArrayLifted @Int16BE) >>= k
+  GetFWord24BE k -> readBytes "Word24BE" 3 (indexByteArrayLifted @Word24BE) >>= k
+  GetFInt24BE k -> readBytes "Int24BE" 3 (indexByteArrayLifted @Int24BE) >>= k
+  GetFWord32BE k -> readBytes "Word32BE" 4 (indexByteArrayLifted @Word32BE) >>= k
+  GetFInt32BE k -> readBytes "Int32BE" 4 (indexByteArrayLifted @Int32BE) >>= k
+  GetFFloatBE k -> readBytes "FloatBE" 4 (indexByteArrayLifted @FloatBE) >>= k
   GetFShortByteString bc k ->
     let !len = fromIntegral bc
     in  readBytes "ShortByteString" len (readShortByteString len) >>= k
@@ -312,6 +310,9 @@ writeBytes bc f = do
     let !newPos = pos + bc
     writeSTRef posRef newPos
 
+writeArray :: LiftedPrim a => a -> MutableByteArray (PrimState (ST s)) -> Int -> ST s ()
+writeArray val arr pos = writeByteArrayLifted arr pos val
+
 writeShortByteString :: ShortByteString -> Int -> MutableByteArray s -> Int -> ST s ()
 writeShortByteString (SBS frozArr) len arr pos = copyByteArray arr pos (ByteArray frozArr) 0 len
 
@@ -328,36 +329,38 @@ writeStaticSeq (PutStaticSeqF n mz p s k) = do
   k
 
 writeStaticArray :: PutStaticArrayF (PutEff s a) -> PutEff s a
-writeStaticArray psa@(PutStaticArrayF needElems mz a@(PrimArray frozArr) k) = do
+writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = do
   let !elemSize = putStaticArrayElemSize psa
-      !haveElems = sizeofPrimArray a
+      !haveElems = sizeofLiftedPrimArray a
       !useElems = min haveElems (fromIntegral needElems)
       !useBc = elemSize * useElems
-  writeBytes useBc (\arr pos -> copyByteArray arr pos (ByteArray frozArr) 0 useBc)
+  writeBytes useBc (\arr pos -> copyByteArray arr pos ba 0 useBc)
   let !needBc = putStaticArraySize psa
   unless (useBc == needBc) $ do
     let !extraBc = needBc - useBc
-    writeBytes extraBc (\arr pos -> setByteArray arr (pos + useBc) (pos + extraBc) (fromJust mz))
+    case mz of
+      Nothing -> error "no default element for undersized static array"
+      Just z -> writeBytes extraBc (\arr pos -> setByteArrayLifted arr pos extraBc z)
   k
 
 execPutRun :: PutF (PutEff s a) -> PutEff s a
 execPutRun = \case
-  PutFWord8 x k -> writeBytes 1 (\arr pos -> writeByteArray arr pos x) *> k
-  PutFInt8 x k -> writeBytes 1 (\arr pos -> writeByteArray arr pos x) *> k
-  PutFWord16LE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
-  PutFInt16LE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
-  PutFWord24LE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
-  PutFInt24LE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
-  PutFWord32LE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
-  PutFInt32LE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
-  PutFFloatLE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
-  PutFWord16BE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
-  PutFInt16BE x k -> writeBytes 2 (writeByteArrayLiftedInBytes x) *> k
-  PutFWord24BE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
-  PutFInt24BE x k -> writeBytes 3 (writeByteArrayLiftedInBytes x) *> k
-  PutFWord32BE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
-  PutFInt32BE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
-  PutFFloatBE x k -> writeBytes 4 (writeByteArrayLiftedInBytes x) *> k
+  PutFWord8 x k -> writeBytes 1 (writeArray x) *> k
+  PutFInt8 x k -> writeBytes 1 (writeArray x) *> k
+  PutFWord16LE x k -> writeBytes 2 (writeArray x) *> k
+  PutFInt16LE x k -> writeBytes 2 (writeArray x) *> k
+  PutFWord24LE x k -> writeBytes 3 (writeArray x) *> k
+  PutFInt24LE x k -> writeBytes 3 (writeArray x) *> k
+  PutFWord32LE x k -> writeBytes 4 (writeArray x) *> k
+  PutFInt32LE x k -> writeBytes 4 (writeArray x) *> k
+  PutFFloatLE x k -> writeBytes 4 (writeArray x) *> k
+  PutFWord16BE x k -> writeBytes 2 (writeArray x) *> k
+  PutFInt16BE x k -> writeBytes 2 (writeArray x) *> k
+  PutFWord24BE x k -> writeBytes 3 (writeArray x) *> k
+  PutFInt24BE x k -> writeBytes 3 (writeArray x) *> k
+  PutFWord32BE x k -> writeBytes 4 (writeArray x) *> k
+  PutFInt32BE x k -> writeBytes 4 (writeArray x) *> k
+  PutFFloatBE x k -> writeBytes 4 (writeArray x) *> k
   PutFShortByteString bc sbs k ->
     let !len = fromIntegral bc
     in  writeBytes len (writeShortByteString sbs len) *> k

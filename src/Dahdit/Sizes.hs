@@ -33,8 +33,6 @@ import qualified Data.ByteString.Short as BSS
 import Data.Default (Default)
 import Data.Foldable (foldMap')
 import Data.Int (Int16, Int32, Int64, Int8)
-import Data.Primitive (Prim)
-import Data.Primitive.PrimArray (PrimArray, sizeofPrimArray)
 import Data.Proxy (Proxy (..))
 import Data.Semigroup (Sum (..))
 import Data.Sequence (Seq)
@@ -128,12 +126,6 @@ instance StaticByteSized a => ByteSized (Seq a) where
   byteSize ss =
     let !elen = staticByteSize (Proxy :: Proxy a)
         !alen = fromIntegral (Seq.length ss)
-    in  elen * alen
-
-instance (StaticByteSized a, Prim a) => ByteSized (PrimArray a) where
-  byteSize pa =
-    let !elen = staticByteSize (Proxy :: Proxy a)
-        !alen = fromIntegral (sizeofPrimArray pa)
     in  elen * alen
 
 instance (StaticByteSized a, LiftedPrim a) => ByteSized (LiftedPrimArray a) where

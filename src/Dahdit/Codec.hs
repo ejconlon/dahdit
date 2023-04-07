@@ -18,12 +18,12 @@ where
 import Dahdit.Binary (Binary (..))
 import Dahdit.Fancy (BoolByte, ExactBytes, StaticArray, StaticSeq, TermBytes)
 import Dahdit.Free (Get, Put)
+import Dahdit.LiftedPrim (LiftedPrim)
 import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE, Word24BE, Word24LE, Word32BE, Word32LE)
 import Dahdit.Sizes (ByteSized (..), StaticByteSized)
 import Data.Coerce (coerce)
 import Data.Default (Default)
 import Data.Int (Int8)
-import Data.Primitive (Prim)
 import Data.Word (Word8)
 import GHC.TypeLits (KnownNat, KnownSymbol)
 
@@ -114,7 +114,7 @@ deriving via (ViaBinary TermBytes) instance HasCodec TermBytes
 
 deriving via (ViaBinary (StaticSeq n a)) instance (KnownNat n, Binary a, StaticByteSized a, Default a) => HasCodec (StaticSeq n a)
 
-deriving via (ViaBinary (StaticArray n a)) instance (KnownNat n, Prim a, StaticByteSized a, Default a) => HasCodec (StaticArray n a)
+deriving via (ViaBinary (StaticArray n a)) instance (KnownNat n, LiftedPrim a, StaticByteSized a, Default a) => HasCodec (StaticArray n a)
 
 deriving via (ViaBinary BoolByte) instance HasCodec BoolByte
 

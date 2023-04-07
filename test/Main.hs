@@ -16,6 +16,7 @@ import Dahdit
   , Put
   , ShortByteString
   , StaticByteSized (..)
+  , StaticBytes (..)
   , ViaGeneric (..)
   , ViaStaticGeneric (..)
   , Word16LE
@@ -75,9 +76,9 @@ import Dahdit
   , runGet
   , runPut
   )
+import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Short as BSS
 import Data.Primitive.ByteArray (byteArrayFromList)
-import Data.Primitive.PrimArray (primArrayFromList)
 import qualified Data.Sequence as Seq
 import GHC.Float (castWord32ToFloat)
 import Test.Tasty (TestTree, defaultMain, testGroup)
@@ -90,6 +91,11 @@ data DynFoo = DynFoo !Word8 !Word16LE
 data StaFoo = StaFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
   deriving (ByteSized, StaticByteSized, Binary) via (ViaStaticGeneric StaFoo)
+
+type StaBytes = StaticBytes 2
+
+mkStaBytes :: String -> StaBytes
+mkStaBytes = StaticBytes . BSS.toShort . BSC.pack
 
 runGetCase :: (Show a, Eq a) => Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> IO ()
 runGetCase getter mayRes bsl = do
@@ -129,6 +135,9 @@ testDahditByteSize =
     , testCase "ShortByteString" (byteSize @ShortByteString (BSS.pack [0xEC, 0x5D]) @?= 2)
     , testCase "DynFoo" (byteSize (DynFoo 0xBB 0x5DEC) @?= 3)
     , testCase "StaFoo" (byteSize (StaFoo 0xBB 0x5DEC) @?= 3)
+    , testCase "StaBytes" (byteSize (mkStaBytes "hi") @?= 2)
+    , testCase "StaBytes (less)" (byteSize (mkStaBytes "h") @?= 2)
+    , testCase "StaBytes (more)" (byteSize (mkStaBytes "hi!") @?= 2)
     ]
 
 testDahditStaticByteSize :: TestTree
@@ -144,6 +153,7 @@ testDahditStaticByteSize =
     , testCase "FloatLE" (staticByteSize @FloatLE Proxy @?= 4)
     , testCase "StaFoo" (staticByteSize @StaFoo Proxy @?= 3)
     , testCase "BoolByte" (staticByteSize @BoolByte Proxy @?= 1)
+    , testCase "StaBytes" (staticByteSize @StaBytes Proxy @?= 2)
     ]
 
 testDahditGet :: TestTree
@@ -176,7 +186,7 @@ testDahditGet =
     , testCase "Two Word16LE" (runGetCase ((,) <$> getWord16LE <*> getWord16LE) (Just (4, 0, (0x5DEC, 0x4020))) [0xEC, 0x5D, 0x20, 0x40])
     , testCase "Seq" (runGetCase (getSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
     , testCase "StaticSeq" (runGetCase (getStaticSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "StaticArray" (runGetCase (getStaticArray @Word16LE 2) (Just (4, 0, primArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
+    , testCase "StaticArray" (runGetCase (getStaticArray @Word16LE 2) (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
     , testCase "DynFoo" (runGetCase (get @DynFoo) (Just (3, 0, DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
     , testCase "StaFoo" (runGetCase (get @StaFoo) (Just (3, 0, StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
     , testCase "getRemainingSize" (runGetCase getRemainingSize (Just (0, 3, 3)) [0xBB, 0xEC, 0x5D])
@@ -192,6 +202,7 @@ testDahditGet =
     , testCase "BoolByte False" (runGetCase (get @BoolByte) (Just (1, 0, BoolByte False)) [0x00])
     , testCase "getByteArray" (runGetCase (getByteArray 3) (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC, 0x5D])
     , testCase "getLiftedPrimArray" (runGetCase (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D])
+    , testCase "StaBytes" (runGetCase (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21])
     ]
 
 testDahditPut :: TestTree
@@ -219,13 +230,16 @@ testDahditPut =
     , testCase "Two Word16LE" (runPutCase (putWord16LE 0x5DEC *> putWord16LE 0x4020) [0xEC, 0x5D, 0x20, 0x40])
     , testCase "Seq" (runPutCase (putSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
     , testCase "StaticSeq" (runPutCase (putStaticSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "StaticArray" (runPutCase (putStaticArray @Word16LE (primArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
+    , testCase "StaticArray" (runPutCase (putStaticArray @Word16LE (liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
     , testCase "DynFoo" (runPutCase (put (DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
     , testCase "StaFoo" (runPutCase (put (StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
     , testCase "BoolByte True" (runPutCase (put (BoolByte True)) [0x01])
     , testCase "BoolByte False" (runPutCase (put (BoolByte False)) [0x00])
     , testCase "putByteArray" (runPutCase (putByteArray (byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC])
     , testCase "putLiftedPrimArray" (runPutCase (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00])
+    , testCase "StaBytes" (runPutCase (put (mkStaBytes "hi")) [0x68, 0x69])
+    , testCase "StaBytes (less)" (runPutCase (put (mkStaBytes "h")) [0x68, 0x00])
+    , testCase "StaBytes (more)" (runPutCase (put (mkStaBytes "hi!")) [0x68, 0x69])
     ]
 
 testDahdit :: TestTree

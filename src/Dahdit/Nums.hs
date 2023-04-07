@@ -39,7 +39,7 @@ import Data.Bits (Bits (..))
 import Data.Default (Default (..))
 import Data.Int (Int16, Int32, Int8)
 import Data.Primitive.ByteArray (indexByteArray, writeByteArray)
-import Data.Primitive.Types (Prim (..))
+-- import Data.Primitive.Types (Prim (..))
 import Data.Proxy (Proxy (..))
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word8)
@@ -50,23 +50,23 @@ class (Num le, Num be) => EndianPair le be | le -> be, be -> le where
 
 newtype Word16LE = Word16LE {unWord16LE :: Word16}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default, Prim)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
 
 instance LiftedPrim Word16LE where
   elemSizeLifted _ = 2
 
-  indexByteArrayLiftedInBytes arr pos =
+  indexByteArrayLifted arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
     in  Word16LE (mkWord16LE b0 b1)
 
-  writeByteArrayLiftedInBytes w arr pos =
-    let !(b0, b1) = unMkWord16LE (unWord16LE w)
+  writeByteArrayLifted arr pos w =
+    let (!b0, !b1) = unMkWord16LE (unWord16LE w)
     in  writeByteArray arr pos b0 *> writeByteArray arr (pos + 1) b1
 
 newtype Int16LE = Int16LE {unInt16LE :: Int16}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default, Prim)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaFromIntegral Word16LE Int16LE)
 
 newtype Word24LE = Word24LE {unWord24LE :: Word24}
@@ -79,14 +79,14 @@ instance Default Word24LE where
 instance LiftedPrim Word24LE where
   elemSizeLifted _ = 3
 
-  indexByteArrayLiftedInBytes arr pos =
+  indexByteArrayLifted arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
     in  Word24LE (mkWord24LE b0 b1 b2)
 
-  writeByteArrayLiftedInBytes w arr pos = do
-    let !(b0, b1, b2) = unMkWord24LE (unWord24LE w)
+  writeByteArrayLifted arr pos w = do
+    let (!b0, !b1, !b2) = unMkWord24LE (unWord24LE w)
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1
     writeByteArray arr (pos + 2) b2
@@ -101,20 +101,20 @@ instance Default Int24LE where
 
 newtype Word32LE = Word32LE {unWord32LE :: Word32}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default, Prim)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
 
 instance LiftedPrim Word32LE where
   elemSizeLifted _ = 4
 
-  indexByteArrayLiftedInBytes arr pos =
+  indexByteArrayLifted arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
         !b3 = indexByteArray arr (pos + 3)
     in  Word32LE (mkWord32LE b0 b1 b2 b3)
 
-  writeByteArrayLiftedInBytes w arr pos = do
-    let !(b0, b1, b2, b3) = unMkWord32LE (unWord32LE w)
+  writeByteArrayLifted arr pos w = do
+    let (!b0, !b1, !b2, !b3) = unMkWord32LE (unWord32LE w)
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1
     writeByteArray arr (pos + 2) b2
@@ -122,25 +122,25 @@ instance LiftedPrim Word32LE where
 
 newtype Int32LE = Int32LE {unInt32LE :: Int32}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default, Prim)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaFromIntegral Word32LE Int32LE)
 
 newtype FloatLE = FloatLE {unFloatLE :: Float}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Real, Fractional, Floating, RealFrac, Default, Prim)
+  deriving newtype (Eq, Ord, Num, Real, Fractional, Floating, RealFrac, Default)
 
 instance LiftedPrim FloatLE where
   elemSizeLifted _ = 4
 
-  indexByteArrayLiftedInBytes arr pos =
+  indexByteArrayLifted arr pos =
     let !b0 = indexByteArray arr pos
         !b1 = indexByteArray arr (pos + 1)
         !b2 = indexByteArray arr (pos + 2)
         !b3 = indexByteArray arr (pos + 3)
     in  FloatLE (mkFloatLE b0 b1 b2 b3)
 
-  writeByteArrayLiftedInBytes f arr pos = do
-    let !(b0, b1, b2, b3) = unMkFloatLE (unFloatLE f)
+  writeByteArrayLifted arr pos f = do
+    let (!b0, !b1, !b2, !b3) = unMkFloatLE (unFloatLE f)
     writeByteArray arr pos b0
     writeByteArray arr (pos + 1) b1
     writeByteArray arr (pos + 2) b2
@@ -184,7 +184,7 @@ newtype Int32BE = Int32BE {unInt32BE :: Int32}
 
 newtype FloatBE = FloatBE {unFloatBE :: Float}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Real, Fractional, Floating, RealFrac, Default, Prim)
+  deriving newtype (Eq, Ord, Num, Real, Fractional, Floating, RealFrac, Default)
   deriving (LiftedPrim) via (ViaEndianPair FloatLE FloatBE)
 
 instance EndianPair Word8 Word8 where
@@ -227,5 +227,5 @@ newtype ViaEndianPair le be = ViaEndianPair {unViaEndianPair :: be}
 
 instance (LiftedPrim le, EndianPair le be) => LiftedPrim (ViaEndianPair le be) where
   elemSizeLifted _ = elemSizeLifted (Proxy :: Proxy le)
-  indexByteArrayLiftedInBytes arr pos = ViaEndianPair (toBigEndian (indexByteArrayLiftedInBytes arr pos))
-  writeByteArrayLiftedInBytes (ViaEndianPair bval) = writeByteArrayLiftedInBytes (toLittleEndian bval)
+  indexByteArrayLifted arr pos = ViaEndianPair (toBigEndian (indexByteArrayLifted arr pos))
+  writeByteArrayLifted arr pos (ViaEndianPair bval) = writeByteArrayLifted arr pos (toLittleEndian bval)

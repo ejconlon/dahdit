@@ -25,15 +25,14 @@ import Dahdit.Funs
   , unsafePutStaticArrayN
   , unsafePutStaticSeqN
   )
+import Dahdit.LiftedPrim (LiftedPrim, LiftedPrimArray, replicateLiftedPrimArray)
 import Dahdit.Proxy (proxyForNatF)
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
 import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Default (Default (..))
-import Data.Primitive (Prim)
 import Data.Primitive.ByteArray (ByteArray (..), byteArrayFromListN)
-import Data.Primitive.PrimArray (PrimArray, replicatePrimArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -143,18 +142,18 @@ instance (KnownNat n, Binary a, StaticByteSized a, Default a) => Binary (StaticS
   get = fmap StaticSeq (getStaticSeq (fromIntegral (natVal (Proxy :: Proxy n))) get)
   put = unsafePutStaticSeqN (fromIntegral (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
 
-newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: PrimArray a}
+newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray a}
   deriving stock (Show)
   deriving newtype (Eq)
   deriving (ByteSized) via (ViaStaticByteSized (StaticArray n a))
 
-instance (KnownNat n, Prim a, Default a) => Default (StaticArray n a) where
-  def = StaticArray (replicatePrimArray (fromIntegral (natVal (Proxy :: Proxy n))) def)
+instance (KnownNat n, LiftedPrim a, Default a) => Default (StaticArray n a) where
+  def = StaticArray (replicateLiftedPrimArray (fromIntegral (natVal (Proxy :: Proxy n))) def)
 
 instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) where
   staticByteSize _ = fromIntegral (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
 
-instance (KnownNat n, Prim a, StaticByteSized a, Default a) => Binary (StaticArray n a) where
+instance (KnownNat n, LiftedPrim a, StaticByteSized a, Default a) => Binary (StaticArray n a) where
   get = fmap StaticArray (getStaticArray (fromIntegral (natVal (Proxy :: Proxy n))))
   put = unsafePutStaticArrayN (fromIntegral (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
 
