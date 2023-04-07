@@ -38,6 +38,7 @@ library
       Dahdit.Generic
       Dahdit.Internal
       Dahdit.LiftedPrim
+      Dahdit.Mem
       Dahdit.Nums
       Dahdit.Proxy
       Dahdit.Run
