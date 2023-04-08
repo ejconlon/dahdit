@@ -17,7 +17,7 @@ import Dahdit.Proxy (proxyFor)
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, sizeofMutableByteArray, unsafeFreezeByteArray)
+import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, unsafeFreezeByteArray)
 import Data.Primitive.Ptr (copyPtrToMutableByteArray)
 import Data.Word (Word8)
 import Foreign.Ptr (Ptr, plusPtr)
@@ -89,7 +89,7 @@ instance WriteMem (IxPtrLen x) where
 writeSBSMem :: WriteMem q => ShortByteString -> ByteCount -> q s -> ByteCount -> ST s ()
 writeSBSMem (SBS harr) = copyArrayMemInBytes (ByteArray harr) 0
 
-freezeSBSMem :: MutableByteArray s -> ST s ShortByteString
-freezeSBSMem marr = do
-  ByteArray harr <- freezeByteArray marr 0 (sizeofMutableByteArray marr)
+freezeSBSMem :: MutableByteArray s -> ByteCount -> ST s ShortByteString
+freezeSBSMem marr len = do
+  ByteArray harr <- freezeByteArray marr 0 (coerce len)
   pure (SBS harr)

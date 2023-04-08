@@ -7,6 +7,9 @@ module Dahdit
   , ByteArray
   , Generic
   , Proxy (..)
+  , GetError (..)
+  , prettyGetError
+  , runCount
   , module Dahdit.Binary
   , module Dahdit.BinaryRep
   , module Dahdit.Counts
@@ -14,10 +17,10 @@ module Dahdit
   , module Dahdit.Free
   , module Dahdit.Funs
   , module Dahdit.Generic
+  , module Dahdit.Iface
   , module Dahdit.LiftedPrim
   , module Dahdit.Nums
   , module Dahdit.Proxy
-  , module Dahdit.Run
   , module Dahdit.Sizes
   )
 where
@@ -29,10 +32,11 @@ import Dahdit.Fancy
 import Dahdit.Free (Get, Put, PutM)
 import Dahdit.Funs hiding (unsafePutStaticArrayN, unsafePutStaticSeqN)
 import Dahdit.Generic
+import Dahdit.Iface
 import Dahdit.LiftedPrim
 import Dahdit.Nums
 import Dahdit.Proxy
-import Dahdit.Run
+import Dahdit.Run (GetError (..), prettyGetError, runCount)
 import Dahdit.Sizes
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)

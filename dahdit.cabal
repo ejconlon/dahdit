@@ -37,6 +37,7 @@ library
       Dahdit.Free
       Dahdit.Funs
       Dahdit.Generic
+      Dahdit.Iface
       Dahdit.Internal
       Dahdit.LiftedPrim
       Dahdit.Mem

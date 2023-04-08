@@ -75,8 +75,8 @@ import Dahdit
   , putWord32LE
   , putWord8
   , runCount
-  , runGet
-  , runPut
+  , runGetSBS
+  , runPutSBS
   , sizeofLiftedPrimArray
   )
 import qualified Data.ByteString.Char8 as BSC
@@ -104,7 +104,7 @@ mkStaBytes = StaticBytes . BSS.toShort . BSC.pack
 runGetCase :: (Show a, Eq a) => Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> IO ()
 runGetCase getter mayRes bsl = do
   let bs = BSS.pack bsl
-      (result, actBc) = runGet getter bs
+      (result, actBc) = runGetSBS getter bs
   case (result, mayRes) of
     (Left _, Nothing) -> pure ()
     (Left err, Just (_, _, expecVal)) -> fail ("Got error <" ++ show err ++ ">, expected value <" ++ show expecVal ++ ">")
@@ -120,7 +120,7 @@ runPutCase putter expecList = do
       expecBs = BSS.pack expecList
       estBc = runCount putter
   estBc @?= expecBc
-  let actBs = runPut putter
+  let actBs = runPutSBS putter
       actBc = byteSize actBs
   actBs @?= expecBs
   actBc @?= expecBc

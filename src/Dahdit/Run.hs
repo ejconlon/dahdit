@@ -2,16 +2,13 @@ module Dahdit.Run
   ( GetError (..)
   , prettyGetError
   , runGet
-  , runGetIO
-  , runGetFile
   , runCount
   , runPut
-  , runPutFile
   )
 where
 
 import Control.Applicative (Alternative (..))
-import Control.Exception (Exception (..), throwIO)
+import Control.Exception (Exception (..))
 import Control.Monad (replicateM_, unless)
 import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.Free.Church (F (..))
@@ -39,7 +36,7 @@ import Dahdit.Free
   , ScopeMode (..)
   )
 import Dahdit.LiftedPrim (LiftedPrimArray (..), sizeofLiftedPrimArray)
-import Dahdit.Mem (ReadMem (..), WriteMem (..), freezeSBSMem, readSBSMem, viewSBSMem, writeSBSMem)
+import Dahdit.Mem (ReadMem (..), WriteMem (..), readSBSMem, writeSBSMem)
 import Dahdit.Nums
   ( FloatBE
   , FloatLE
@@ -58,15 +55,10 @@ import Dahdit.Nums
   )
 import Dahdit.Proxy (proxyForF)
 import Dahdit.Sizes (staticByteSize)
-import qualified Data.ByteString as BS
-import Data.ByteString.Short (ShortByteString)
-import qualified Data.ByteString.Short as BSS
-import qualified Data.ByteString.Short as SBS
 import Data.Coerce (coerce)
 import Data.Foldable (for_, toList)
 import Data.Int (Int8)
 import Data.Maybe (fromJust)
-import Data.Primitive.ByteArray (newByteArray)
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified Data.Sequence as Seq
 import Data.Word (Word8)
@@ -238,29 +230,13 @@ mkGetRun (Get (F w)) = GetRun (w pure wrap)
 mkGetEff :: ReadMem r => Get a -> GetEff s r a
 mkGetEff = iterGetRun . mkGetRun
 
-runGetST :: ReadMem r => Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
-runGetST act len mem = runST $ do
+runGet :: ReadMem r => Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
+runGet act len mem = runST $ do
   let eff = mkGetEff act
   env <- newGetEnv len mem
   ea <- runGetEff eff env
   bc <- readSTRef (geOff env)
   pure (ea, bc)
-
-runGet :: Get a -> ShortByteString -> (Either GetError a, ByteCount)
-runGet act sbs = runGetST act (coerce (SBS.length sbs)) (viewSBSMem sbs)
-
-runGetIO :: Get a -> ShortByteString -> IO (a, ByteCount)
-runGetIO act sbs =
-  let (ea, bc) = runGet act sbs
-  in  case ea of
-        Left e -> throwIO e
-        Right a -> pure (a, bc)
-
-runGetFile :: Get a -> FilePath -> IO (a, ByteCount)
-runGetFile act fp = do
-  bs <- BS.readFile fp
-  let sbs = BSS.toShort bs
-  runGetIO act sbs
 
 -- Put unsafe:
 
@@ -362,15 +338,12 @@ mkPutRun (PutM (F w)) = PutRun (w pure wrap)
 mkPutEff :: WriteMem q => PutM a -> PutEff s q a
 mkPutEff = iterPutRun . mkPutRun
 
-runPutUnsafe :: WriteMem q => Put -> ByteCount -> q s -> ST s (q s)
+runPutUnsafe :: WriteMem q => Put -> ByteCount -> q s -> ST s ByteCount
 runPutUnsafe act len mem = do
   let eff = mkPutRun act
   st@(PutEnv _ offRef _) <- newPutEnv len mem
   runPutRun eff st
-  off <- readSTRef offRef
-  -- This is just a sanity check - if it goes wrong then there's a bug in the library
-  unless (off == len) (error ("Invalid put length: (given " ++ show len ++ ", used " ++ show off ++ ")"))
-  pure mem
+  readSTRef offRef
 
 -- Count:
 
@@ -431,18 +404,9 @@ runCount act =
 
 -- Put safe:
 
-runPutST :: WriteMem q => Put -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ST s z) -> z
-runPutST act mkMem useMem = do
-  let bc = runCount act
-  runST (mkMem bc >>= runPutUnsafe act bc >>= useMem)
-
-runPut :: Put -> ShortByteString
-runPut act = runPutST act (newByteArray . coerce) freezeSBSMem
-
--- Put file:
-
-runPutFile :: FilePath -> Put -> IO ()
-runPutFile fp act =
-  let bs = runPut act
-      bs' = BSS.fromShort bs
-  in  BS.writeFile fp bs'
+runPut :: WriteMem q => Put -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
+runPut act mkMem useMem = runST $ do
+  let len = runCount act
+  mem <- mkMem len
+  off <- runPutUnsafe act len mem
+  useMem mem len off
