@@ -1,7 +1,11 @@
 module Dahdit.Iface
-  ( runGetSBS
+  ( GetSource (..)
+  , PutSink (..)
+  , runGetSBS
+  , runGetBS
   , runGetFile
   , runPutSBS
+  , runPutBS
   , runPutFile
   )
 where
@@ -18,23 +22,25 @@ import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (newByteArray)
 
-class Gettable z where
-  runGet :: Get a -> z -> (Either GetError a, ByteCount)
+-- TODO support getting with offset
+class GetSource z where
+  getFromSource :: Get a -> z -> (Either GetError a, ByteCount)
 
-instance Gettable ShortByteString where
-  runGet = runGetSBS
+instance GetSource ShortByteString where
+  getFromSource = runGetSBS
 
-instance Gettable ByteString where
-  runGet = runGetBS
+instance GetSource ByteString where
+  getFromSource = runGetBS
 
-class Puttable z where
-  runPut :: Put -> z
+-- TODO support putting with offset
+class PutSink z where
+  putToSink :: Put -> z
 
-instance Puttable ShortByteString where
-  runPut = runPutSBS
+instance PutSink ShortByteString where
+  putToSink = runPutSBS
 
-instance Puttable ByteString where
-  runPut = runPutBS
+instance PutSink ByteString where
+  putToSink = runPutBS
 
 runGetSBS :: Get a -> ShortByteString -> (Either GetError a, ByteCount)
 runGetSBS act sbs = runGetInternal act (coerce (BSS.length sbs)) (viewSBSMem sbs)
