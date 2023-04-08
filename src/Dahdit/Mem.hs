@@ -10,13 +10,17 @@ module Dahdit.Mem
   )
 where
 
-import Control.Monad.ST (ST)
+import Control.Monad.ST (ST, runST)
 import Dahdit.Counts (ByteCount (..))
 import Dahdit.LiftedPrim (LiftedPrim (..), setByteArrayLifted)
+import Dahdit.Proxy (proxyFor)
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, freezeByteArray, sizeofMutableByteArray)
-import Foreign.Ptr (Ptr)
+import Data.Foldable (for_)
+import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, sizeofMutableByteArray, unsafeFreezeByteArray)
+import Data.Primitive.Ptr (copyPtrToMutableByteArray)
+import Data.Word (Word8)
+import Foreign.Ptr (Ptr, plusPtr)
 
 -- | Pair of pointer to chunk of memory and usable length.
 data PtrLen x = PtrLen
@@ -38,9 +42,16 @@ instance ReadMem ByteArray where
   indexMemInBytes = indexArrayLiftedInBytes
   cloneArrayMemInBytes arr off len = cloneByteArray arr (coerce off) (coerce len)
 
+clonePtr :: Ptr x -> ByteCount -> ByteCount -> ByteArray
+clonePtr ptr off len = runST $ do
+  let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
+  marr <- newByteArray (coerce len)
+  copyPtrToMutableByteArray marr 0 wptr (coerce len)
+  unsafeFreezeByteArray marr
+
 instance ReadMem (PtrLen x) where
   indexMemInBytes = indexPtrLiftedInBytes . plPtr
-  cloneArrayMemInBytes = error "TODO"
+  cloneArrayMemInBytes = clonePtr . plPtr
 
 readSBSMem :: ReadMem r => r -> ByteCount -> ByteCount -> ShortByteString
 readSBSMem mem off len = let !(ByteArray frozArr) = cloneArrayMemInBytes mem off len in SBS frozArr
@@ -58,10 +69,22 @@ instance WriteMem MutableByteArray where
   copyArrayMemInBytes arr arrOff arrLen mem off = copyByteArray mem (coerce off) arr (coerce arrOff) (coerce arrLen)
   setMemInBytes len val mem off = setByteArrayLifted mem off len val
 
+copyPtr :: ByteArray -> ByteCount -> ByteCount -> Ptr x -> ByteCount -> ST s ()
+copyPtr arr arrOff arrLen ptr off =
+  let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
+  in  copyByteArrayToPtr wptr arr (coerce arrOff) (coerce arrLen)
+
+setPtr :: LiftedPrim a => ByteCount -> a -> Ptr x -> ByteCount -> ST s ()
+setPtr len val ptr off = do
+  let elemSize = elemSizeLifted (proxyFor val)
+      elemLen = div (coerce len) elemSize
+  for_ [0 .. elemLen - 1] $ \pos ->
+    writePtrLiftedInBytes ptr (off + pos * elemSize) val
+
 instance WriteMem (IxPtrLen x) where
   writeMemInBytes val mem off = writePtrLiftedInBytes (plPtr (unIxPtrLen mem)) off val
-  copyArrayMemInBytes = error "TODO"
-  setMemInBytes = error "TODO"
+  copyArrayMemInBytes arr arrOff arrLen = copyPtr arr arrOff arrLen . plPtr . unIxPtrLen
+  setMemInBytes len val = setPtr len val . plPtr . unIxPtrLen
 
 writeSBSMem :: WriteMem q => ShortByteString -> ByteCount -> q s -> ByteCount -> ST s ()
 writeSBSMem (SBS harr) = copyArrayMemInBytes (ByteArray harr) 0
