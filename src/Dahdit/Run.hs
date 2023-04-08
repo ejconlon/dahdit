@@ -1,9 +1,9 @@
 module Dahdit.Run
   ( GetError (..)
   , prettyGetError
-  , runGet
+  , runGetInternal
   , runCount
-  , runPut
+  , runPutInternal
   )
 where
 
@@ -230,8 +230,8 @@ mkGetRun (Get (F w)) = GetRun (w pure wrap)
 mkGetEff :: ReadMem r => Get a -> GetEff s r a
 mkGetEff = iterGetRun . mkGetRun
 
-runGet :: ReadMem r => Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
-runGet act len mem = runST $ do
+runGetInternal :: ReadMem r => Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
+runGetInternal act len mem = runST $ do
   let eff = mkGetEff act
   env <- newGetEnv len mem
   ea <- runGetEff eff env
@@ -404,8 +404,8 @@ runCount act =
 
 -- Put safe:
 
-runPut :: WriteMem q => Put -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
-runPut act mkMem useMem = runST $ do
+runPutInternal :: WriteMem q => Put -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
+runPutInternal act mkMem useMem = runST $ do
   let len = runCount act
   mem <- mkMem len
   off <- runPutUnsafe act len mem
