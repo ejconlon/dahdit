@@ -1,6 +1,6 @@
 module Dahdit.Mem
-  ( ReadPtr (..)
-  , WritePtr (..)
+  ( PtrLen (..)
+  , IxPtrLen (..)
   , ReadMem (..)
   , readSBSMem
   , viewSBSMem
@@ -18,17 +18,17 @@ import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, freezeByteArray, sizeofMutableByteArray)
 import Foreign.Ptr (Ptr)
 
-data ReadPtr x = ReadPtr
-  { rpPtr :: !(Ptr x)
-  , rpLen :: !ByteCount
+-- | Pair of pointer to chunk of memory and usable length.
+data PtrLen x = PtrLen
+  { plPtr :: !(Ptr x)
+  , plLen :: !ByteCount
   }
   deriving stock (Eq, Ord, Show)
 
-data WritePtr x s = WritePtr
-  { wpPtr :: !(Ptr x)
-  , wpLen :: !ByteCount
-  }
-  deriving stock (Eq, Ord, Show)
+-- | A wrapper over 'PtrLen' with an additional free type index to align with 'ST' state.
+newtype IxPtrLen x s = IxPtrLen {unIxPtrLen :: PtrLen x}
+  deriving stock (Show)
+  deriving newtype (Eq, Ord)
 
 class ReadMem r where
   indexMemInBytes :: LiftedPrim a => r -> ByteCount -> a
@@ -38,8 +38,8 @@ instance ReadMem ByteArray where
   indexMemInBytes = indexArrayLiftedInBytes
   cloneArrayMemInBytes arr off len = cloneByteArray arr (coerce off) (coerce len)
 
-instance ReadMem (ReadPtr x) where
-  indexMemInBytes = indexPtrLiftedInBytes . rpPtr
+instance ReadMem (PtrLen x) where
+  indexMemInBytes = indexPtrLiftedInBytes . plPtr
   cloneArrayMemInBytes = error "TODO"
 
 readSBSMem :: ReadMem r => r -> ByteCount -> ByteCount -> ShortByteString
@@ -58,8 +58,8 @@ instance WriteMem MutableByteArray where
   copyArrayMemInBytes arr arrOff arrLen mem off = copyByteArray mem (coerce off) arr (coerce arrOff) (coerce arrLen)
   setMemInBytes len val mem off = setByteArrayLifted mem off len val
 
-instance WriteMem (WritePtr x) where
-  writeMemInBytes val mem off = writePtrLiftedInBytes (wpPtr mem) off val
+instance WriteMem (IxPtrLen x) where
+  writeMemInBytes val mem off = writePtrLiftedInBytes (plPtr (unIxPtrLen mem)) off val
   copyArrayMemInBytes = error "TODO"
   setMemInBytes = error "TODO"
 
