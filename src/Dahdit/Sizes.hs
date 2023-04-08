@@ -1,7 +1,5 @@
 module Dahdit.Sizes
-  ( ElementCount (..)
-  , ByteCount (..)
-  , StaticByteSized (..)
+  ( StaticByteSized (..)
   , byteSizeViaStatic
   , ByteSized (..)
   , ViaStaticByteSized (..)
@@ -10,7 +8,7 @@ module Dahdit.Sizes
   )
 where
 
-import Dahdit.LiftedPrim (LiftedPrim, LiftedPrimArray, sizeofLiftedPrimArray)
+import Dahdit.Counts (ByteCount (..))
 import Dahdit.Nums
   ( FloatBE
   , FloatLE
@@ -30,7 +28,7 @@ import Dahdit.Nums
 import Dahdit.Proxy (proxyFor, proxyForF)
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
-import Data.Default (Default)
+import Data.Coerce (coerce)
 import Data.Foldable (foldMap')
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Proxy (Proxy (..))
@@ -38,14 +36,6 @@ import Data.Semigroup (Sum (..))
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Word (Word16, Word32, Word64, Word8)
-
-newtype ElementCount = ElementCount {unElementCount :: Word64}
-  deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bounded, Default)
-
-newtype ByteCount = ByteCount {unByteCount :: Word64}
-  deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bounded, Default)
 
 class ByteSized a where
   byteSize :: a -> ByteCount
@@ -120,18 +110,12 @@ instance ByteSized FloatBE where
   byteSize _ = 4
 
 instance ByteSized ShortByteString where
-  byteSize = fromIntegral . BSS.length
+  byteSize = coerce . BSS.length
 
 instance StaticByteSized a => ByteSized (Seq a) where
   byteSize ss =
-    let !elen = staticByteSize (Proxy :: Proxy a)
-        !alen = fromIntegral (Seq.length ss)
-    in  elen * alen
-
-instance (StaticByteSized a, LiftedPrim a) => ByteSized (LiftedPrimArray a) where
-  byteSize lpa =
-    let !elen = staticByteSize (Proxy :: Proxy a)
-        !alen = fromIntegral (sizeofLiftedPrimArray lpa)
+    let elen = staticByteSize (Proxy :: Proxy a)
+        alen = coerce (Seq.length ss)
     in  elen * alen
 
 class ByteSized a => StaticByteSized a where
@@ -218,4 +202,4 @@ byteSizeFoldable :: (Foldable f, ByteSized a) => f a -> ByteCount
 byteSizeFoldable = getSum . foldMap' (Sum . byteSize)
 
 staticByteSizeFoldable :: (Foldable f, StaticByteSized a) => f a -> ByteCount
-staticByteSizeFoldable fa = staticByteSize (proxyForF fa) * fromIntegral (length fa)
+staticByteSizeFoldable fa = staticByteSize (proxyForF fa) * coerce (length fa)

@@ -2,8 +2,8 @@ module Main (main) where
 
 import Dahdit
   ( Binary (..)
-  , BoolByte (BoolByte)
-  , ByteCount
+  , BoolByte (..)
+  , ByteCount (..)
   , ByteSized (..)
   , FloatBE (..)
   , FloatLE (..)
@@ -50,6 +50,7 @@ import Dahdit
   , getWord32BE
   , getWord32LE
   , getWord8
+  , lengthLiftedPrimArray
   , liftedPrimArrayFromList
   , putByteArray
   , putByteString
@@ -76,9 +77,11 @@ import Dahdit
   , runCount
   , runGet
   , runPut
+  , sizeofLiftedPrimArray
   )
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Short as BSS
+import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (byteArrayFromList)
 import qualified Data.Sequence as Seq
 import GHC.Float (castWord32ToFloat)
@@ -109,11 +112,11 @@ runGetCase getter mayRes bsl = do
     (Right actVal, Just (expecBc, expecLeft, expecVal)) -> do
       actVal @?= expecVal
       actBc @?= expecBc
-      BSS.length bs - fromIntegral actBc @?= fromIntegral expecLeft
+      coerce (BSS.length bs) - actBc @?= expecLeft
 
 runPutCase :: Put -> [Word8] -> IO ()
 runPutCase putter expecList = do
-  let expecBc = fromIntegral (length expecList)
+  let expecBc = coerce (length expecList)
       expecBs = BSS.pack expecList
       estBc = runCount putter
   estBc @?= expecBc
@@ -245,7 +248,10 @@ testDahditPut =
 
 testDahditLiftedPrimArray :: TestTree
 testDahditLiftedPrimArray = testCase "liftedPrimArray" $ do
-  liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC] @?= LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00])
+  let arr = LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]) :: LiftedPrimArray Word16LE
+  liftedPrimArrayFromList [0xFD, 0x6E, 0xEC] @?= arr
+  sizeofLiftedPrimArray arr @?= 6
+  lengthLiftedPrimArray arr @?= 3
 
 testDahdit :: TestTree
 testDahdit =

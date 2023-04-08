@@ -53,8 +53,8 @@ mkWord16LE b0 b1 = (fromIntegral b1 `unsafeShiftL` 8) .|. fromIntegral b0
 
 unMkWord16LE :: Word16 -> (Word8, Word8)
 unMkWord16LE w =
-  let !b0 = fromIntegral w
-      !b1 = fromIntegral (w `shiftR` 8)
+  let b0 = fromIntegral w
+      b1 = fromIntegral (w `shiftR` 8)
   in  (b0, b1)
 
 mkWord24LE :: Word8 -> Word8 -> Word8 -> Word24
@@ -62,7 +62,7 @@ mkWord24LE b0 b1 b2 = fromIntegral (mkWord32LE b0 b1 b2 0)
 
 unMkWord24LE :: Word24 -> (Word8, Word8, Word8)
 unMkWord24LE w =
-  let !v = fromIntegral w
+  let v = fromIntegral w
       (b0, b1, b2, _) = unMkWord32LE v
   in  (b0, b1, b2)
 
@@ -75,10 +75,10 @@ mkWord32LE b0 b1 b2 b3 =
 
 unMkWord32LE :: Word32 -> (Word8, Word8, Word8, Word8)
 unMkWord32LE w =
-  let !b0 = fromIntegral w
-      !b1 = fromIntegral (w `shiftR` 8)
-      !b2 = fromIntegral (w `shiftR` 16)
-      !b3 = fromIntegral (w `shiftR` 24)
+  let b0 = fromIntegral w
+      b1 = fromIntegral (w `shiftR` 8)
+      b2 = fromIntegral (w `shiftR` 16)
+      b3 = fromIntegral (w `shiftR` 24)
   in  (b0, b1, b2, b3)
 
 mkFloatLE :: Word8 -> Word8 -> Word8 -> Word8 -> Float

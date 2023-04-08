@@ -22,6 +22,7 @@ import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Free (FreeT (..), iterT, wrap)
 import Control.Monad.Trans.Maybe (MaybeT (..))
+import Dahdit.Counts (ByteCount (..), ElemCount (..))
 import Dahdit.Free
   ( Get (..)
   , GetF (..)
@@ -56,10 +57,12 @@ import Dahdit.Nums
   , Word32LE
   )
 import Dahdit.Proxy (proxyForF)
-import Dahdit.Sizes (ByteCount (..), staticByteSize)
+import Dahdit.Sizes (staticByteSize)
 import qualified Data.ByteString as BS
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
+import qualified Data.ByteString.Short as SBS
+import Data.Coerce (coerce)
 import Data.Foldable (for_, toList)
 import Data.Int (Int8)
 import Data.Maybe (fromJust)
@@ -70,29 +73,20 @@ import Data.Word (Word8)
 
 -- Sizes:
 
-getStaticSeqSize :: GetStaticSeqF a -> Int
-getStaticSeqSize (GetStaticSeqF ec g _) =
-  let !z = fromIntegral (staticByteSize (proxyForF g))
-  in  z * fromIntegral ec
+getStaticSeqSize :: GetStaticSeqF a -> ByteCount
+getStaticSeqSize (GetStaticSeqF ec g _) = staticByteSize (proxyForF g) * coerce ec
 
-getStaticArraySize :: GetStaticArrayF a -> Int
-getStaticArraySize (GetStaticArrayF n prox _) =
-  let !z = fromIntegral (staticByteSize prox)
-  in  z * fromIntegral n
+getStaticArraySize :: GetStaticArrayF a -> ByteCount
+getStaticArraySize (GetStaticArrayF n prox _) = staticByteSize prox * coerce n
 
-putStaticSeqSize :: PutStaticSeqF a -> Int
-putStaticSeqSize (PutStaticSeqF n _ _ s _) =
-  let !z = fromIntegral (staticByteSize (proxyForF s))
-  in  z * fromIntegral n
+putStaticSeqSize :: PutStaticSeqF a -> ByteCount
+putStaticSeqSize (PutStaticSeqF n _ _ s _) = staticByteSize (proxyForF s) * coerce n
 
-putStaticArrayElemSize :: PutStaticArrayF a -> Int
-putStaticArrayElemSize (PutStaticArrayF _ _ a _) =
-  fromIntegral (staticByteSize (proxyForF a))
+putStaticArrayElemSize :: PutStaticArrayF a -> ByteCount
+putStaticArrayElemSize (PutStaticArrayF _ _ a _) = staticByteSize (proxyForF a)
 
-putStaticArraySize :: PutStaticArrayF a -> Int
-putStaticArraySize (PutStaticArrayF n _ a _) =
-  let !z = fromIntegral (staticByteSize (proxyForF a))
-  in  z * fromIntegral n
+putStaticArraySize :: PutStaticArrayF a -> ByteCount
+putStaticArraySize (PutStaticArrayF n _ a _) = staticByteSize (proxyForF a) * coerce n
 
 -- Get:
 
@@ -112,19 +106,18 @@ prettyGetError = \case
   GetErrorFail msg -> "User error: " ++ msg
 
 data GetEnv s r = GetEnv
-  { geLen :: !Int
+  { geLen :: !ByteCount
   -- ^ Remaining length of buffer segment
-  , geOff :: !(STRef s Int)
+  , geOff :: !(STRef s ByteCount)
   -- ^ Offset from buffer start (in bytes)
   , geArray :: !r
   -- ^ Source buffer
   }
 
-newGetEnv :: ReadMem r => r -> ST s (GetEnv s r)
-newGetEnv mem = do
-  let !len = totalReadMemInBytes mem
+newGetEnv :: ByteCount -> r -> ST s (GetEnv s r)
+newGetEnv len mem = do
   off <- newSTRef 0
-  pure $! GetEnv len off mem
+  pure (GetEnv len off mem)
 
 newtype GetEff s r a = GetEff {unGetEff :: ReaderT (GetEnv s r) (ExceptT GetError (ST s)) a}
   deriving newtype (Functor, Applicative, Monad, MonadReader (GetEnv s r), MonadError GetError)
@@ -141,55 +134,54 @@ stGetEff = GetEff . lift . lift
 newtype GetRun s r a = GetRun {unGetRun :: FreeT GetF (GetEff s r) a}
   deriving newtype (Functor, Applicative, Monad)
 
-guardReadBytes :: String -> Int -> GetEff s r Int
+guardReadBytes :: String -> ByteCount -> GetEff s r ByteCount
 guardReadBytes nm bc = do
-  GetEnv l offRef _ <- ask
+  GetEnv len offRef _ <- ask
   off <- stGetEff (readSTRef offRef)
-  let !ac = l - off
+  let ac = len - off
   if bc > ac
-    then throwError (GetErrorParseNeed nm (fromIntegral ac) (fromIntegral bc))
+    then throwError (GetErrorParseNeed nm ac bc)
     else pure off
 
-readBytes :: String -> Int -> (r -> Int -> a) -> GetEff s r a
+readBytes :: String -> ByteCount -> (r -> ByteCount -> a) -> GetEff s r a
 readBytes nm bc f = do
   off <- guardReadBytes nm bc
   GetEnv _ offRef mem <- ask
   stGetEff $ do
-    let !a = f mem off
-        !newOff = off + bc
+    let a = f mem off
+        newOff = off + bc
     writeSTRef offRef newOff
     pure a
 
 readScope :: ReadMem r => GetScopeF (GetEff s r a) -> GetEff s r a
 readScope (GetScopeF sm bc g k) = do
-  let intBc = fromIntegral bc
   GetEnv oldLen offRef _ <- ask
   oldOff <- stGetEff (readSTRef offRef)
-  let !oldAvail = oldLen - oldOff
-  if intBc > oldAvail
-    then throwError (GetErrorParseNeed "scope" (fromIntegral oldAvail) bc)
+  let oldAvail = oldLen - oldOff
+  if bc > oldAvail
+    then throwError (GetErrorParseNeed "scope" oldAvail bc)
     else do
-      let !newLen = oldOff + intBc
+      let newLen = oldOff + bc
       a <- local (\ge -> ge {geLen = newLen}) (mkGetEff g)
       case sm of
         ScopeModeWithin -> k a
         ScopeModeExact -> do
           newOff <- stGetEff (readSTRef offRef)
-          let !actualBc = newOff - oldOff
-          if actualBc == intBc
+          let actualBc = newOff - oldOff
+          if actualBc == bc
             then k a
-            else throwError (GetErrorScopedMismatch (fromIntegral actualBc) bc)
+            else throwError (GetErrorScopedMismatch actualBc bc)
 
 readStaticSeq :: ReadMem r => GetStaticSeqF (GetEff s r a) -> GetEff s r a
 readStaticSeq gss@(GetStaticSeqF ec g k) = do
-  let !bc = getStaticSeqSize gss
+  let bc = getStaticSeqSize gss
   _ <- guardReadBytes "static sequence" bc
-  ss <- Seq.replicateA (fromIntegral ec) (mkGetEff g)
+  ss <- Seq.replicateA (coerce ec) (mkGetEff g)
   k ss
 
 readStaticArray :: ReadMem r => GetStaticArrayF (GetEff s r a) -> GetEff s r a
 readStaticArray gsa@(GetStaticArrayF _ _ k) = do
-  let !bc = getStaticArraySize gsa
+  let bc = getStaticArraySize gsa
   sa <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
   k (LiftedPrimArray sa)
 
@@ -220,21 +212,18 @@ execGetRun = \case
   GetFInt32BE k -> readBytes "Int32BE" 4 (indexMemInBytes @_ @Int32BE) >>= k
   GetFFloatBE k -> readBytes "FloatBE" 4 (indexMemInBytes @_ @FloatBE) >>= k
   GetFShortByteString bc k ->
-    let !len = fromIntegral bc
-    in  readBytes "ShortByteString" len (\mem off -> readSBSMem mem off len) >>= k
+    readBytes "ShortByteString" bc (\mem off -> readSBSMem mem off bc) >>= k
   GetFStaticSeq gss -> readStaticSeq gss
   GetFStaticArray gsa -> readStaticArray gsa
   GetFByteArray bc k ->
-    let !len = fromIntegral bc
-    in  readBytes "ByteArray" len (\mem off -> cloneArrayMemInBytes mem off len) >>= k
+    readBytes "ByteArray" bc (\mem off -> cloneArrayMemInBytes mem off bc) >>= k
   GetFScope gs -> readScope gs
-  GetFSkip bc k -> readBytes "skip" (fromIntegral bc) (\_ _ -> ()) *> k
+  GetFSkip bc k -> readBytes "skip" bc (\_ _ -> ()) *> k
   GetFLookAhead gla -> readLookAhead gla
   GetFRemainingSize k -> do
     GetEnv len offRef _ <- ask
     off <- stGetEff (readSTRef offRef)
-    let !bc = fromIntegral (len - off)
-    k bc
+    k (len - off)
   GetFFail msg -> fail msg
 
 runGetRun :: ReadMem r => GetRun s r a -> GetEnv s r -> ST s (Either GetError a)
@@ -249,16 +238,16 @@ mkGetRun (Get (F w)) = GetRun (w pure wrap)
 mkGetEff :: ReadMem r => Get a -> GetEff s r a
 mkGetEff = iterGetRun . mkGetRun
 
-runGetST :: ReadMem r => Get a -> r -> (Either GetError a, ByteCount)
-runGetST act mem = runST $ do
+runGetST :: ReadMem r => Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
+runGetST act len mem = runST $ do
   let eff = mkGetEff act
-  env <- newGetEnv mem
+  env <- newGetEnv len mem
   ea <- runGetEff eff env
   bc <- readSTRef (geOff env)
-  pure (ea, fromIntegral bc)
+  pure (ea, bc)
 
 runGet :: Get a -> ShortByteString -> (Either GetError a, ByteCount)
-runGet act = runGetST act . viewSBSMem
+runGet act sbs = runGetST act (coerce (SBS.length sbs)) (viewSBSMem sbs)
 
 runGetIO :: Get a -> ShortByteString -> IO (a, ByteCount)
 runGetIO act sbs =
@@ -276,17 +265,16 @@ runGetFile act fp = do
 -- Put unsafe:
 
 data PutEnv s q = PutEnv
-  { peLen :: !Int
+  { peLen :: !ByteCount
   -- ^ Remaining capacity in buffer segment
-  , peOff :: !(STRef s Int)
+  , peOff :: !(STRef s ByteCount)
   -- ^ Offset in bytes from start of buffer
   , peArray :: !(q s)
   -- ^ Destination buffer
   }
 
-newPutEnv :: WriteMem q => q s -> ST s (PutEnv s q)
-newPutEnv mem = do
-  let len = totalWriteMemInBytes mem
+newPutEnv :: ByteCount -> q s -> ST s (PutEnv s q)
+newPutEnv len mem = do
   offRef <- newSTRef 0
   pure (PutEnv len offRef mem)
 
@@ -302,37 +290,35 @@ stPutEff = PutEff . lift
 newtype PutRun s q a = PutRun {unPutRun :: FreeT PutF (PutEff s q) a}
   deriving newtype (Functor, Applicative, Monad)
 
-writeBytes :: Int -> (q s -> Int -> ST s ()) -> PutEff s q ()
+writeBytes :: ByteCount -> (q s -> ByteCount -> ST s ()) -> PutEff s q ()
 writeBytes bc f = do
   PutEnv _ offRef mem <- ask
   stPutEff $ do
     off <- readSTRef offRef
     f mem off
-    let !newOff = off + bc
+    let newOff = off + bc
     writeSTRef offRef newOff
 
 writeStaticSeq :: WriteMem q => PutStaticSeqF (PutEff s q a) -> PutEff s q a
 writeStaticSeq (PutStaticSeqF n mz p s k) = do
-  let n' = fromIntegral n
-  for_ (take n' (toList s)) $ \a -> do
-    let !x = p a
-    mkPutEff x
-  let !e = Seq.length s
-  unless (n' <= e) $ do
-    let !q = mkPutEff (p (fromJust mz))
-    replicateM_ (n' - e) q
+  for_ (take (coerce n) (toList s)) $ \a -> do
+    mkPutEff (p a)
+  let e = Seq.length s
+  unless (coerce n <= e) $ do
+    let q = mkPutEff (p (fromJust mz))
+    replicateM_ (coerce n - e) q
   k
 
 writeStaticArray :: WriteMem q => PutStaticArrayF (PutEff s q a) -> PutEff s q a
 writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = do
-  let !elemSize = putStaticArrayElemSize psa
-      !haveElems = sizeofLiftedPrimArray a
-      !useElems = min haveElems (fromIntegral needElems)
-      !useBc = elemSize * useElems
+  let elemSize = putStaticArrayElemSize psa
+      haveElems = sizeofLiftedPrimArray a
+      useElems = min haveElems (coerce needElems)
+      useBc = elemSize * coerce useElems
   writeBytes useBc (copyArrayMemInBytes ba 0 useBc)
-  let !needBc = putStaticArraySize psa
+  let needBc = putStaticArraySize psa
   unless (useBc == needBc) $ do
-    let !extraBc = needBc - useBc
+    let extraBc = needBc - useBc
     case mz of
       Nothing -> error "no default element for undersized static array"
       Just z -> writeBytes extraBc (setMemInBytes extraBc z)
@@ -357,13 +343,11 @@ execPutRun = \case
   PutFInt32BE x k -> writeBytes 4 (writeMemInBytes x) *> k
   PutFFloatBE x k -> writeBytes 4 (writeMemInBytes x) *> k
   PutFShortByteString bc sbs k ->
-    let !len = fromIntegral bc
-    in  writeBytes len (writeSBSMem sbs len) *> k
+    writeBytes bc (writeSBSMem sbs bc) *> k
   PutFStaticSeq pss -> writeStaticSeq pss
   PutFStaticArray psa -> writeStaticArray psa
   PutFByteArray bc barr k ->
-    let !len = fromIntegral bc
-    in  writeBytes len (copyArrayMemInBytes barr 0 len) *> k
+    writeBytes bc (copyArrayMemInBytes barr 0 bc) *> k
   PutFStaticHint (PutStaticHintF _ p k) -> mkPutEff p *> k
 
 runPutRun :: WriteMem q => PutRun s q a -> PutEnv s q -> ST s a
@@ -379,10 +363,9 @@ mkPutEff :: WriteMem q => PutM a -> PutEff s q a
 mkPutEff = iterPutRun . mkPutRun
 
 runPutUnsafe :: WriteMem q => Put -> ByteCount -> q s -> ST s (q s)
-runPutUnsafe act bc mem = do
-  let !len = fromIntegral bc
-      !eff = mkPutRun act
-  st@(PutEnv _ offRef _) <- newPutEnv mem
+runPutUnsafe act len mem = do
+  let eff = mkPutRun act
+  st@(PutEnv _ offRef _) <- newPutEnv len mem
   runPutRun eff st
   off <- readSTRef offRef
   -- This is just a sanity check - if it goes wrong then there's a bug in the library
@@ -391,10 +374,10 @@ runPutUnsafe act bc mem = do
 
 -- Count:
 
-newtype CountEff a = CountEff {unCountEff :: MaybeT (State Int) a}
-  deriving newtype (Functor, Applicative, Monad, Alternative, MonadState Int)
+newtype CountEff a = CountEff {unCountEff :: MaybeT (State ByteCount) a}
+  deriving newtype (Functor, Applicative, Monad, Alternative, MonadState ByteCount)
 
-runCountEff :: CountEff a -> Int -> (Maybe a, Int)
+runCountEff :: CountEff a -> ByteCount -> (Maybe a, ByteCount)
 runCountEff act = runState (runMaybeT (unCountEff act))
 
 newtype CountRun a = CountRun {unCountRun :: FreeT PutF CountEff a}
@@ -418,23 +401,17 @@ execCountRun = \case
   PutFWord32BE _ k -> State.modify' (4 +) *> k
   PutFInt32BE _ k -> State.modify' (4 +) *> k
   PutFFloatBE _ k -> State.modify' (4 +) *> k
-  PutFShortByteString bc _ k ->
-    let !len = fromIntegral bc
-    in  State.modify' (len +) *> k
+  PutFShortByteString bc _ k -> State.modify' (bc +) *> k
   PutFStaticSeq pss@(PutStaticSeqF _ _ _ _ k) ->
-    let !len = putStaticSeqSize pss
-    in  State.modify' (len +) *> k
+    let bc = putStaticSeqSize pss
+    in  State.modify' (bc +) *> k
   PutFStaticArray psv@(PutStaticArrayF _ _ _ k) ->
-    let !len = putStaticArraySize psv
-    in  State.modify' (len +) *> k
-  PutFByteArray bc _ k ->
-    let !len = fromIntegral bc
-    in  State.modify' (len +) *> k
-  PutFStaticHint (PutStaticHintF bc _ k) ->
-    let !len = fromIntegral bc
-    in  State.modify' (len +) *> k
+    let bc = putStaticArraySize psv
+    in  State.modify' (bc +) *> k
+  PutFByteArray bc _ k -> State.modify' (bc +) *> k
+  PutFStaticHint (PutStaticHintF bc _ k) -> State.modify' (bc +) *> k
 
-runCountRun :: CountRun a -> Int -> (Maybe a, Int)
+runCountRun :: CountRun a -> ByteCount -> (Maybe a, ByteCount)
 runCountRun = runCountEff . iterCountRun
 
 iterCountRun :: CountRun a -> CountEff a
@@ -450,7 +427,7 @@ runCount :: Put -> ByteCount
 runCount act =
   let eff = mkCountRun act
       (_, bc) = runCountRun eff 0
-  in  fromIntegral bc
+  in  bc
 
 -- Put safe:
 
@@ -460,12 +437,12 @@ runPutST act mkMem useMem = do
   runST (mkMem bc >>= runPutUnsafe act bc >>= useMem)
 
 runPut :: Put -> ShortByteString
-runPut act = runPutST act (newByteArray . fromIntegral) freezeSBSMem
+runPut act = runPutST act (newByteArray . coerce) freezeSBSMem
 
 -- Put file:
 
 runPutFile :: FilePath -> Put -> IO ()
 runPutFile fp act =
-  let !bs = runPut act
-      !bs' = BSS.fromShort bs
+  let bs = runPut act
+      bs' = BSS.fromShort bs
   in  BS.writeFile fp bs'

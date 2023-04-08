@@ -12,6 +12,7 @@ where
 
 import Control.Monad (unless)
 import Dahdit.Binary (Binary (..))
+import Dahdit.Counts (ByteCount (..))
 import Dahdit.Free (Get)
 import Dahdit.Funs
   ( getByteString
@@ -31,6 +32,7 @@ import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (.
 import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
+import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Primitive.ByteArray (ByteArray (..), byteArrayFromListN)
 import Data.Proxy (Proxy (..))
@@ -40,19 +42,17 @@ import Data.String (IsString)
 import Data.Word (Word8)
 import GHC.TypeLits (KnownNat, KnownSymbol, Nat, Symbol, natVal, symbolVal)
 
-getUntilNull :: Get (Int, [Word8])
+getUntilNull :: Get (ByteCount, [Word8])
 getUntilNull = go 0 []
  where
   go !i !racc = do
     w <- getWord8
     if w == 0
-      then
-        let !acc = reverse racc
-        in  pure (i, acc)
+      then pure (i, reverse racc)
       else go (i + 1) (w : racc)
 
-mkSBS :: Int -> [Word8] -> ShortByteString
-mkSBS n bs = let !(ByteArray ba) = byteArrayFromListN n bs in SBS ba
+mkSBS :: ByteCount -> [Word8] -> ShortByteString
+mkSBS n bs = let !(ByteArray ba) = byteArrayFromListN (coerce n) bs in SBS ba
 
 -- | Bytes terminated with null byte.
 -- NOTE: Terminated with TWO null bytes if the string is even length
@@ -66,17 +66,17 @@ instance Default TermBytes where
 
 instance ByteSized TermBytes where
   byteSize (TermBytes sbs) =
-    let !bc = byteSize sbs + 1
+    let bc = byteSize sbs + 1
     in  if even bc then bc else bc + 1
 
 instance Binary TermBytes where
   get = do
-    (!i, acc) <- getUntilNull
+    (i, acc) <- getUntilNull
     unless (odd i) $ do
       w <- getWord8
       unless (w == 0) (fail "TermBytes missing word pad")
-    let !sbs = mkSBS i acc
-    pure $! TermBytes sbs
+    let sbs = mkSBS i acc
+    pure (TermBytes sbs)
 
   put (TermBytes sbs) = do
     putByteString sbs
@@ -134,14 +134,14 @@ newtype StaticSeq (n :: Nat) a = StaticSeq {unStaticSeq :: Seq a}
   deriving (ByteSized) via (ViaStaticByteSized (StaticSeq n a))
 
 instance (KnownNat n, Default a) => Default (StaticSeq n a) where
-  def = StaticSeq (Seq.replicate (fromIntegral (natVal (Proxy :: Proxy n))) def)
+  def = StaticSeq (Seq.replicate (fromInteger (natVal (Proxy :: Proxy n))) def)
 
 instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticSeq n a) where
-  staticByteSize _ = fromIntegral (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
+  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
 
 instance (KnownNat n, Binary a, StaticByteSized a, Default a) => Binary (StaticSeq n a) where
-  get = fmap StaticSeq (getStaticSeq (fromIntegral (natVal (Proxy :: Proxy n))) get)
-  put = unsafePutStaticSeqN (fromIntegral (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
+  get = fmap StaticSeq (getStaticSeq (fromInteger (natVal (Proxy :: Proxy n))) get)
+  put = unsafePutStaticSeqN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
 
 newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray a}
   deriving stock (Show)
@@ -150,14 +150,14 @@ newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray
 deriving via (ViaStaticByteSized (StaticArray n a)) instance (KnownNat n, StaticByteSized a) => ByteSized (StaticArray n a)
 
 instance (KnownNat n, LiftedPrim a, Default a) => Default (StaticArray n a) where
-  def = StaticArray (replicateLiftedPrimArray (fromIntegral (natVal (Proxy :: Proxy n))) def)
+  def = StaticArray (replicateLiftedPrimArray (fromInteger (natVal (Proxy :: Proxy n))) def)
 
 instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) where
-  staticByteSize _ = fromIntegral (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
+  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
 
 instance (KnownNat n, LiftedPrim a, StaticByteSized a, Default a) => Binary (StaticArray n a) where
-  get = fmap StaticArray (getStaticArray (fromIntegral (natVal (Proxy :: Proxy n))))
-  put = unsafePutStaticArrayN (fromIntegral (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
+  get = fmap StaticArray (getStaticArray (fromInteger (natVal (Proxy :: Proxy n))))
+  put = unsafePutStaticArrayN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
 
 newtype BoolByte = BoolByte {unBoolByte :: Bool}
   deriving stock (Show)
@@ -183,15 +183,15 @@ instance Default (ExactBytes s) where
   def = ExactBytes ()
 
 instance KnownSymbol s => StaticByteSized (ExactBytes s) where
-  staticByteSize _ = fromIntegral (length (symbolVal (Proxy :: Proxy s)))
+  staticByteSize _ = coerce (length (symbolVal (Proxy :: Proxy s)))
 
 instance KnownSymbol s => Binary (ExactBytes s) where
   get = do
-    let !s = symbolVal (Proxy :: Proxy s)
-        !bc = fromIntegral (length s)
-        !bs = BSS.pack (fmap c2w s)
+    let s = symbolVal (Proxy :: Proxy s)
+        bc = coerce (length s)
+        bs = BSS.pack (fmap c2w s)
     getExpect s (getByteString bc) bs
-    pure $! ExactBytes ()
+    pure (ExactBytes ())
   put _ = do
-    let !s = symbolVal (Proxy :: Proxy s)
+    let s = symbolVal (Proxy :: Proxy s)
     putByteString (BSS.pack (fmap c2w s))

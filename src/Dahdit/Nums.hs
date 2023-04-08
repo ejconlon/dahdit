@@ -22,6 +22,7 @@ module Dahdit.Nums
   )
 where
 
+import Dahdit.Counts (ByteCount (..))
 import Dahdit.Internal
   ( ViaFromIntegral (..)
   , mkFloatLE
@@ -57,23 +58,24 @@ instance LiftedPrim Word16LE where
   elemSizeLifted _ = 2
 
   indexArrayLiftedInBytes arr off =
-    let !b0 = indexByteArray arr off
-        !b1 = indexByteArray arr (off + 1)
+    let !b0 = indexByteArray arr (coerce off)
+        !b1 = indexByteArray arr (coerce off + 1)
     in  Word16LE (mkWord16LE b0 b1)
 
   writeArrayLiftedInBytes arr off w =
     let (!b0, !b1) = unMkWord16LE (unWord16LE w)
-    in  writeByteArray arr off b0 *> writeByteArray arr (off + 1) b1
+    in  writeByteArray arr (coerce off) b0
+          *> writeByteArray arr (coerce off + 1) b1
 
   indexPtrLiftedInBytes ptr off =
-    let !b0 = indexOffPtr (coerce ptr) off
-        !b1 = indexOffPtr (coerce ptr) (off + 1)
+    let !b0 = indexOffPtr (coerce ptr) (coerce off)
+        !b1 = indexOffPtr (coerce ptr) (coerce off + 1)
     in  Word16LE (mkWord16LE b0 b1)
 
   writePtrLiftedInBytes ptr off w =
     let (!b0, !b1) = unMkWord16LE (unWord16LE w)
-    in  writeOffPtr (coerce ptr) off b0
-          *> writeOffPtr (coerce ptr) (off + 1) b1
+    in  writeOffPtr (coerce ptr) (coerce off) b0
+          *> writeOffPtr (coerce ptr) (coerce off + 1) b1
 
 newtype Int16LE = Int16LE {unInt16LE :: Int16}
   deriving stock (Show)
@@ -91,28 +93,28 @@ instance LiftedPrim Word24LE where
   elemSizeLifted _ = 3
 
   indexArrayLiftedInBytes arr off =
-    let !b0 = indexByteArray arr off
-        !b1 = indexByteArray arr (off + 1)
-        !b2 = indexByteArray arr (off + 2)
+    let !b0 = indexByteArray arr (coerce off)
+        !b1 = indexByteArray arr (coerce off + 1)
+        !b2 = indexByteArray arr (coerce off + 2)
     in  Word24LE (mkWord24LE b0 b1 b2)
 
   writeArrayLiftedInBytes arr off w = do
     let (!b0, !b1, !b2) = unMkWord24LE (unWord24LE w)
-    writeByteArray arr off b0
-    writeByteArray arr (off + 1) b1
-    writeByteArray arr (off + 2) b2
+    writeByteArray arr (coerce off) b0
+    writeByteArray arr (coerce off + 1) b1
+    writeByteArray arr (coerce off + 2) b2
 
   indexPtrLiftedInBytes ptr off =
-    let !b0 = indexOffPtr (coerce ptr) off
-        !b1 = indexOffPtr (coerce ptr) (off + 1)
-        !b2 = indexOffPtr (coerce ptr) (off + 2)
+    let !b0 = indexOffPtr (coerce ptr) (coerce off)
+        !b1 = indexOffPtr (coerce ptr) (coerce off + 1)
+        !b2 = indexOffPtr (coerce ptr) (coerce off + 2)
     in  Word24LE (mkWord24LE b0 b1 b2)
 
   writePtrLiftedInBytes ptr off w =
     let (!b0, !b1, !b2) = unMkWord24LE (unWord24LE w)
-    in  writeOffPtr (coerce ptr) off b0
-          *> writeOffPtr (coerce ptr) (off + 1) b1
-          *> writeOffPtr (coerce ptr) (off + 2) b2
+    in  writeOffPtr (coerce ptr) (coerce off) b0
+          *> writeOffPtr (coerce ptr) (coerce off + 1) b1
+          *> writeOffPtr (coerce ptr) (coerce off + 2) b2
 
 newtype Int24LE = Int24LE {unInt24LE :: Int24}
   deriving stock (Show)
@@ -130,32 +132,32 @@ instance LiftedPrim Word32LE where
   elemSizeLifted _ = 4
 
   indexArrayLiftedInBytes arr off =
-    let !b0 = indexByteArray arr off
-        !b1 = indexByteArray arr (off + 1)
-        !b2 = indexByteArray arr (off + 2)
-        !b3 = indexByteArray arr (off + 3)
+    let !b0 = indexByteArray arr (coerce off)
+        !b1 = indexByteArray arr (coerce off + 1)
+        !b2 = indexByteArray arr (coerce off + 2)
+        !b3 = indexByteArray arr (coerce off + 3)
     in  Word32LE (mkWord32LE b0 b1 b2 b3)
 
   writeArrayLiftedInBytes arr off w = do
     let (!b0, !b1, !b2, !b3) = unMkWord32LE (unWord32LE w)
-    writeByteArray arr off b0
-    writeByteArray arr (off + 1) b1
-    writeByteArray arr (off + 2) b2
-    writeByteArray arr (off + 3) b3
+    writeByteArray arr (coerce off) b0
+    writeByteArray arr (coerce off + 1) b1
+    writeByteArray arr (coerce off + 2) b2
+    writeByteArray arr (coerce off + 3) b3
 
   indexPtrLiftedInBytes ptr off =
-    let !b0 = indexOffPtr (coerce ptr) off
-        !b1 = indexOffPtr (coerce ptr) (off + 1)
-        !b2 = indexOffPtr (coerce ptr) (off + 2)
-        !b3 = indexOffPtr (coerce ptr) (off + 3)
+    let !b0 = indexOffPtr (coerce ptr) (coerce off)
+        !b1 = indexOffPtr (coerce ptr) (coerce off + 1)
+        !b2 = indexOffPtr (coerce ptr) (coerce off + 2)
+        !b3 = indexOffPtr (coerce ptr) (coerce off + 3)
     in  Word32LE (mkWord32LE b0 b1 b2 b3)
 
   writePtrLiftedInBytes ptr off w =
     let (!b0, !b1, !b2, !b3) = unMkWord32LE (unWord32LE w)
-    in  writeOffPtr (coerce ptr) off b0
-          *> writeOffPtr (coerce ptr) (off + 1) b1
-          *> writeOffPtr (coerce ptr) (off + 2) b2
-          *> writeOffPtr (coerce ptr) (off + 3) b3
+    in  writeOffPtr (coerce ptr) (coerce off) b0
+          *> writeOffPtr (coerce ptr) (coerce off + 1) b1
+          *> writeOffPtr (coerce ptr) (coerce off + 2) b2
+          *> writeOffPtr (coerce ptr) (coerce off + 3) b3
 
 newtype Int32LE = Int32LE {unInt32LE :: Int32}
   deriving stock (Show)
@@ -170,32 +172,32 @@ instance LiftedPrim FloatLE where
   elemSizeLifted _ = 4
 
   indexArrayLiftedInBytes arr off =
-    let !b0 = indexByteArray arr off
-        !b1 = indexByteArray arr (off + 1)
-        !b2 = indexByteArray arr (off + 2)
-        !b3 = indexByteArray arr (off + 3)
+    let !b0 = indexByteArray arr (coerce off)
+        !b1 = indexByteArray arr (coerce off + 1)
+        !b2 = indexByteArray arr (coerce off + 2)
+        !b3 = indexByteArray arr (coerce off + 3)
     in  FloatLE (mkFloatLE b0 b1 b2 b3)
 
   writeArrayLiftedInBytes arr off f = do
     let (!b0, !b1, !b2, !b3) = unMkFloatLE (unFloatLE f)
-    writeByteArray arr off b0
-    writeByteArray arr (off + 1) b1
-    writeByteArray arr (off + 2) b2
-    writeByteArray arr (off + 3) b3
+    writeByteArray arr (coerce off) b0
+    writeByteArray arr (coerce off + 1) b1
+    writeByteArray arr (coerce off + 2) b2
+    writeByteArray arr (coerce off + 3) b3
 
   indexPtrLiftedInBytes ptr off =
-    let !b0 = indexOffPtr (coerce ptr) off
-        !b1 = indexOffPtr (coerce ptr) (off + 1)
-        !b2 = indexOffPtr (coerce ptr) (off + 2)
-        !b3 = indexOffPtr (coerce ptr) (off + 3)
+    let !b0 = indexOffPtr (coerce ptr) (coerce off)
+        !b1 = indexOffPtr (coerce ptr) (coerce off + 1)
+        !b2 = indexOffPtr (coerce ptr) (coerce off + 2)
+        !b3 = indexOffPtr (coerce ptr) (coerce off + 3)
     in  FloatLE (mkFloatLE b0 b1 b2 b3)
 
   writePtrLiftedInBytes ptr off f =
     let (!b0, !b1, !b2, !b3) = unMkFloatLE (unFloatLE f)
-    in  writeOffPtr (coerce ptr) off b0
-          *> writeOffPtr (coerce ptr) (off + 1) b1
-          *> writeOffPtr (coerce ptr) (off + 2) b2
-          *> writeOffPtr (coerce ptr) (off + 3) b3
+    in  writeOffPtr (coerce ptr) (coerce off) b0
+          *> writeOffPtr (coerce ptr) (coerce off + 1) b1
+          *> writeOffPtr (coerce ptr) (coerce off + 2) b2
+          *> writeOffPtr (coerce ptr) (coerce off + 3) b3
 
 newtype Word16BE = Word16BE {unWord16BE :: Word16}
   deriving stock (Show)

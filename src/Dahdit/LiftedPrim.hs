@@ -13,6 +13,7 @@ module Dahdit.LiftedPrim
   , liftedPrimArrayFromList
   , generateLiftedPrimArray
   , sizeofLiftedPrimArray
+  , lengthLiftedPrimArray
   , cloneLiftedPrimArray
   , replicateLiftedPrimArray
   , setByteArrayLifted
@@ -20,6 +21,7 @@ module Dahdit.LiftedPrim
 where
 
 import Control.Monad.Primitive (PrimMonad (..))
+import Dahdit.Counts (ByteCount (..), ElemCount (..))
 import Dahdit.Internal (ViaFromIntegral (..))
 import Dahdit.Proxy (proxyFor, proxyForF)
 import Data.Coerce (coerce)
@@ -50,63 +52,47 @@ import Foreign.Ptr (Ptr)
 -- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
 -- It's all about reading and writing structures from lifted byte arrays and pointers.
 class LiftedPrim a where
-  elemSizeLifted :: Proxy a -> Int
+  elemSizeLifted :: Proxy a -> ByteCount
+  indexArrayLiftedInBytes :: ByteArray -> ByteCount -> a
+  writeArrayLiftedInBytes :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> a -> m ()
+  indexPtrLiftedInBytes :: Ptr x -> ByteCount -> a
+  writePtrLiftedInBytes :: PrimMonad m => Ptr x -> ByteCount -> a -> m ()
 
-  -- |The offset here is in bytes
-  indexArrayLiftedInBytes :: ByteArray -> Int -> a
-
-  -- | The offset here is in bytes
-  writeArrayLiftedInBytes :: PrimMonad m => MutableByteArray (PrimState m) -> Int -> a -> m ()
-
-  -- | The offset here is in bytes
-  indexPtrLiftedInBytes :: Ptr x -> Int -> a
-
-  -- | The offset here is in bytes
-  writePtrLiftedInBytes :: PrimMonad m => Ptr x -> Int -> a -> m ()
-
--- | The position here is in elems
-indexArrayLiftedInElems :: LiftedPrim a => Proxy a -> ByteArray -> Int -> a
+indexArrayLiftedInElems :: LiftedPrim a => Proxy a -> ByteArray -> ElemCount -> a
 indexArrayLiftedInElems prox arr pos =
-  let !sz = elemSizeLifted prox
-  in  indexArrayLiftedInBytes arr (pos * sz)
+  indexArrayLiftedInBytes arr (coerce pos * elemSizeLifted prox)
 
--- | The position here is in elems
-writeArrayLiftedInElems :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> Int -> a -> m ()
+writeArrayLiftedInElems :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> ElemCount -> a -> m ()
 writeArrayLiftedInElems arr pos val =
-  let !sz = elemSizeLifted (proxyFor val)
-  in  writeArrayLiftedInBytes arr (pos * sz) val
+  writeArrayLiftedInBytes arr (coerce pos * elemSizeLifted (proxyFor val)) val
 
--- | The position here is in elems
-indexPtrLiftedInElems :: LiftedPrim a => Proxy a -> Ptr x -> Int -> a
+indexPtrLiftedInElems :: LiftedPrim a => Proxy a -> Ptr x -> ElemCount -> a
 indexPtrLiftedInElems prox ptr pos =
-  let !sz = elemSizeLifted prox
-  in  indexPtrLiftedInBytes ptr (pos * sz)
+  indexPtrLiftedInBytes ptr (coerce pos * elemSizeLifted prox)
 
--- | The position here is in elems
-writePtrLiftedInElems :: (PrimMonad m, LiftedPrim a) => Ptr x -> Int -> a -> m ()
+writePtrLiftedInElems :: (PrimMonad m, LiftedPrim a) => Ptr x -> ElemCount -> a -> m ()
 writePtrLiftedInElems ptr pos val =
-  let !sz = elemSizeLifted (proxyFor val)
-  in  writePtrLiftedInBytes ptr (pos * sz) val
+  writePtrLiftedInBytes ptr (coerce pos * elemSizeLifted (proxyFor val)) val
 
 instance LiftedPrim Word8 where
   elemSizeLifted _ = 1
-  indexArrayLiftedInBytes = indexByteArray
-  writeArrayLiftedInBytes = writeByteArray
-  indexPtrLiftedInBytes = indexOffPtr . coerce
-  writePtrLiftedInBytes = writeOffPtr . coerce
+  indexArrayLiftedInBytes arr = indexByteArray arr . coerce
+  writeArrayLiftedInBytes marr = writeByteArray marr . coerce
+  indexPtrLiftedInBytes ptr = indexOffPtr (coerce ptr) . coerce
+  writePtrLiftedInBytes ptr = writeOffPtr (coerce ptr) . coerce
 
 instance LiftedPrim Int8 where
   elemSizeLifted _ = 1
-  indexArrayLiftedInBytes = indexByteArray
-  writeArrayLiftedInBytes = writeByteArray
-  indexPtrLiftedInBytes = indexOffPtr . coerce
-  writePtrLiftedInBytes = writeOffPtr . coerce
+  indexArrayLiftedInBytes arr = indexByteArray arr . coerce
+  writeArrayLiftedInBytes marr = writeByteArray marr . coerce
+  indexPtrLiftedInBytes ptr = indexOffPtr (coerce ptr) . coerce
+  writePtrLiftedInBytes ptr = writeOffPtr (coerce ptr) . coerce
 
 -- | NOTE: Relies on same byte width of both types!
 instance (Integral x, LiftedPrim x, Integral y) => LiftedPrim (ViaFromIntegral x y) where
   elemSizeLifted _ = elemSizeLifted (Proxy :: Proxy x)
   indexArrayLiftedInBytes arr off = ViaFromIntegral (fromIntegral (indexArrayLiftedInBytes arr off :: x))
-  writeArrayLiftedInBytes arr off val = let !x = fromIntegral (unViaFromIntegral val) :: x in writeArrayLiftedInBytes arr off x
+  writeArrayLiftedInBytes arr off val = let x = fromIntegral (unViaFromIntegral val) :: x in writeArrayLiftedInBytes arr off x
   indexPtrLiftedInBytes ptr = ViaFromIntegral . fromIntegral @x @y . indexPtrLiftedInBytes ptr
   writePtrLiftedInBytes ptr off (ViaFromIntegral y) = writePtrLiftedInBytes ptr off (fromIntegral y :: x)
 
@@ -123,28 +109,28 @@ newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray {unMutableLiftedPrim
 emptyLiftedPrimArray :: LiftedPrimArray a
 emptyLiftedPrimArray = LiftedPrimArray emptyByteArray
 
-indexLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int -> a
+indexLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> ElemCount -> a
 indexLiftedPrimArray (LiftedPrimArray arr) = indexArrayLiftedInElems Proxy arr
 
-writeLiftedPrimArray :: (LiftedPrim a, PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> Int -> a -> m ()
+writeLiftedPrimArray :: (LiftedPrim a, PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> a -> m ()
 writeLiftedPrimArray (MutableLiftedPrimArray arr) = writeArrayLiftedInElems arr
 
-freezeLiftedPrimArray :: PrimMonad m => MutableLiftedPrimArray (PrimState m) a -> Int -> Int -> m (LiftedPrimArray a)
-freezeLiftedPrimArray (MutableLiftedPrimArray arr) off len = fmap LiftedPrimArray (freezeByteArray arr off len)
+freezeLiftedPrimArray :: PrimMonad m => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> ElemCount -> m (LiftedPrimArray a)
+freezeLiftedPrimArray (MutableLiftedPrimArray arr) off len = fmap LiftedPrimArray (freezeByteArray arr (coerce off) (coerce len))
 
 unsafeFreezeLiftedPrimArray :: PrimMonad m => MutableLiftedPrimArray (PrimState m) a -> m (LiftedPrimArray a)
 unsafeFreezeLiftedPrimArray (MutableLiftedPrimArray arr) = fmap LiftedPrimArray (unsafeFreezeByteArray arr)
 
-thawLiftedPrimArray :: PrimMonad m => LiftedPrimArray a -> Int -> Int -> m (MutableLiftedPrimArray (PrimState m) a)
-thawLiftedPrimArray (LiftedPrimArray arr) off len = fmap MutableLiftedPrimArray (thawByteArray arr off len)
+thawLiftedPrimArray :: PrimMonad m => LiftedPrimArray a -> ElemCount -> ElemCount -> m (MutableLiftedPrimArray (PrimState m) a)
+thawLiftedPrimArray (LiftedPrimArray arr) off len = fmap MutableLiftedPrimArray (thawByteArray arr (coerce off) (coerce len))
 
 unsafeThawLiftedPrimArray :: PrimMonad m => LiftedPrimArray a -> m (MutableLiftedPrimArray (PrimState m) a)
 unsafeThawLiftedPrimArray (LiftedPrimArray arr) = fmap MutableLiftedPrimArray (unsafeThawByteArray arr)
 
-liftedPrimArrayFromListN :: LiftedPrim a => Int -> [a] -> LiftedPrimArray a
+liftedPrimArrayFromListN :: LiftedPrim a => ElemCount -> [a] -> LiftedPrimArray a
 liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
-  let !elemSize = elemSizeLifted (proxyForF xs)
-      !len = n * elemSize
+  let elemSize = elemSizeLifted (proxyForF xs)
+      len = coerce n * coerce elemSize
   arr <- newByteArray len
   offRef <- newSTRef 0
   for_ xs $ \x -> do
@@ -154,38 +140,41 @@ liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
   pure arr
 
 liftedPrimArrayFromList :: LiftedPrim a => [a] -> LiftedPrimArray a
-liftedPrimArrayFromList xs = liftedPrimArrayFromListN (length xs) xs
+liftedPrimArrayFromList xs = liftedPrimArrayFromListN (coerce (length xs)) xs
 
-generateLiftedPrimArray :: LiftedPrim a => Int -> (Int -> a) -> LiftedPrimArray a
+generateLiftedPrimArray :: LiftedPrim a => ElemCount -> (ElemCount -> a) -> LiftedPrimArray a
 generateLiftedPrimArray n f = liftedPrimArrayFromListN n (fmap f [0 .. n - 1])
 
-sizeofLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int
-sizeofLiftedPrimArray pa@(LiftedPrimArray arr) =
-  let !elemSize = elemSizeLifted (proxyForF pa)
-      !arrSize = sizeofByteArray arr
-  in  div arrSize elemSize
+sizeofLiftedPrimArray :: LiftedPrimArray a -> ByteCount
+sizeofLiftedPrimArray (LiftedPrimArray arr) = coerce (sizeofByteArray arr)
 
-cloneLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> Int -> Int -> LiftedPrimArray a
+lengthLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> ElemCount
+lengthLiftedPrimArray pa@(LiftedPrimArray arr) =
+  let elemSize = coerce (elemSizeLifted (proxyForF pa))
+      arrSize = sizeofByteArray arr
+  in  coerce (div arrSize elemSize)
+
+cloneLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> ElemCount -> ElemCount -> LiftedPrimArray a
 cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
-  let !elemSize = elemSizeLifted (proxyForF pa)
-      !byteOff = off * elemSize
-      !byteLen = len * elemSize
-      !arr' = cloneByteArray arr byteOff byteLen
+  let elemSize = elemSizeLifted (proxyForF pa)
+      byteOff = coerce off * elemSize
+      byteLen = coerce len * elemSize
+      arr' = cloneByteArray arr (coerce byteOff) (coerce byteLen)
   in  LiftedPrimArray arr'
 
-replicateLiftedPrimArray :: LiftedPrim a => Int -> a -> LiftedPrimArray a
+replicateLiftedPrimArray :: LiftedPrim a => ElemCount -> a -> LiftedPrimArray a
 replicateLiftedPrimArray len val = LiftedPrimArray $ runByteArray $ do
-  let !elemSize = elemSizeLifted (proxyFor val)
-      !byteLen = len * elemSize
-  arr <- newByteArray byteLen
+  let elemSize = elemSizeLifted (proxyFor val)
+      byteLen = coerce len * elemSize
+  arr <- newByteArray (coerce byteLen)
   for_ [0 .. len - 1] $ \pos ->
-    writeArrayLiftedInBytes arr (pos * elemSize) val
+    writeArrayLiftedInBytes arr (coerce pos * elemSize) val
   pure arr
 
 -- | Fill a byte array with the given value
-setByteArrayLifted :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> Int -> Int -> a -> m ()
+setByteArrayLifted :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> a -> m ()
 setByteArrayLifted arr off len val = do
-  let !elemSize = elemSizeLifted (proxyFor val)
-      !elemLen = div len elemSize
+  let elemSize = elemSizeLifted (proxyFor val)
+      elemLen = div (coerce len) elemSize
   for_ [0 .. elemLen - 1] $ \pos ->
     writeArrayLiftedInBytes arr (off + pos * elemSize) val
