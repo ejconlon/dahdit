@@ -19,7 +19,9 @@ import Control.Monad.Free.Church (F (..))
 import Dahdit.Counts (ByteCount, ElemCount)
 import Dahdit.LiftedPrim (LiftedPrim, LiftedPrimArray)
 import Dahdit.Nums
-  ( FloatBE
+  ( DoubleBE
+  , DoubleLE
+  , FloatBE
   , FloatLE
   , Int16BE
   , Int16LE
@@ -27,12 +29,16 @@ import Dahdit.Nums
   , Int24LE
   , Int32BE
   , Int32LE
+  , Int64BE
+  , Int64LE
   , Word16BE
   , Word16LE
   , Word24BE
   , Word24LE
   , Word32BE
   , Word32LE
+  , Word64BE
+  , Word64LE
   )
 import Dahdit.Sizes (StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
@@ -80,14 +86,20 @@ data GetF a
   | GetFInt24LE (Int24LE -> a)
   | GetFWord32LE (Word32LE -> a)
   | GetFInt32LE (Int32LE -> a)
+  | GetFWord64LE (Word64LE -> a)
+  | GetFInt64LE (Int64LE -> a)
   | GetFFloatLE (FloatLE -> a)
+  | GetFDoubleLE (DoubleLE -> a)
   | GetFWord16BE (Word16BE -> a)
   | GetFInt16BE (Int16BE -> a)
   | GetFWord24BE (Word24BE -> a)
   | GetFInt24BE (Int24BE -> a)
   | GetFWord32BE (Word32BE -> a)
   | GetFInt32BE (Int32BE -> a)
+  | GetFWord64BE (Word64BE -> a)
+  | GetFInt64BE (Int64BE -> a)
   | GetFFloatBE (FloatBE -> a)
+  | GetFDoubleBE (DoubleBE -> a)
   | GetFShortByteString !ByteCount (ShortByteString -> a)
   | GetFStaticSeq !(GetStaticSeqF a)
   | GetFStaticArray !(GetStaticArrayF a)
@@ -132,14 +144,20 @@ data PutF a
   | PutFInt24LE !Int24LE a
   | PutFWord32LE !Word32LE a
   | PutFInt32LE !Int32LE a
+  | PutFWord64LE !Word64LE a
+  | PutFInt64LE !Int64LE a
   | PutFFloatLE !FloatLE a
+  | PutFDoubleLE !DoubleLE a
   | PutFWord16BE !Word16BE a
   | PutFInt16BE !Int16BE a
   | PutFWord24BE !Word24BE a
   | PutFInt24BE !Int24BE a
   | PutFWord32BE !Word32BE a
+  | PutFWord64BE !Word64BE a
+  | PutFInt64BE !Int64BE a
   | PutFInt32BE !Int32BE a
   | PutFFloatBE !FloatBE a
+  | PutFDoubleBE !DoubleBE a
   | PutFShortByteString !ByteCount !ShortByteString a
   | PutFStaticSeq !(PutStaticSeqF a)
   | PutFStaticArray !(PutStaticArrayF a)
