@@ -1,10 +1,8 @@
 module Dahdit.Binary
   ( Binary (..)
-  , byteSizeViaPut
   )
 where
 
-import Dahdit.Counts (ByteCount)
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs
   ( getFloatBE
@@ -56,16 +54,12 @@ import Dahdit.Nums
   , Word32BE (..)
   , Word32LE
   )
-import Dahdit.Run (runCount)
 import Data.Int (Int8)
 import Data.Word (Word8)
 
 class Binary a where
   get :: Get a
   put :: a -> Put
-
-byteSizeViaPut :: Binary a => a -> ByteCount
-byteSizeViaPut = runCount . put
 
 instance Binary () where
   get = pure ()
