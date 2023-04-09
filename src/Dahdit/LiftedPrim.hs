@@ -55,8 +55,8 @@ class LiftedPrim a where
   elemSizeLifted :: Proxy a -> ByteCount
   indexArrayLiftedInBytes :: ByteArray -> ByteCount -> a
   writeArrayLiftedInBytes :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> a -> m ()
-  indexPtrLiftedInBytes :: Ptr x -> ByteCount -> a
-  writePtrLiftedInBytes :: PrimMonad m => Ptr x -> ByteCount -> a -> m ()
+  indexPtrLiftedInBytes :: Ptr Word8 -> ByteCount -> a
+  writePtrLiftedInBytes :: PrimMonad m => Ptr Word8 -> ByteCount -> a -> m ()
 
 indexArrayLiftedInElems :: LiftedPrim a => Proxy a -> ByteArray -> ElemCount -> a
 indexArrayLiftedInElems prox arr pos =
@@ -66,11 +66,11 @@ writeArrayLiftedInElems :: (PrimMonad m, LiftedPrim a) => MutableByteArray (Prim
 writeArrayLiftedInElems arr pos val =
   writeArrayLiftedInBytes arr (coerce pos * elemSizeLifted (proxyFor val)) val
 
-indexPtrLiftedInElems :: LiftedPrim a => Proxy a -> Ptr x -> ElemCount -> a
+indexPtrLiftedInElems :: LiftedPrim a => Proxy a -> Ptr Word8 -> ElemCount -> a
 indexPtrLiftedInElems prox ptr pos =
   indexPtrLiftedInBytes ptr (coerce pos * elemSizeLifted prox)
 
-writePtrLiftedInElems :: (PrimMonad m, LiftedPrim a) => Ptr x -> ElemCount -> a -> m ()
+writePtrLiftedInElems :: (PrimMonad m, LiftedPrim a) => Ptr Word8 -> ElemCount -> a -> m ()
 writePtrLiftedInElems ptr pos val =
   writePtrLiftedInBytes ptr (coerce pos * elemSizeLifted (proxyFor val)) val
 
@@ -78,8 +78,8 @@ instance LiftedPrim Word8 where
   elemSizeLifted _ = 1
   indexArrayLiftedInBytes arr = indexByteArray arr . coerce
   writeArrayLiftedInBytes marr = writeByteArray marr . coerce
-  indexPtrLiftedInBytes ptr = indexOffPtr (coerce ptr) . coerce
-  writePtrLiftedInBytes ptr = writeOffPtr (coerce ptr) . coerce
+  indexPtrLiftedInBytes ptr = indexOffPtr ptr . coerce
+  writePtrLiftedInBytes ptr = writeOffPtr ptr . coerce
 
 instance LiftedPrim Int8 where
   elemSizeLifted _ = 1

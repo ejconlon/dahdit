@@ -36,8 +36,8 @@ import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Foreign.Marshal.Alloc (callocBytes, finalizerFree, free)
 import Foreign.Ptr (Ptr, plusPtr)
 
--- | A wrapper over 'Ptr' with an additional free type index to align with 'ST' state.
-newtype IxPtr x s = IxPtr {unIxPtr :: Ptr x}
+-- | A wrapper over 'Ptr' with an additional phantom type index to align with 'ST' state.
+newtype IxPtr s = IxPtr {unIxPtr :: Ptr Word8}
   deriving stock (Show)
   deriving newtype (Eq, Ord)
 
@@ -49,14 +49,14 @@ instance ReadMem ByteArray where
   indexMemInBytes = indexArrayLiftedInBytes
   cloneArrayMemInBytes arr off len = cloneByteArray arr (coerce off) (coerce len)
 
-clonePtr :: Ptr x -> ByteCount -> ByteCount -> ByteArray
+clonePtr :: Ptr Word8 -> ByteCount -> ByteCount -> ByteArray
 clonePtr ptr off len = runST $ do
   let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
   marr <- newByteArray (coerce len)
   copyPtrToMutableByteArray marr 0 wptr (coerce len)
   unsafeFreezeByteArray marr
 
-instance ReadMem (Ptr x) where
+instance ReadMem (Ptr Word8) where
   indexMemInBytes = indexPtrLiftedInBytes
   cloneArrayMemInBytes = clonePtr
 
@@ -88,19 +88,19 @@ instance WriteMem MutableByteArray where
   setMemInBytes len val mem off = setByteArrayLifted mem off len val
   releaseMem = const Nothing
 
-copyPtr :: ByteArray -> ByteCount -> ByteCount -> Ptr x -> ByteCount -> ST s ()
+copyPtr :: ByteArray -> ByteCount -> ByteCount -> Ptr Word8 -> ByteCount -> ST s ()
 copyPtr arr arrOff arrLen ptr off =
   let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
   in  copyByteArrayToPtr wptr arr (coerce arrOff) (coerce arrLen)
 
-setPtr :: LiftedPrim a => ByteCount -> a -> Ptr x -> ByteCount -> ST s ()
+setPtr :: LiftedPrim a => ByteCount -> a -> Ptr Word8 -> ByteCount -> ST s ()
 setPtr len val ptr off = do
   let elemSize = elemSizeLifted (proxyFor val)
       elemLen = div (coerce len) elemSize
   for_ [0 .. elemLen - 1] $ \pos ->
     writePtrLiftedInBytes ptr (off + pos * elemSize) val
 
-instance WriteMem (IxPtr x) where
+instance WriteMem IxPtr where
   writeMemInBytes val mem off = writePtrLiftedInBytes (unIxPtr mem) off val
   copyArrayMemInBytes arr arrOff arrLen = copyPtr arr arrOff arrLen . unIxPtr
   setMemInBytes len val = setPtr len val . unIxPtr
@@ -119,14 +119,14 @@ guardedFreeze freeze arr len off =
 freezeSBSMem :: MutableByteArray s -> ByteCount -> ByteCount -> ST s ShortByteString
 freezeSBSMem marr cap len = fmap (\(ByteArray harr) -> SBS harr) (if cap == len then unsafeFreezeByteArray marr else freezeByteArray marr 0 (coerce len))
 
-freezeBSMem :: IxPtr x s -> ByteCount -> ByteCount -> ST s ByteString
+freezeBSMem :: IxPtr s -> ByteCount -> ByteCount -> ST s ByteString
 freezeBSMem (IxPtr ptr) _ len =
-  unsafeIOToST (BSU.unsafePackCStringFinalizer (coerce ptr) (coerce len) (free ptr))
+  unsafeIOToST (BSU.unsafePackCStringFinalizer ptr (coerce len) (free ptr))
 
-freezeVecMem :: IxPtr x s -> ByteCount -> ByteCount -> ST s (Vector Word8)
-freezeVecMem (IxPtr ptr) _ len = unsafeIOToST (fmap (\fp -> VS.unsafeFromForeignPtr0 fp (coerce len)) (newForeignPtr finalizerFree (coerce ptr)))
+freezeVecMem :: IxPtr s -> ByteCount -> ByteCount -> ST s (Vector Word8)
+freezeVecMem (IxPtr ptr) _ len = unsafeIOToST (fmap (\fp -> VS.unsafeFromForeignPtr0 fp (coerce len)) (newForeignPtr finalizerFree ptr))
 
-allocPtrMem :: ByteCount -> ST s (IxPtr x s)
+allocPtrMem :: ByteCount -> ST s (IxPtr s)
 allocPtrMem = fmap IxPtr . unsafeIOToST . callocBytes . coerce
 
 allocArrayMem :: ByteCount -> ST s (MutableByteArray s)

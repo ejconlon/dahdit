@@ -57,7 +57,6 @@ import Dahdit.Nums
   , Word32LE
   )
 import Dahdit.Run (runCount)
-import Dahdit.Sizes (ByteSized)
 import Data.Int (Int8)
 import Data.Word (Word8)
 
