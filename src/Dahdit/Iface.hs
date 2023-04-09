@@ -3,24 +3,27 @@ module Dahdit.Iface
   , PutSink (..)
   , runGetSBS
   , runGetBS
+  , runGetVec
   , runGetFile
   , runPutSBS
   , runPutBS
+  , runPutVec
   , runPutFile
   )
 where
 
-import Control.Monad.ST (ST)
 import Dahdit.Counts (ByteCount (..))
 import Dahdit.Free (Get, Put)
-import Dahdit.Mem (freezeSBSMem, viewBSMem, viewSBSMem)
+import Dahdit.Mem (allocArrayMem, allocPtrMem, freezeBSMem, freezeSBSMem, freezeVecMem, viewBSMem, viewSBSMem, viewVecMem)
 import Dahdit.Run (GetError, runGetInternal, runPutInternal)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
-import Data.Primitive.ByteArray (newByteArray)
+import Data.Vector.Storable (Vector)
+import qualified Data.Vector.Storable as VS
+import Data.Word (Word8)
 
 -- TODO support getting with offset
 class GetSource z where
@@ -32,6 +35,9 @@ instance GetSource ShortByteString where
 instance GetSource ByteString where
   getFromSource = runGetBS
 
+instance GetSource (Vector Word8) where
+  getFromSource = runGetVec
+
 -- TODO support putting with offset
 class PutSink z where
   putToSink :: Put -> z
@@ -42,29 +48,31 @@ instance PutSink ShortByteString where
 instance PutSink ByteString where
   putToSink = runPutBS
 
+instance PutSink (Vector Word8) where
+  putToSink = runPutVec
+
 runGetSBS :: Get a -> ShortByteString -> (Either GetError a, ByteCount)
 runGetSBS act sbs = runGetInternal act (coerce (BSS.length sbs)) (viewSBSMem sbs)
 
 runGetBS :: Get a -> ByteString -> (Either GetError a, ByteCount)
 runGetBS act bs = runGetInternal act (coerce (BS.length bs)) (viewBSMem bs)
 
+runGetVec :: Get a -> Vector Word8 -> (Either GetError a, ByteCount)
+runGetVec act vec = runGetInternal act (coerce (VS.length vec)) (viewVecMem vec)
+
 runGetFile :: Get a -> FilePath -> IO (Either GetError a, ByteCount)
 runGetFile act fp = do
   bs <- BS.readFile fp
   pure (runGetBS act bs)
 
-guardedFreeze :: (q s -> ByteCount -> ST s z) -> q s -> ByteCount -> ByteCount -> ST s z
-guardedFreeze freeze arr len off =
-  -- This is a sanity check - if it goes wrong then there's a bug in the library
-  if off /= len
-    then error ("Invalid put length: (given " ++ show len ++ ", used " ++ show off ++ ")")
-    else freeze arr len
-
 runPutSBS :: Put -> ShortByteString
-runPutSBS act = runPutInternal act (newByteArray . coerce) (guardedFreeze freezeSBSMem)
+runPutSBS act = runPutInternal act allocArrayMem freezeSBSMem
 
 runPutBS :: Put -> ByteString
-runPutBS _act = error "TODO"
+runPutBS act = runPutInternal act allocPtrMem freezeBSMem
+
+runPutVec :: Put -> Vector Word8
+runPutVec act = runPutInternal act allocPtrMem freezeVecMem
 
 runPutFile :: FilePath -> Put -> IO ()
 runPutFile fp act =

@@ -71,7 +71,7 @@ instance (Generic t, GStaticByteSized (Rep t)) => StaticByteSized (ViaStaticGene
 
 -- Binary:
 
-class GByteSized f => GBinary (f :: Type -> Type) where
+class GBinary (f :: Type -> Type) where
   gget :: Get (f a)
   gput :: f a -> Put
 

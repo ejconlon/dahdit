@@ -125,6 +125,6 @@ newtype ViaCodec a = ViaCodec {unViaCodec :: a}
 instance ByteSized a => ByteSized (ViaCodec a) where
   byteSize = byteSize . unViaCodec
 
-instance (ByteSized a, HasCodec a) => Binary (ViaCodec a) where
+instance HasCodec a => Binary (ViaCodec a) where
   get = coerce (parse (codec @a))
   put = coerce (produce (codec @a))

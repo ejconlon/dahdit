@@ -61,7 +61,7 @@ import Dahdit.Sizes (ByteSized)
 import Data.Int (Int8)
 import Data.Word (Word8)
 
-class ByteSized a => Binary a where
+class Binary a where
   get :: Get a
   put :: a -> Put
 

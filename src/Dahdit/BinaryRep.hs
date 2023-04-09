@@ -27,7 +27,7 @@ instance (Binary x, Integral x, Bounded a, Enum a) => BinaryRep x (ViaBoundedEnu
 
 newtype ViaBinaryRep a = ViaBinaryRep {unViaBinaryRep :: a}
 
-instance BinaryRep x a => ByteSized (ViaBinaryRep a) where
+instance (ByteSized x, BinaryRep x a) => ByteSized (ViaBinaryRep a) where
   byteSize = byteSize . toBinaryRep . unViaBinaryRep
 
 instance (StaticByteSized x, BinaryRep x a) => StaticByteSized (ViaBinaryRep a) where

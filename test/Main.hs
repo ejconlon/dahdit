@@ -87,9 +87,35 @@ import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (byteArrayFromList)
 import Data.Proxy (asProxyTypeOf)
 import qualified Data.Sequence as Seq
+import Data.Vector.Storable (Vector)
+import qualified Data.Vector.Storable as VS
 import GHC.Float (castWord32ToFloat)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
+
+class GetSource z => GetCase z where
+  initSource :: [Word8] -> z
+
+instance GetCase ShortByteString where
+  initSource = BSS.pack
+
+instance GetCase ByteString where
+  initSource = BS.pack
+
+instance GetCase (Vector Word8) where
+  initSource = VS.fromList
+
+class PutSink z => PutCase z where
+  consumeSink :: z -> [Word8]
+
+instance PutCase ShortByteString where
+  consumeSink = BSS.unpack
+
+instance PutCase ByteString where
+  consumeSink = BS.unpack
+
+instance PutCase (Vector Word8) where
+  consumeSink = VS.toList
 
 data DynFoo = DynFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
@@ -103,24 +129,6 @@ type StaBytes = StaticBytes 2
 
 mkStaBytes :: String -> StaBytes
 mkStaBytes = StaticBytes . BSS.toShort . BSC.pack
-
-class GetSource z => GetCase z where
-  initSource :: [Word8] -> z
-
-instance GetCase ShortByteString where
-  initSource = BSS.pack
-
-instance GetCase ByteString where
-  initSource = BS.pack
-
-class PutSink z => PutCase z where
-  consumeSink :: z -> [Word8]
-
-instance PutCase ShortByteString where
-  consumeSink = BSS.unpack
-
-instance PutCase ByteString where
-  consumeSink = BS.unpack
 
 runGetCase :: (Show a, Eq a, GetCase z) => Proxy z -> Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> IO ()
 runGetCase p getter mayRes buf = do
@@ -284,9 +292,11 @@ testDahdit =
     , testDahditStaticByteSize
     , testDahditGet "ShortByteString" (Proxy :: Proxy ShortByteString)
     , testDahditGet "ByteString" (Proxy :: Proxy ByteString)
+    , testDahditGet "Vector" (Proxy :: Proxy (Vector Word8))
     , testDahditPut "ShortByteString" (Proxy :: Proxy ShortByteString)
-    , -- , testDahditPut "ByteString" (Proxy :: Proxy ByteString)
-      testDahditLiftedPrimArray
+    , testDahditPut "ByteString" (Proxy :: Proxy ByteString)
+    , testDahditPut "Vector" (Proxy :: Proxy (Vector Word8))
+    , testDahditLiftedPrimArray
     ]
 
 main :: IO ()

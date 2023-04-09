@@ -3,6 +3,7 @@ module Dahdit
   , Int8
   , ByteString
   , ShortByteString
+  , Vector
   , Seq (..)
   , ByteArray
   , Generic
@@ -44,5 +45,6 @@ import Data.Int (Int8)
 import Data.Primitive.ByteArray (ByteArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq (..))
+import Data.Vector.Storable (Vector)
 import Data.Word (Word8)
 import GHC.Generics (Generic)

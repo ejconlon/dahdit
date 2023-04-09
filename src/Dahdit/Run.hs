@@ -8,12 +8,13 @@ module Dahdit.Run
 where
 
 import Control.Applicative (Alternative (..))
-import Control.Exception (Exception (..))
+import Control.Exception (Exception (..), onException)
 import Control.Monad (replicateM_, unless)
 import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.Free.Church (F (..))
 import Control.Monad.Reader (MonadReader (..), ReaderT (..), asks)
 import Control.Monad.ST.Strict (ST, runST)
+import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeSTToIO)
 import Control.Monad.State.Strict (MonadState, State, runState)
 import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
@@ -406,7 +407,8 @@ runCount act =
 
 runPutInternal :: WriteMem q => Put -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
 runPutInternal act mkMem useMem = runST $ do
-  let len = runCount act
-  mem <- mkMem len
-  off <- runPutUnsafe act len mem
-  useMem mem len off
+  let cap = runCount act
+  mem <- mkMem cap
+  case releaseMem mem of
+    Nothing -> runPutUnsafe act cap mem >>= useMem mem cap
+    Just rel -> unsafeIOToST (onException (unsafeSTToIO (runPutUnsafe act cap mem >>= useMem mem cap)) rel)
