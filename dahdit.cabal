@@ -67,6 +67,7 @@ library
       LambdaCase
       KindSignatures
       MultiParamTypeClasses
+      MultiWayIf
       Rank2Types
       ScopedTypeVariables
       StandaloneDeriving
@@ -113,6 +114,7 @@ test-suite dahdit-test
       LambdaCase
       KindSignatures
       MultiParamTypeClasses
+      MultiWayIf
       Rank2Types
       ScopedTypeVariables
       StandaloneDeriving

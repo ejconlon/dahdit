@@ -52,7 +52,7 @@ class (Num le, Num be) => EndianPair le be | le -> be, be -> le where
 
 newtype Word16LE = Word16LE {unWord16LE :: Word16}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
 
 instance LiftedPrim Word16LE where
   elemSizeLifted _ = 2
@@ -79,12 +79,12 @@ instance LiftedPrim Word16LE where
 
 newtype Int16LE = Int16LE {unInt16LE :: Int16}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaFromIntegral Word16LE Int16LE)
 
 newtype Word24LE = Word24LE {unWord24LE :: Word24}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits)
 
 instance Default Word24LE where
   def = 0
@@ -118,7 +118,7 @@ instance LiftedPrim Word24LE where
 
 newtype Int24LE = Int24LE {unInt24LE :: Int24}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits)
   deriving (LiftedPrim) via (ViaFromIntegral Word24LE Int24LE)
 
 instance Default Int24LE where
@@ -126,7 +126,7 @@ instance Default Int24LE where
 
 newtype Word32LE = Word32LE {unWord32LE :: Word32}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
 
 instance LiftedPrim Word32LE where
   elemSizeLifted _ = 4
@@ -161,7 +161,7 @@ instance LiftedPrim Word32LE where
 
 newtype Int32LE = Int32LE {unInt32LE :: Int32}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaFromIntegral Word32LE Int32LE)
 
 newtype FloatLE = FloatLE {unFloatLE :: Float}
@@ -201,17 +201,17 @@ instance LiftedPrim FloatLE where
 
 newtype Word16BE = Word16BE {unWord16BE :: Word16}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaEndianPair Word16LE Word16BE)
 
 newtype Int16BE = Int16BE {unInt16BE :: Int16}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaEndianPair Int16LE Int16BE)
 
 newtype Word24BE = Word24BE {unWord24BE :: Word24}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits)
   deriving (LiftedPrim) via (ViaEndianPair Word24LE Word24BE)
 
 instance Default Word24BE where
@@ -219,7 +219,7 @@ instance Default Word24BE where
 
 newtype Int24BE = Int24BE {unInt24BE :: Int24}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits)
   deriving (LiftedPrim) via (ViaEndianPair Int24LE Int24BE)
 
 instance Default Int24BE where
@@ -227,12 +227,12 @@ instance Default Int24BE where
 
 newtype Word32BE = Word32BE {unWord32BE :: Word32}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaEndianPair Word32LE Word32BE)
 
 newtype Int32BE = Int32BE {unInt32BE :: Int32}
   deriving stock (Show)
-  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Bits, Default)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded, Real, Integral, Bits, Default)
   deriving (LiftedPrim) via (ViaEndianPair Int32LE Int32BE)
 
 newtype FloatBE = FloatBE {unFloatBE :: Float}

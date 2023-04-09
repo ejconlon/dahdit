@@ -125,6 +125,10 @@ data StaFoo = StaFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
   deriving (ByteSized, StaticByteSized, Binary) via (ViaStaticGeneric StaFoo)
 
+data TagFoo = TagFooOne !Word8 | TagFooTwo !Word16LE
+  deriving stock (Eq, Show, Generic)
+  deriving (ByteSized, Binary) via (ViaGeneric TagFoo)
+
 type StaBytes = StaticBytes 2
 
 mkStaBytes :: String -> StaBytes
@@ -173,6 +177,8 @@ testDahditByteSize =
     , testCase "StaBytes" (byteSize (mkStaBytes "hi") @?= 2)
     , testCase "StaBytes (less)" (byteSize (mkStaBytes "h") @?= 2)
     , testCase "StaBytes (more)" (byteSize (mkStaBytes "hi!") @?= 2)
+    , testCase "TagFoo (one)" (byteSize (TagFooOne 7) @?= 2)
+    , testCase "TagFoo (two)" (byteSize (TagFooTwo 7) @?= 3)
     ]
 
 testDahditStaticByteSize :: TestTree
@@ -238,6 +244,8 @@ testDahditGet n p =
     , testCase "getByteArray" (runGetCase p (getByteArray 3) (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC, 0x5D])
     , testCase "getLiftedPrimArray" (runGetCase p (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D])
     , testCase "StaBytes" (runGetCase p (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21])
+    , testCase "TagFoo (one)" (runGetCase p (get @TagFoo) (Just (2, 0, TagFooOne 7)) [0x00, 0x07])
+    , testCase "TagFoo (two)" (runGetCase p (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00])
     ]
 
 testDahditPut :: PutCase z => String -> Proxy z -> TestTree
@@ -275,6 +283,8 @@ testDahditPut n p =
     , testCase "StaBytes" (runPutCase p (put (mkStaBytes "hi")) [0x68, 0x69])
     , testCase "StaBytes (less)" (runPutCase p (put (mkStaBytes "h")) [0x68, 0x00])
     , testCase "StaBytes (more)" (runPutCase p (put (mkStaBytes "hi!")) [0x68, 0x69])
+    , testCase "TagFoo (one)" (runPutCase p (put (TagFooOne 7)) [0x00, 0x07])
+    , testCase "TagFoo (two)" (runPutCase p (put (TagFooTwo 7)) [0x01, 0x07, 0x00])
     ]
 
 testDahditLiftedPrimArray :: TestTree

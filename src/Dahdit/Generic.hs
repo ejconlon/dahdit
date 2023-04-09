@@ -11,10 +11,13 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Counts (ByteCount)
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (putStaticHint)
+import Dahdit.Nums (Word16LE, Word32LE)
 import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
+import Data.Bits (Bits (..))
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
-import GHC.Generics (Generic (..), K1 (..), M1 (..), U1 (..), (:*:) (..))
+import Data.Word (Word8)
+import GHC.Generics (C1, Generic (..), K1 (..), M1 (..), U1 (..), (:*:) (..), (:+:) (..))
 
 -- | Use: deriving (ByteSized, Binary) via (ViaGeneric Foo)
 newtype ViaGeneric a = ViaGeneric {unViaGeneric :: a}
@@ -38,6 +41,13 @@ instance (GByteSized a, GByteSized b) => GByteSized (a :*: b) where
 -- Metadata
 instance GByteSized a => GByteSized (M1 i c a) where
   gbyteSize = gbyteSize . unM1
+
+-- Sum
+instance (GByteSized a, GByteSized b, SumSize a, SumSize b) => GByteSized (a :+: b) where
+  gbyteSize s =
+    sumSizeBytes s + case s of
+      L1 a -> gbyteSize a
+      R1 b -> gbyteSize b
 
 -- Field
 instance ByteSized a => GByteSized (K1 i a) where
@@ -98,3 +108,95 @@ instance (Generic t, GBinary (Rep t)) => Binary (ViaGeneric t) where
 instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaStaticGeneric t) where
   get = fmap (ViaStaticGeneric . to) gget
   put = putStaticHint (gput . from . unViaStaticGeneric)
+
+-- Everything that follows is borrowed from the binary package, which
+-- borrows from the cereal package!
+
+-- The following GBinary instance for sums has support for serializing
+-- types with up to 2^64-1 constructors. It will use the minimal
+-- number of bytes needed to encode the constructor. For example when
+-- a type has 2^8 constructors or less it will use a single byte to
+-- encode the constructor. If it has 2^16 constructors or less it will
+-- use two bytes, and so on till 2^64-1.
+
+instance
+  ( GSumBinary a
+  , GSumBinary b
+  , SumSize a
+  , SumSize b
+  )
+  => GBinary (a :+: b)
+  where
+  gget
+    | size - 1 <= fromIntegral (maxBound :: Word8) = (get :: Get Word8) >>= checkGetSum (fromIntegral size)
+    | size - 1 <= fromIntegral (maxBound :: Word16LE) = (get :: Get Word16LE) >>= checkGetSum (fromIntegral size)
+    | size - 1 <= (maxBound :: Word32LE) = (get :: Get Word32LE) >>= checkGetSum size
+    | otherwise = sizeError "decode" size
+   where
+    size = unTagged (sumSize :: Tagged (a :+: b))
+  gput
+    | size - 1 <= fromIntegral (maxBound :: Word8) = putSum (0 :: Word8) (fromIntegral size)
+    | size - 1 <= fromIntegral (maxBound :: Word16LE) = putSum (0 :: Word16LE) (fromIntegral size)
+    | size - 1 <= (maxBound :: Word32LE) = putSum (0 :: Word32LE) size
+    | otherwise = sizeError "encode" size
+   where
+    size = unTagged (sumSize :: Tagged (a :+: b))
+
+sizeError :: Show size => String -> size -> error
+sizeError s size = error ("Can't " ++ s ++ " a type with " ++ show size ++ " constructors")
+
+checkGetSum
+  :: (Ord word, Num word, Bits word, GSumBinary f)
+  => word
+  -> word
+  -> Get (f a)
+checkGetSum size code
+  | code < size = getSum code size
+  | otherwise = fail "Unknown encoding for constructor"
+{-# INLINE checkGetSum #-}
+
+class GSumBinary f where
+  getSum :: (Ord word, Num word, Bits word) => word -> word -> Get (f a)
+  putSum :: (Num w, Bits w, Binary w) => w -> w -> f a -> Put
+
+instance (GSumBinary a, GSumBinary b) => GSumBinary (a :+: b) where
+  getSum !code !size
+    | code < sizeL = L1 <$> getSum code sizeL
+    | otherwise = R1 <$> getSum (code - sizeL) sizeR
+   where
+    sizeL = size `shiftR` 1
+    sizeR = size - sizeL
+  putSum !code !size s = case s of
+    L1 x -> putSum code sizeL x
+    R1 x -> putSum (code + sizeL) sizeR x
+   where
+    sizeL = size `shiftR` 1
+    sizeR = size - sizeL
+
+instance GBinary a => GSumBinary (C1 c a) where
+  getSum _ _ = gget
+  putSum !code _ x = put code <> gput x
+
+class SumSize (f :: Type -> Type) where
+  sumSize :: Tagged f
+
+newtype Tagged (s :: Type -> Type) = Tagged {unTagged :: Word32LE}
+
+instance (SumSize a, SumSize b) => SumSize (a :+: b) where
+  sumSize = Tagged (unTagged (sumSize :: Tagged a) + unTagged (sumSize :: Tagged b))
+
+instance SumSize (C1 c a) where
+  sumSize = Tagged 1
+
+sumSizeFor :: SumSize f => f a -> Tagged f
+sumSizeFor = const sumSize
+
+taggedBytes :: Tagged f -> ByteCount
+taggedBytes (Tagged size)
+  | size - 1 <= fromIntegral (maxBound :: Word8) = 1
+  | size - 1 <= fromIntegral (maxBound :: Word16LE) = 2
+  | size - 1 <= (maxBound :: Word32LE) = 4
+  | otherwise = sizeError "size" size
+
+sumSizeBytes :: SumSize f => f a -> ByteCount
+sumSizeBytes = taggedBytes . sumSizeFor
