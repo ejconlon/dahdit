@@ -1,6 +1,9 @@
 module Dahdit.Iface
-  ( GetSource (..)
-  , PutSink (..)
+  ( BinaryTarget (..)
+  , decode
+  , decodeFile
+  , encode
+  , encodeFile
   , runGetSBS
   , runGetBS
   , runGetVec
@@ -12,10 +15,12 @@ module Dahdit.Iface
   )
 where
 
+import Dahdit.Binary (Binary (..))
 import Dahdit.Counts (ByteCount (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Mem (allocArrayMem, allocPtrMem, freezeBSMem, freezeSBSMem, freezeVecMem, viewBSMem, viewSBSMem, viewVecMem)
 import Dahdit.Run (GetError, runGetInternal, runPutInternal)
+import Dahdit.Sizes (ByteSized (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Short (ShortByteString)
@@ -25,31 +30,34 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
 import Data.Word (Word8)
 
--- TODO support getting with offset
-class GetSource z where
-  getFromSource :: Get a -> z -> (Either GetError a, ByteCount)
+-- TODO support get/put with offset
+class BinaryTarget z where
+  getTarget :: Get a -> z -> (Either GetError a, ByteCount)
+  putTarget :: Put -> ByteCount -> z
 
-instance GetSource ShortByteString where
-  getFromSource = runGetSBS
+instance BinaryTarget ShortByteString where
+  getTarget = runGetSBS
+  putTarget = runPutSBS
 
-instance GetSource ByteString where
-  getFromSource = runGetBS
+instance BinaryTarget ByteString where
+  getTarget = runGetBS
+  putTarget = runPutBS
 
-instance GetSource (Vector Word8) where
-  getFromSource = runGetVec
+instance BinaryTarget (Vector Word8) where
+  getTarget = runGetVec
+  putTarget = runPutVec
 
--- TODO support putting with offset
-class PutSink z where
-  putToSink :: Put -> z
+decode :: (Binary a, BinaryTarget z) => z -> (Either GetError a, ByteCount)
+decode = getTarget get
 
-instance PutSink ShortByteString where
-  putToSink = runPutSBS
+decodeFile :: Binary a => FilePath -> IO (Either GetError a, ByteCount)
+decodeFile = runGetFile get
 
-instance PutSink ByteString where
-  putToSink = runPutBS
+encode :: (Binary a, ByteSized a, BinaryTarget z) => a -> z
+encode a = putTarget (put a) (byteSize a)
 
-instance PutSink (Vector Word8) where
-  putToSink = runPutVec
+encodeFile :: (Binary a, ByteSized a) => a -> FilePath -> IO ()
+encodeFile a = runPutFile (put a) (byteSize a)
 
 runGetSBS :: Get a -> ShortByteString -> (Either GetError a, ByteCount)
 runGetSBS act sbs = runGetInternal act (coerce (BSS.length sbs)) (viewSBSMem sbs)
@@ -65,16 +73,16 @@ runGetFile act fp = do
   bs <- BS.readFile fp
   pure (runGetBS act bs)
 
-runPutSBS :: Put -> ShortByteString
-runPutSBS act = runPutInternal act allocArrayMem freezeSBSMem
+runPutSBS :: Put -> ByteCount -> ShortByteString
+runPutSBS act cap = runPutInternal act cap allocArrayMem freezeSBSMem
 
-runPutBS :: Put -> ByteString
-runPutBS act = runPutInternal act allocPtrMem freezeBSMem
+runPutBS :: Put -> ByteCount -> ByteString
+runPutBS act cap = runPutInternal act cap allocPtrMem freezeBSMem
 
-runPutVec :: Put -> Vector Word8
-runPutVec act = runPutInternal act allocPtrMem freezeVecMem
+runPutVec :: Put -> ByteCount -> Vector Word8
+runPutVec act cap = runPutInternal act cap allocPtrMem freezeVecMem
 
-runPutFile :: FilePath -> Put -> IO ()
-runPutFile fp act =
-  let bs = runPutBS act
+runPutFile :: Put -> ByteCount -> FilePath -> IO ()
+runPutFile act cap fp =
+  let bs = runPutBS act cap
   in  BS.writeFile fp bs

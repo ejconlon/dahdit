@@ -429,9 +429,8 @@ runCount act =
 
 -- Put safe:
 
-runPutInternal :: WriteMem q => Put -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
-runPutInternal act mkMem useMem = runST $ do
-  let cap = runCount act
+runPutInternal :: WriteMem q => Put -> ByteCount -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
+runPutInternal act cap mkMem useMem = runST $ do
   mem <- mkMem cap
   case releaseMem mem of
     Nothing -> runPutUnsafe act cap mem >>= useMem mem cap

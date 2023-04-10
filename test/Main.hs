@@ -2,6 +2,7 @@ module Main (main) where
 
 import Dahdit
   ( Binary (..)
+  , BinaryTarget (..)
   , BoolByte (..)
   , ByteCount (..)
   , ByteSized (..)
@@ -12,7 +13,6 @@ import Dahdit
   , FloatLE (..)
   , Generic
   , Get
-  , GetSource (..)
   , Int16BE
   , Int16LE
   , Int24BE
@@ -24,7 +24,6 @@ import Dahdit
   , LiftedPrimArray (..)
   , Proxy (..)
   , Put
-  , PutSink (..)
   , ShortByteString
   , StaticByteSized (..)
   , StaticBytes (..)
@@ -120,28 +119,20 @@ import GHC.Float (castWord32ToFloat, castWord64ToDouble)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
-class GetSource z => GetCase z where
+class BinaryTarget z => CaseTarget z where
   initSource :: [Word8] -> z
-
-instance GetCase ShortByteString where
-  initSource = BSS.pack
-
-instance GetCase ByteString where
-  initSource = BS.pack
-
-instance GetCase (Vector Word8) where
-  initSource = VS.fromList
-
-class PutSink z => PutCase z where
   consumeSink :: z -> [Word8]
 
-instance PutCase ShortByteString where
+instance CaseTarget ShortByteString where
+  initSource = BSS.pack
   consumeSink = BSS.unpack
 
-instance PutCase ByteString where
+instance CaseTarget ByteString where
+  initSource = BS.pack
   consumeSink = BS.unpack
 
-instance PutCase (Vector Word8) where
+instance CaseTarget (Vector Word8) where
+  initSource = VS.fromList
   consumeSink = VS.toList
 
 data DynFoo = DynFoo !Word8 !Word16LE
@@ -161,11 +152,11 @@ type StaBytes = StaticBytes 2
 mkStaBytes :: String -> StaBytes
 mkStaBytes = StaticBytes . BSS.toShort . BSC.pack
 
-runGetCase :: (Show a, Eq a, GetCase z) => Proxy z -> Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> IO ()
+runGetCase :: (Show a, Eq a, CaseTarget z) => Proxy z -> Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> IO ()
 runGetCase p getter mayRes buf = do
   let src = initSource buf `asProxyTypeOf` p
       totLen = coerce (length buf)
-      (result, actOff) = getFromSource getter src
+      (result, actOff) = getTarget getter src
   case (result, mayRes) of
     (Left _, Nothing) -> pure ()
     (Left err, Just (_, _, expecVal)) -> fail ("Got error <" ++ show err ++ ">, expected value <" ++ show expecVal ++ ">")
@@ -175,13 +166,13 @@ runGetCase p getter mayRes buf = do
       actOff @?= expecOff
       totLen - actOff @?= expecLeft
 
-runPutCase :: PutCase z => Proxy z -> Put -> [Word8] -> IO ()
+runPutCase :: CaseTarget z => Proxy z -> Put -> [Word8] -> IO ()
 runPutCase p putter expecList = do
   let expecBc = coerce (length expecList)
       expecBs = expecList
       estBc = runCount putter
   estBc @?= expecBc
-  let actSink = putToSink putter `asProxyTypeOf` p
+  let actSink = putTarget putter estBc `asProxyTypeOf` p
       actBs = consumeSink actSink
       actBc = coerce (length actBs)
   actBs @?= expecBs
@@ -282,7 +273,7 @@ testDahditStaticByteSize =
     , testCase "StaBytes" (staticByteSize @StaBytes Proxy @?= 2)
     ]
 
-testDahditGet :: GetCase z => String -> Proxy z -> TestTree
+testDahditGet :: CaseTarget z => String -> Proxy z -> TestTree
 testDahditGet n p =
   testGroup
     ("get (" ++ n ++ ")")
@@ -333,7 +324,7 @@ testDahditGet n p =
     , testCase "TagFoo (two)" (runGetCase p (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00])
     ]
 
-testDahditPut :: PutCase z => String -> Proxy z -> TestTree
+testDahditPut :: CaseTarget z => String -> Proxy z -> TestTree
 testDahditPut n p =
   testGroup
     ("put (" ++ n ++ ")")
