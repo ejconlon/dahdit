@@ -38,10 +38,17 @@ import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
 import Data.Foldable (foldMap')
 import Data.Int (Int16, Int32, Int64, Int8)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (..))
 import Data.Semigroup (Sum (..))
 import Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeLits (KnownNat, KnownSymbol, natVal, symbolVal)
@@ -162,11 +169,45 @@ instance ByteSized DoubleBE where
 instance ByteSized ShortByteString where
   byteSize = coerce . BSS.length
 
-instance StaticByteSized a => ByteSized (Seq a) where
-  byteSize ss =
-    let elen = staticByteSize (Proxy :: Proxy a)
-        alen = coerce (Seq.length ss)
-    in  elen * alen
+instance ByteSized a => ByteSized [a] where
+  byteSize = byteSizeFoldable
+
+instance ByteSized a => ByteSized (Seq a) where
+  byteSize = byteSizeFoldable
+
+instance ByteSized a => ByteSized (Maybe a) where
+  byteSize = \case
+    Nothing -> 1
+    Just a -> 1 + byteSize a
+
+instance (ByteSized b, ByteSized a) => ByteSized (Either b a) where
+  byteSize = \case
+    Left b -> 1 + byteSize b
+    Right a -> 1 + byteSize a
+
+instance (ByteSized a, ByteSized b) => ByteSized (a, b) where
+  byteSize (a, b) = byteSize a + byteSize b
+
+instance (ByteSized a, ByteSized b, ByteSized c) => ByteSized (a, b, c) where
+  byteSize (a, b, c) = byteSize a + byteSize b + byteSize c
+
+instance (ByteSized a, ByteSized b, ByteSized c, ByteSized d) => ByteSized (a, b, c, d) where
+  byteSize (a, b, c, d) = byteSize a + byteSize b + byteSize c + byteSize d
+
+instance (ByteSized a, ByteSized b, ByteSized c, ByteSized d, ByteSized e) => ByteSized (a, b, c, d, e) where
+  byteSize (a, b, c, d, e) = byteSize a + byteSize b + byteSize c + byteSize d + byteSize e
+
+instance ByteSized a => ByteSized (Set a) where
+  byteSize = byteSize . Set.toAscList
+
+instance (ByteSized k, ByteSized v) => ByteSized (Map k v) where
+  byteSize = byteSize . Map.toAscList
+
+instance ByteSized IntSet where
+  byteSize = byteSize . IntSet.toAscList
+
+instance ByteSized v => ByteSized (IntMap v) where
+  byteSize = byteSize . IntMap.toAscList
 
 class ByteSized a => StaticByteSized a where
   staticByteSize :: Proxy a -> ByteCount

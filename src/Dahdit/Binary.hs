@@ -4,7 +4,7 @@ module Dahdit.Binary
 where
 
 import Control.Monad (unless)
-import Dahdit.Counts (ByteCount (..))
+import Dahdit.Counts (ByteCount (..), ElemCount (..))
 import Dahdit.Fancy (BoolByte (..), ExactBytes (..), StaticArray (..), StaticBytes (..), StaticSeq (..), TermBytes (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs
@@ -23,6 +23,7 @@ import Dahdit.Funs
   , getInt64BE
   , getInt64LE
   , getInt8
+  , getSeq
   , getStaticArray
   , getStaticSeq
   , getWord16BE
@@ -49,6 +50,7 @@ import Dahdit.Funs
   , putInt64BE
   , putInt64LE
   , putInt8
+  , putSeq
   , putWord16BE
   , putWord16LE
   , putWord24BE
@@ -90,9 +92,20 @@ import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
 import Data.Default (Default (..))
+import Data.Foldable (toList)
 import Data.Int (Int16, Int32, Int64, Int8)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Primitive.ByteArray (ByteArray (..), byteArrayFromListN)
 import Data.Proxy (Proxy (..))
+import Data.Sequence (Seq (..))
+import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeLits (KnownNat, KnownSymbol, natVal, symbolVal)
@@ -222,6 +235,48 @@ instance Binary Char where
 instance Binary Int where
   get = fmap fromIntegral getInt64LE
   put = putInt64LE . fromIntegral
+
+instance Binary a => Binary [a] where
+  get = fmap toList (get @(Seq a))
+  put = put @(Seq a) . Seq.fromList
+
+instance Binary a => Binary (Seq a) where
+  get = do
+    ec <- get @Int
+    getSeq (coerce ec) get
+  put s = put @Int (Seq.length s) *> putSeq put s
+
+instance Binary a => Binary (Set a) where
+  get = fmap Set.fromDistinctAscList get
+  put = put . Set.toAscList
+
+instance (Binary k, Binary v) => Binary (Map k v) where
+  get = fmap Map.fromDistinctAscList get
+  put = put . Map.toAscList
+
+instance Binary IntSet where
+  get = fmap IntSet.fromDistinctAscList get
+  put = put . IntSet.toAscList
+
+instance Binary v => Binary (IntMap v) where
+  get = fmap IntMap.fromDistinctAscList get
+  put = put . IntMap.toAscList
+
+instance (Binary a, Binary b) => Binary (a, b) where
+  get = error "TODO"
+  put = error "TODO"
+
+instance (Binary a, Binary b, Binary c) => Binary (a, b, c) where
+  get = error "TODO"
+  put = error "TODO"
+
+instance (Binary a, Binary b, Binary c, Binary d) => Binary (a, b, c, d) where
+  get = error "TODO"
+  put = error "TODO"
+
+instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a, b, c, d, e) where
+  get = error "TODO"
+  put = error "TODO"
 
 -- Fancy
 
