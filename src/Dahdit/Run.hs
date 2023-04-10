@@ -39,7 +39,9 @@ import Dahdit.Free
 import Dahdit.LiftedPrim (LiftedPrimArray (..), sizeofLiftedPrimArray)
 import Dahdit.Mem (ReadMem (..), WriteMem (..), readSBSMem, writeSBSMem)
 import Dahdit.Nums
-  ( FloatBE
+  ( DoubleBE
+  , DoubleLE
+  , FloatBE
   , FloatLE
   , Int16BE
   , Int16LE (..)
@@ -47,12 +49,16 @@ import Dahdit.Nums
   , Int24LE
   , Int32BE
   , Int32LE
+  , Int64BE
+  , Int64LE
   , Word16BE
   , Word16LE (..)
   , Word24BE
   , Word24LE
   , Word32BE
   , Word32LE
+  , Word64BE
+  , Word64LE
   )
 import Dahdit.Proxy (proxyForF)
 import Dahdit.Sizes (staticByteSize)
@@ -196,14 +202,20 @@ execGetRun = \case
   GetFInt24LE k -> readBytes "Int24LE" 3 (indexMemInBytes @_ @Int24LE) >>= k
   GetFWord32LE k -> readBytes "Word32LE" 4 (indexMemInBytes @_ @Word32LE) >>= k
   GetFInt32LE k -> readBytes "Int32LE" 4 (indexMemInBytes @_ @Int32LE) >>= k
+  GetFWord64LE k -> readBytes "Word64LE" 8 (indexMemInBytes @_ @Word64LE) >>= k
+  GetFInt64LE k -> readBytes "Int64LE" 8 (indexMemInBytes @_ @Int64LE) >>= k
   GetFFloatLE k -> readBytes "FloatLE" 4 (indexMemInBytes @_ @FloatLE) >>= k
+  GetFDoubleLE k -> readBytes "DoubleLE" 8 (indexMemInBytes @_ @DoubleLE) >>= k
   GetFWord16BE k -> readBytes "Word16BE" 2 (indexMemInBytes @_ @Word16BE) >>= k
   GetFInt16BE k -> readBytes "Int16BE" 2 (indexMemInBytes @_ @Int16BE) >>= k
   GetFWord24BE k -> readBytes "Word24BE" 3 (indexMemInBytes @_ @Word24BE) >>= k
   GetFInt24BE k -> readBytes "Int24BE" 3 (indexMemInBytes @_ @Int24BE) >>= k
   GetFWord32BE k -> readBytes "Word32BE" 4 (indexMemInBytes @_ @Word32BE) >>= k
   GetFInt32BE k -> readBytes "Int32BE" 4 (indexMemInBytes @_ @Int32BE) >>= k
+  GetFWord64BE k -> readBytes "Word64BE" 8 (indexMemInBytes @_ @Word64BE) >>= k
+  GetFInt64BE k -> readBytes "Int64BE" 8 (indexMemInBytes @_ @Int64BE) >>= k
   GetFFloatBE k -> readBytes "FloatBE" 4 (indexMemInBytes @_ @FloatBE) >>= k
+  GetFDoubleBE k -> readBytes "DoubleBE" 8 (indexMemInBytes @_ @DoubleBE) >>= k
   GetFShortByteString bc k ->
     readBytes "ShortByteString" bc (\mem off -> readSBSMem mem off bc) >>= k
   GetFStaticSeq gss -> readStaticSeq gss
@@ -311,14 +323,20 @@ execPutRun = \case
   PutFInt24LE x k -> writeBytes 3 (writeMemInBytes x) *> k
   PutFWord32LE x k -> writeBytes 4 (writeMemInBytes x) *> k
   PutFInt32LE x k -> writeBytes 4 (writeMemInBytes x) *> k
+  PutFWord64LE x k -> writeBytes 8 (writeMemInBytes x) *> k
+  PutFInt64LE x k -> writeBytes 8 (writeMemInBytes x) *> k
   PutFFloatLE x k -> writeBytes 4 (writeMemInBytes x) *> k
+  PutFDoubleLE x k -> writeBytes 8 (writeMemInBytes x) *> k
   PutFWord16BE x k -> writeBytes 2 (writeMemInBytes x) *> k
   PutFInt16BE x k -> writeBytes 2 (writeMemInBytes x) *> k
   PutFWord24BE x k -> writeBytes 3 (writeMemInBytes x) *> k
   PutFInt24BE x k -> writeBytes 3 (writeMemInBytes x) *> k
   PutFWord32BE x k -> writeBytes 4 (writeMemInBytes x) *> k
   PutFInt32BE x k -> writeBytes 4 (writeMemInBytes x) *> k
+  PutFWord64BE x k -> writeBytes 8 (writeMemInBytes x) *> k
+  PutFInt64BE x k -> writeBytes 8 (writeMemInBytes x) *> k
   PutFFloatBE x k -> writeBytes 4 (writeMemInBytes x) *> k
+  PutFDoubleBE x k -> writeBytes 8 (writeMemInBytes x) *> k
   PutFShortByteString bc sbs k ->
     writeBytes bc (writeSBSMem sbs bc) *> k
   PutFStaticSeq pss -> writeStaticSeq pss
@@ -367,14 +385,20 @@ execCountRun = \case
   PutFInt24LE _ k -> State.modify' (3 +) *> k
   PutFWord32LE _ k -> State.modify' (4 +) *> k
   PutFInt32LE _ k -> State.modify' (4 +) *> k
+  PutFWord64LE _ k -> State.modify' (8 +) *> k
+  PutFInt64LE _ k -> State.modify' (8 +) *> k
   PutFFloatLE _ k -> State.modify' (4 +) *> k
+  PutFDoubleLE _ k -> State.modify' (8 +) *> k
   PutFWord16BE _ k -> State.modify' (2 +) *> k
   PutFInt16BE _ k -> State.modify' (2 +) *> k
   PutFWord24BE _ k -> State.modify' (3 +) *> k
   PutFInt24BE _ k -> State.modify' (3 +) *> k
   PutFWord32BE _ k -> State.modify' (4 +) *> k
   PutFInt32BE _ k -> State.modify' (4 +) *> k
+  PutFWord64BE _ k -> State.modify' (8 +) *> k
+  PutFInt64BE _ k -> State.modify' (8 +) *> k
   PutFFloatBE _ k -> State.modify' (4 +) *> k
+  PutFDoubleBE _ k -> State.modify' (8 +) *> k
   PutFShortByteString bc _ k -> State.modify' (bc +) *> k
   PutFStaticSeq pss@(PutStaticSeqF _ _ _ _ k) ->
     let bc = putStaticSeqSize pss

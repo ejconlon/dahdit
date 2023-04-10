@@ -6,14 +6,21 @@ import Dahdit
   , ByteCount (..)
   , ByteSized (..)
   , ByteString
+  , DoubleBE (..)
+  , DoubleLE (..)
   , FloatBE (..)
   , FloatLE (..)
   , Generic
   , Get
   , GetSource (..)
+  , Int16BE
   , Int16LE
+  , Int24BE
+  , Int24LE
+  , Int32BE
   , Int32LE
-  , Int8
+  , Int64BE
+  , Int64LE
   , LiftedPrimArray (..)
   , Proxy (..)
   , Put
@@ -23,11 +30,18 @@ import Dahdit
   , StaticBytes (..)
   , ViaGeneric (..)
   , ViaStaticGeneric (..)
+  , Word16BE
   , Word16LE
+  , Word24BE
+  , Word24LE
+  , Word32BE
   , Word32LE
-  , Word8
+  , Word64BE
+  , Word64LE
   , getByteArray
   , getByteString
+  , getDoubleBE
+  , getDoubleLE
   , getExact
   , getFloatBE
   , getFloatLE
@@ -37,6 +51,8 @@ import Dahdit
   , getInt24LE
   , getInt32BE
   , getInt32LE
+  , getInt64BE
+  , getInt64LE
   , getInt8
   , getLiftedPrimArray
   , getLookAhead
@@ -52,11 +68,15 @@ import Dahdit
   , getWord24LE
   , getWord32BE
   , getWord32LE
+  , getWord64BE
+  , getWord64LE
   , getWord8
   , lengthLiftedPrimArray
   , liftedPrimArrayFromList
   , putByteArray
   , putByteString
+  , putDoubleBE
+  , putDoubleLE
   , putFloatBE
   , putFloatLE
   , putInt16BE
@@ -65,6 +85,8 @@ import Dahdit
   , putInt24LE
   , putInt32BE
   , putInt32LE
+  , putInt64BE
+  , putInt64LE
   , putInt8
   , putLiftedPrimArray
   , putSeq
@@ -76,6 +98,8 @@ import Dahdit
   , putWord24LE
   , putWord32BE
   , putWord32LE
+  , putWord64BE
+  , putWord64LE
   , putWord8
   , runCount
   , sizeofLiftedPrimArray
@@ -84,12 +108,15 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
+import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Primitive.ByteArray (byteArrayFromList)
 import Data.Proxy (asProxyTypeOf)
 import qualified Data.Sequence as Seq
+import Data.ShortWord (Int24, Word24)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
-import GHC.Float (castWord32ToFloat)
+import Data.Word (Word16, Word32, Word64, Word8)
+import GHC.Float (castWord32ToFloat, castWord64ToDouble)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
@@ -164,13 +191,41 @@ testDahditByteSize :: TestTree
 testDahditByteSize =
   testGroup
     "byteSize"
-    [ testCase "Word8" (byteSize @Word8 0x5D @?= 1)
-    , testCase "Int8" (byteSize @Int8 0x5D @?= 1)
-    , testCase "Word16LE" (byteSize @Word16LE 0x5DEC @?= 2)
-    , testCase "Int16LE" (byteSize @Int16LE 0x5DEC @?= 2)
-    , testCase "Word32LE" (byteSize @Word32LE 0x5DEC6EFD @?= 4)
-    , testCase "Int32LE" (byteSize @Int32LE 0x5DEC6EFD @?= 4)
-    , testCase "FloatLE" (byteSize (FloatLE (castWord32ToFloat 0x5DEC6EFD)) @?= 4)
+    [ testCase "Word8" (byteSize @Word8 0 @?= 1)
+    , testCase "Int8" (byteSize @Int8 0 @?= 1)
+    , testCase "Word16" (byteSize @Word16 0 @?= 2)
+    , testCase "Int16" (byteSize @Int16 0 @?= 2)
+    , testCase "Word24" (byteSize @Word24 0 @?= 3)
+    , testCase "Int24" (byteSize @Int24 0 @?= 3)
+    , testCase "Word32" (byteSize @Word32 0 @?= 4)
+    , testCase "Int32" (byteSize @Int32 0 @?= 4)
+    , testCase "Word64" (byteSize @Word64 0 @?= 8)
+    , testCase "Int64" (byteSize @Int64 0 @?= 8)
+    , testCase "Float" (byteSize @Float 0 @?= 4)
+    , testCase "Double" (byteSize @Double 0 @?= 8)
+    , testCase "()" (byteSize @() () @?= 0)
+    , testCase "Bool" (byteSize @Bool False @?= 1)
+    , testCase "Int" (byteSize @Int 0 @?= 8)
+    , testCase "Word16LE" (byteSize @Word16LE 0 @?= 2)
+    , testCase "Int16LE" (byteSize @Int16LE 0 @?= 2)
+    , testCase "Word24LE" (byteSize @Word24LE 0 @?= 3)
+    , testCase "Int24LE" (byteSize @Int24LE 0 @?= 3)
+    , testCase "Word32LE" (byteSize @Word32LE 0 @?= 4)
+    , testCase "Int32LE" (byteSize @Int32LE 0 @?= 4)
+    , testCase "Word64LE" (byteSize @Word64LE 0 @?= 8)
+    , testCase "Int64LE" (byteSize @Int64LE 0 @?= 8)
+    , testCase "FloatLE" (byteSize (FloatLE (castWord32ToFloat 0)) @?= 4)
+    , testCase "DoubleLE" (byteSize (DoubleLE (castWord64ToDouble 0)) @?= 8)
+    , testCase "Word16BE" (byteSize @Word16BE 0 @?= 2)
+    , testCase "Int16BE" (byteSize @Int16BE 0 @?= 2)
+    , testCase "Word24BE" (byteSize @Word24BE 0 @?= 3)
+    , testCase "Int24BE" (byteSize @Int24BE 0 @?= 3)
+    , testCase "Word32BE" (byteSize @Word32BE 0 @?= 4)
+    , testCase "Int32BE" (byteSize @Int32BE 0 @?= 4)
+    , testCase "Word64BE" (byteSize @Word64BE 0 @?= 8)
+    , testCase "Int64BE" (byteSize @Int64BE 0 @?= 8)
+    , testCase "FloatBE" (byteSize (FloatBE (castWord32ToFloat 0)) @?= 4)
+    , testCase "DoubleBE" (byteSize (DoubleBE (castWord64ToDouble 0)) @?= 8)
     , testCase "ShortByteString" (byteSize @ShortByteString (BSS.pack [0xEC, 0x5D]) @?= 2)
     , testCase "DynFoo" (byteSize (DynFoo 0xBB 0x5DEC) @?= 3)
     , testCase "StaFoo" (byteSize (StaFoo 0xBB 0x5DEC) @?= 3)
@@ -187,11 +242,39 @@ testDahditStaticByteSize =
     "staticByteSize"
     [ testCase "Word8" (staticByteSize @Word8 Proxy @?= 1)
     , testCase "Int8" (staticByteSize @Int8 Proxy @?= 1)
+    , testCase "Word16" (staticByteSize @Word16 Proxy @?= 2)
+    , testCase "Int16" (staticByteSize @Int16 Proxy @?= 2)
+    , testCase "Word24" (staticByteSize @Word24 Proxy @?= 3)
+    , testCase "Int24" (staticByteSize @Int24 Proxy @?= 3)
+    , testCase "Word32" (staticByteSize @Word32 Proxy @?= 4)
+    , testCase "Int32" (staticByteSize @Int32 Proxy @?= 4)
+    , testCase "Word64" (staticByteSize @Word64 Proxy @?= 8)
+    , testCase "Int64" (staticByteSize @Int64 Proxy @?= 8)
+    , testCase "Float" (staticByteSize @Float Proxy @?= 4)
+    , testCase "Double" (staticByteSize @Double Proxy @?= 8)
+    , testCase "()" (staticByteSize @() Proxy @?= 0)
+    , testCase "Bool" (staticByteSize @Bool Proxy @?= 1)
+    , testCase "Int" (staticByteSize @Int Proxy @?= 8)
     , testCase "Word16LE" (staticByteSize @Word16LE Proxy @?= 2)
     , testCase "Int16LE" (staticByteSize @Int16LE Proxy @?= 2)
+    , testCase "Word24LE" (staticByteSize @Word24LE Proxy @?= 3)
+    , testCase "Int24LE" (staticByteSize @Int24LE Proxy @?= 3)
     , testCase "Word32LE" (staticByteSize @Word32LE Proxy @?= 4)
     , testCase "Int32LE" (staticByteSize @Int32LE Proxy @?= 4)
+    , testCase "Word64LE" (staticByteSize @Word64LE Proxy @?= 8)
+    , testCase "Int64LE" (staticByteSize @Int64LE Proxy @?= 8)
     , testCase "FloatLE" (staticByteSize @FloatLE Proxy @?= 4)
+    , testCase "DoubleLE" (staticByteSize @DoubleLE Proxy @?= 8)
+    , testCase "Word16BE" (staticByteSize @Word16BE Proxy @?= 2)
+    , testCase "Int16BE" (staticByteSize @Int16BE Proxy @?= 2)
+    , testCase "Word24BE" (staticByteSize @Word24BE Proxy @?= 3)
+    , testCase "Int24BE" (staticByteSize @Int24BE Proxy @?= 3)
+    , testCase "Word32BE" (staticByteSize @Word32BE Proxy @?= 4)
+    , testCase "Int32BE" (staticByteSize @Int32BE Proxy @?= 4)
+    , testCase "Word64BE" (staticByteSize @Word64BE Proxy @?= 8)
+    , testCase "Int64BE" (staticByteSize @Int64BE Proxy @?= 8)
+    , testCase "FloatBE" (staticByteSize @FloatBE Proxy @?= 4)
+    , testCase "DoubleBE" (staticByteSize @DoubleBE Proxy @?= 8)
     , testCase "StaFoo" (staticByteSize @StaFoo Proxy @?= 3)
     , testCase "BoolByte" (staticByteSize @BoolByte Proxy @?= 1)
     , testCase "StaBytes" (staticByteSize @StaBytes Proxy @?= 2)

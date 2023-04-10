@@ -5,7 +5,9 @@ where
 
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs
-  ( getFloatBE
+  ( getDoubleBE
+  , getDoubleLE
+  , getFloatBE
   , getFloatLE
   , getInt16BE
   , getInt16LE
@@ -13,6 +15,8 @@ import Dahdit.Funs
   , getInt24LE
   , getInt32BE
   , getInt32LE
+  , getInt64BE
+  , getInt64LE
   , getInt8
   , getWord16BE
   , getWord16LE
@@ -20,7 +24,11 @@ import Dahdit.Funs
   , getWord24LE
   , getWord32BE
   , getWord32LE
+  , getWord64BE
+  , getWord64LE
   , getWord8
+  , putDoubleBE
+  , putDoubleLE
   , putFloatBE
   , putFloatLE
   , putInt16BE
@@ -29,6 +37,8 @@ import Dahdit.Funs
   , putInt24LE
   , putInt32BE
   , putInt32LE
+  , putInt64BE
+  , putInt64LE
   , putInt8
   , putWord16BE
   , putWord16LE
@@ -36,26 +46,35 @@ import Dahdit.Funs
   , putWord24LE
   , putWord32BE
   , putWord32LE
+  , putWord64BE
+  , putWord64LE
   , putWord8
   )
 import Dahdit.Nums
-  ( FloatBE (..)
-  , FloatLE
+  ( DoubleBE (..)
+  , DoubleLE (..)
+  , FloatBE (..)
+  , FloatLE (..)
   , Int16BE (..)
-  , Int16LE
+  , Int16LE (..)
   , Int24BE (..)
-  , Int24LE
+  , Int24LE (..)
   , Int32BE (..)
-  , Int32LE
+  , Int32LE (..)
+  , Int64BE (..)
+  , Int64LE (..)
   , Word16BE (..)
-  , Word16LE
+  , Word16LE (..)
   , Word24BE (..)
-  , Word24LE
+  , Word24LE (..)
   , Word32BE (..)
-  , Word32LE
+  , Word32LE (..)
+  , Word64BE (..)
+  , Word64LE (..)
   )
-import Data.Int (Int8)
-import Data.Word (Word8)
+import Data.Int (Int16, Int32, Int64, Int8)
+import Data.ShortWord (Int24, Word24)
+import Data.Word (Word16, Word32, Word64, Word8)
 
 class Binary a where
   get :: Get a
@@ -97,9 +116,21 @@ instance Binary Int32LE where
   get = getInt32LE
   put = putInt32LE
 
+instance Binary Word64LE where
+  get = getWord64LE
+  put = putWord64LE
+
+instance Binary Int64LE where
+  get = getInt64LE
+  put = putInt64LE
+
 instance Binary FloatLE where
   get = getFloatLE
   put = putFloatLE
+
+instance Binary DoubleLE where
+  get = getDoubleLE
+  put = putDoubleLE
 
 instance Binary Word16BE where
   get = getWord16BE
@@ -125,6 +156,40 @@ instance Binary Int32BE where
   get = getInt32BE
   put = putInt32BE
 
+instance Binary Word64BE where
+  get = getWord64BE
+  put = putWord64BE
+
+instance Binary Int64BE where
+  get = getInt64BE
+  put = putInt64BE
+
 instance Binary FloatBE where
   get = getFloatBE
   put = putFloatBE
+
+instance Binary DoubleBE where
+  get = getDoubleBE
+  put = putDoubleBE
+
+deriving via Word16LE instance Binary Word16
+
+deriving via Int16LE instance Binary Int16
+
+deriving via Word24LE instance Binary Word24
+
+deriving via Int24LE instance Binary Int24
+
+deriving via Word32LE instance Binary Word32
+
+deriving via Int32LE instance Binary Int32
+
+deriving via Word64LE instance Binary Word64
+
+deriving via Int64LE instance Binary Int64
+
+deriving via FloatLE instance Binary Float
+
+deriving via DoubleLE instance Binary Double
+
+-- TODO Int and Bool instances

@@ -1,3 +1,4 @@
+-- TODO just export types here and define instances alongside class definitions
 module Dahdit.Fancy
   ( TermBytes (..)
   , StaticBytes (..)
