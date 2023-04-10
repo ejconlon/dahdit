@@ -98,7 +98,7 @@ instance (Integral x, LiftedPrim x, Integral y) => LiftedPrim (ViaFromIntegral x
 
 newtype LiftedPrimArray a = LiftedPrimArray {unLiftedPrimArray :: ByteArray}
   deriving stock (Show)
-  deriving newtype (Eq, Semigroup, Monoid)
+  deriving newtype (Eq, Ord, Semigroup, Monoid)
 
 instance Default (LiftedPrimArray a) where
   def = emptyLiftedPrimArray

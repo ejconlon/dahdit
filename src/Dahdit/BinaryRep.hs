@@ -3,6 +3,7 @@
 module Dahdit.BinaryRep
   ( BinaryRep (..)
   , ViaBoundedEnum (..)
+  , ViaIntegral (..)
   , ViaBinaryRep (..)
   )
 where
@@ -24,6 +25,12 @@ instance (Binary x, Integral x, Bounded a, Enum a) => BinaryRep x (ViaBoundedEnu
           then Left ("Invalid enum value: " ++ show i)
           else Right (ViaBoundedEnum (toEnum i))
   toBinaryRep = fromIntegral . fromEnum . unViaBoundedEnum
+
+newtype ViaIntegral x a = ViaIntegral {unViaIntegral :: a}
+
+instance (Binary x, Integral x, Integral a) => BinaryRep x (ViaIntegral x a) where
+  fromBinaryRep = Right . ViaIntegral . fromIntegral
+  toBinaryRep = fromIntegral . unViaIntegral
 
 newtype ViaBinaryRep a = ViaBinaryRep {unViaBinaryRep :: a}
 

@@ -9,6 +9,7 @@ module Dahdit.Sizes
 where
 
 import Dahdit.Counts (ByteCount (..))
+import Dahdit.Fancy (BoolByte, ExactBytes, StaticArray (..), StaticBytes (..), StaticSeq (..), TermBytes (..))
 import Dahdit.Nums
   ( DoubleBE
   , DoubleLE
@@ -43,9 +44,12 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
+import GHC.TypeLits (KnownNat, KnownSymbol, natVal, symbolVal)
 
 class ByteSized a where
   byteSize :: a -> ByteCount
+
+-- Basic types
 
 instance ByteSized () where
   byteSize _ = 0
@@ -87,6 +91,9 @@ instance ByteSized Double where
   byteSize _ = 8
 
 instance ByteSized Bool where
+  byteSize _ = 1
+
+instance ByteSized Char where
   byteSize _ = 1
 
 instance ByteSized Int where
@@ -209,6 +216,9 @@ instance StaticByteSized Double where
 instance StaticByteSized Bool where
   staticByteSize _ = 1
 
+instance StaticByteSized Char where
+  staticByteSize _ = 1
+
 instance StaticByteSized Int where
   staticByteSize _ = 8
 
@@ -272,6 +282,8 @@ instance StaticByteSized FloatBE where
 instance StaticByteSized DoubleBE where
   staticByteSize _ = 8
 
+-- Via
+
 newtype ViaStaticByteSized a = ViaStaticByteSized {unViaStaticByteSized :: a}
 
 instance StaticByteSized a => ByteSized (ViaStaticByteSized a) where
@@ -282,3 +294,35 @@ byteSizeFoldable = getSum . foldMap' (Sum . byteSize)
 
 staticByteSizeFoldable :: (Foldable f, StaticByteSized a) => f a -> ByteCount
 staticByteSizeFoldable fa = staticByteSize (proxyForF fa) * coerce (length fa)
+
+-- Fancy
+
+instance ByteSized TermBytes where
+  byteSize (TermBytes sbs) =
+    let bc = byteSize sbs + 1
+    in  if even bc then bc else bc + 1
+
+deriving via (ViaStaticByteSized (StaticBytes n)) instance KnownNat n => ByteSized (StaticBytes n)
+
+instance KnownNat n => StaticByteSized (StaticBytes n) where
+  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n))
+
+deriving via (ViaStaticByteSized (StaticSeq n a)) instance (KnownNat n, StaticByteSized a) => ByteSized (StaticSeq n a)
+
+instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticSeq n a) where
+  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
+
+deriving via (ViaStaticByteSized (StaticArray n a)) instance (KnownNat n, StaticByteSized a) => ByteSized (StaticArray n a)
+
+instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) where
+  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
+
+deriving via (ViaStaticByteSized BoolByte) instance ByteSized BoolByte
+
+instance StaticByteSized BoolByte where
+  staticByteSize _ = 1
+
+deriving via (ViaStaticByteSized (ExactBytes s)) instance KnownSymbol s => ByteSized (ExactBytes s)
+
+instance KnownSymbol s => StaticByteSized (ExactBytes s) where
+  staticByteSize _ = coerce (length (symbolVal (Proxy :: Proxy s)))
