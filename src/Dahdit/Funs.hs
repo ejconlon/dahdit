@@ -25,6 +25,7 @@ module Dahdit.Funs
   , getSkip
   , getExact
   , getWithin
+  , getList
   , getSeq
   , getStaticSeq
   , getStaticArray
@@ -64,6 +65,7 @@ module Dahdit.Funs
   , putDoubleBE
   , putByteString
   , putFixedString
+  , putList
   , putSeq
   , putStaticSeq
   , unsafePutStaticSeqN
@@ -207,6 +209,17 @@ getExact bc g = Get (F (\x y -> y (GetFScope (GetScopeF ScopeModeExact bc g x)))
 
 getWithin :: ByteCount -> Get a -> Get a
 getWithin bc g = Get (F (\x y -> y (GetFScope (GetScopeF ScopeModeWithin bc g x))))
+
+-- | Get List of dynamically-sized elements
+getList :: ElemCount -> Get a -> Get [a]
+getList ec g = go [] 0
+ where
+  go !acc !i =
+    if i == ec
+      then pure (reverse acc)
+      else do
+        x <- g
+        go (x : acc) (i + 1)
 
 -- | Get Seq of dynamically-sized elements
 getSeq :: ElemCount -> Get a -> Get (Seq a)
@@ -382,6 +395,10 @@ putFixedString pad bc sbs = do
     PutM (F (\x y -> y (PutFShortByteString mostBc sbs (x ()))))
     let diff = len - lenSbs
     unless (diff <= 0) (replicateM_ diff (putWord8 pad))
+
+-- | Put List of dynamically-sized elements
+putList :: (a -> Put) -> [a] -> Put
+putList = traverse_
 
 -- | Put Seq of dynamically-sized elements
 putSeq :: (a -> Put) -> Seq a -> Put

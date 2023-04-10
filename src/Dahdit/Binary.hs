@@ -23,6 +23,7 @@ import Dahdit.Funs
   , getInt64BE
   , getInt64LE
   , getInt8
+  , getList
   , getSeq
   , getStaticArray
   , getStaticSeq
@@ -50,6 +51,7 @@ import Dahdit.Funs
   , putInt64BE
   , putInt64LE
   , putInt8
+  , putList
   , putSeq
   , putWord16BE
   , putWord16LE
@@ -92,7 +94,6 @@ import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
 import Data.Default (Default (..))
-import Data.Foldable (toList)
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -237,8 +238,10 @@ instance Binary Int where
   put = putInt64LE . fromIntegral
 
 instance Binary a => Binary [a] where
-  get = fmap toList (get @(Seq a))
-  put = put @(Seq a) . Seq.fromList
+  get = do
+    ec <- get @Int
+    getList (coerce ec) get
+  put s = put @Int (length s) *> putList put s
 
 instance Binary a => Binary (Seq a) where
   get = do
@@ -262,21 +265,61 @@ instance Binary v => Binary (IntMap v) where
   get = fmap IntMap.fromDistinctAscList get
   put = put . IntMap.toAscList
 
+instance Binary a => Binary (Maybe a) where
+  get = do
+    tag <- get @Int
+    case tag of
+      0 -> pure Nothing
+      1 -> fmap Just get
+      _ -> fail "Unknown encoding for constructor"
+  put = \case
+    Nothing -> put @Int 0
+    Just a -> put @Int 1 *> put a
+
+instance (Binary b, Binary a) => Binary (Either b a) where
+  get = do
+    tag <- get @Int
+    case tag of
+      0 -> fmap Left get
+      1 -> fmap Right get
+      _ -> fail "Unknown encoding for constructor"
+  put = \case
+    Left b -> put @Int 0 *> put b
+    Right a -> put @Int 1 *> put a
+
 instance (Binary a, Binary b) => Binary (a, b) where
-  get = error "TODO"
-  put = error "TODO"
+  get = do
+    a <- get
+    b <- get
+    pure (a, b)
+  put (a, b) = put a *> put b
 
 instance (Binary a, Binary b, Binary c) => Binary (a, b, c) where
-  get = error "TODO"
-  put = error "TODO"
+  get = do
+    a <- get
+    b <- get
+    c <- get
+    pure (a, b, c)
+  put (a, b, c) = put a *> put b *> put c
 
 instance (Binary a, Binary b, Binary c, Binary d) => Binary (a, b, c, d) where
-  get = error "TODO"
-  put = error "TODO"
+  get = do
+    a <- get
+    b <- get
+    c <- get
+    d <- get
+    pure (a, b, c, d)
+  put (a, b, c, d) = put a *> put b *> put c *> put d
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a, b, c, d, e) where
-  get = error "TODO"
-  put = error "TODO"
+  get = do
+    a <- get
+    b <- get
+    c <- get
+    d <- get
+    e <- get
+    pure (a, b, c, d, e)
+  put (a, b, c, d, e) = put a *> put b *> put c *> put d *> put e
 
 -- Fancy
 
