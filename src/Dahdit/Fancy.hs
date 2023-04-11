@@ -12,7 +12,6 @@ where
 
 import Control.Monad (unless)
 import Dahdit.Binary (Binary (..))
-import Dahdit.Counts (ByteCount (..))
 import Dahdit.Free (Get)
 import Dahdit.Funs
   ( getByteString
@@ -29,7 +28,7 @@ import Dahdit.Funs
 import Dahdit.LiftedPrim (LiftedPrim)
 import Dahdit.LiftedPrimArray (LiftedPrimArray, replicateLiftedPrimArray)
 import Dahdit.Proxy (proxyForNatF)
-import Dahdit.Sizes (ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
+import Dahdit.Sizes (ByteCount (..), ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
 import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))

@@ -17,10 +17,9 @@ where
 
 import Control.Monad.ST (ST, runST)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
-import Dahdit.Counts (ByteCount (..))
 import Dahdit.LiftedPrim (LiftedPrim (..), setByteArrayLifted)
 import Dahdit.Proxy (proxyFor)
-import Dahdit.Sizes (staticByteSize)
+import Dahdit.Sizes (ByteCount (..), staticByteSize)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BSI
 import Data.ByteString.Short.Internal (ShortByteString (..))

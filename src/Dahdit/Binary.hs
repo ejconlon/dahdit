@@ -3,7 +3,6 @@ module Dahdit.Binary
   )
 where
 
-import Dahdit.Counts (ElemCount (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs
   ( getDoubleBE
@@ -77,6 +76,7 @@ import Dahdit.Nums
   , Word64BE (..)
   , Word64LE (..)
   )
+import Dahdit.Sizes (ElemCount (..))
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Coerce (coerce)
 import Data.Int (Int16, Int32, Int64, Int8)

@@ -16,7 +16,6 @@ module Dahdit.Free
 where
 
 import Control.Monad.Free.Church (F (..))
-import Dahdit.Counts (ByteCount, ElemCount)
 import Dahdit.LiftedPrim (LiftedPrim)
 import Dahdit.LiftedPrimArray (LiftedPrimArray)
 import Dahdit.Nums
@@ -41,7 +40,7 @@ import Dahdit.Nums
   , Word64BE
   , Word64LE
   )
-import Dahdit.Sizes (StaticByteSized (..))
+import Dahdit.Sizes (ByteCount, ElemCount, StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import Data.Int (Int8)
 import Data.Primitive (ByteArray)

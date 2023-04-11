@@ -32,7 +32,6 @@ library
       Dahdit.Binary
       Dahdit.BinaryRep
       Dahdit.Codec
-      Dahdit.Counts
       Dahdit.Fancy
       Dahdit.Free
       Dahdit.Funs

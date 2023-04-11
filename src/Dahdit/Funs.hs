@@ -79,7 +79,6 @@ where
 
 import Control.Monad (replicateM_, unless)
 import Control.Monad.Free.Church (F (..))
-import Dahdit.Counts (ByteCount (..), ElemCount (..))
 import Dahdit.Free
   ( Get (..)
   , GetF (..)
@@ -120,7 +119,7 @@ import Dahdit.Nums
   , Word64LE
   )
 import Dahdit.Proxy (proxyForF, proxyForFun)
-import Dahdit.Sizes (StaticByteSized (..))
+import Dahdit.Sizes (ByteCount (..), ElemCount (..), StaticByteSized (..))
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)

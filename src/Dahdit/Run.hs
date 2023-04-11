@@ -20,7 +20,6 @@ import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Free (FreeT (..), iterT, wrap)
 import Control.Monad.Trans.Maybe (MaybeT (..))
-import Dahdit.Counts (ByteCount (..), ElemCount (..))
 import Dahdit.Free
   ( Get (..)
   , GetF (..)
@@ -61,7 +60,7 @@ import Dahdit.Nums
   , Word64LE
   )
 import Dahdit.Proxy (proxyForF)
-import Dahdit.Sizes (staticByteSize)
+import Dahdit.Sizes (ByteCount (..), ElemCount (..), staticByteSize)
 import Data.Coerce (coerce)
 import Data.Foldable (for_, toList)
 import Data.Int (Int8)

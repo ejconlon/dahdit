@@ -13,7 +13,6 @@ module Dahdit
   , runCount
   , module Dahdit.Binary
   , module Dahdit.BinaryRep
-  , module Dahdit.Counts
   , module Dahdit.Fancy
   , module Dahdit.Free
   , module Dahdit.Funs
@@ -29,7 +28,6 @@ where
 
 import Dahdit.Binary
 import Dahdit.BinaryRep
-import Dahdit.Counts
 import Dahdit.Fancy
 import Dahdit.Free (Get, Put, PutM)
 import Dahdit.Funs hiding (unsafePutStaticArrayN, unsafePutStaticSeqN)

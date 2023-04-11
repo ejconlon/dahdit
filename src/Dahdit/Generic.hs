@@ -8,11 +8,10 @@ where
 
 import Control.Applicative (liftA2)
 import Dahdit.Binary (Binary (..))
-import Dahdit.Counts (ByteCount)
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (putStaticHint)
 import Dahdit.Nums (Word16LE, Word32LE)
-import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
+import Dahdit.Sizes (ByteCount, ByteSized (..), StaticByteSized (..))
 import Data.Bits (Bits (..))
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))

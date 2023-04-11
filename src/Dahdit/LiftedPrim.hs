@@ -11,7 +11,6 @@ module Dahdit.LiftedPrim
 where
 
 import Control.Monad.Primitive (PrimMonad (..))
-import Dahdit.Counts (ByteCount (..), ElemCount (..))
 import Dahdit.Internal (EndianPair (..), ViaEndianPair (..), ViaFromIntegral (..), mkDoubleLE, mkFloatLE, mkWord16LE, mkWord24LE, mkWord32LE, mkWord64LE, unMkDoubleLE, unMkFloatLE, unMkWord16LE, unMkWord24LE, unMkWord32LE, unMkWord64LE)
 import Dahdit.Nums
   ( DoubleBE
@@ -36,7 +35,7 @@ import Dahdit.Nums
   , Word64LE (..)
   )
 import Dahdit.Proxy (proxyFor)
-import Dahdit.Sizes (StaticByteSized (..))
+import Dahdit.Sizes (ByteCount (..), ElemCount (..), StaticByteSized (..))
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.Int (Int8)

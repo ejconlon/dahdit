@@ -16,11 +16,10 @@ module Dahdit.Iface
 where
 
 import Dahdit.Binary (Binary (..))
-import Dahdit.Counts (ByteCount (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Mem (allocArrayMem, allocPtrMem, freezeBSMem, freezeSBSMem, freezeVecMem, viewBSMem, viewSBSMem, viewVecMem)
 import Dahdit.Run (GetError, runGetInternal, runPutInternal)
-import Dahdit.Sizes (ByteSized (..))
+import Dahdit.Sizes (ByteCount (..), ByteSized (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Short (ShortByteString)

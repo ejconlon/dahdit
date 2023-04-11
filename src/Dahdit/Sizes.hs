@@ -1,5 +1,7 @@
 module Dahdit.Sizes
-  ( ByteSized (..)
+  ( ByteCount (..)
+  , ElemCount (..)
+  , ByteSized (..)
   , StaticByteSized (..)
   , ViaStaticByteSized (..)
   , byteSizeFoldable
@@ -8,7 +10,6 @@ module Dahdit.Sizes
   )
 where
 
-import Dahdit.Counts (ByteCount (..))
 import Dahdit.Internal (ViaEndianPair (..), ViaFromIntegral (..))
 import Dahdit.Nums
   ( DoubleBE
@@ -36,6 +37,7 @@ import Dahdit.Proxy (proxyFor, proxyForF)
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
+import Data.Default (Default)
 import Data.Foldable (foldMap')
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.IntMap (IntMap)
@@ -51,6 +53,16 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
+
+-- Counts
+
+newtype ByteCount = ByteCount {unByteCount :: Int}
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Default)
+
+newtype ElemCount = ElemCount {unElemCount :: Int}
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Default)
 
 -- ByteSized
 

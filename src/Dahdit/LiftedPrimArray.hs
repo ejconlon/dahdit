@@ -19,14 +19,13 @@ module Dahdit.LiftedPrimArray
 where
 
 import Control.Monad.Primitive (PrimMonad (..))
-import Dahdit.Counts (ByteCount (..), ElemCount (..))
 import Dahdit.LiftedPrim
   ( LiftedPrim (..)
   , indexArrayLiftedInElems
   , writeArrayLiftedInElems
   )
 import Dahdit.Proxy (proxyFor, proxyForF)
-import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
+import Dahdit.Sizes (ByteCount (..), ByteSized (..), ElemCount (..), StaticByteSized (..))
 import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Foldable (for_)
