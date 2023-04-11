@@ -17,7 +17,8 @@ where
 
 import Control.Monad.Free.Church (F (..))
 import Dahdit.Counts (ByteCount, ElemCount)
-import Dahdit.LiftedPrim (LiftedPrim, LiftedPrimArray)
+import Dahdit.LiftedPrim (LiftedPrim)
+import Dahdit.LiftedPrimArray (LiftedPrimArray)
 import Dahdit.Nums
   ( DoubleBE
   , DoubleLE
@@ -49,13 +50,13 @@ import Data.Sequence (Seq)
 import Data.Word (Word8)
 
 data GetStaticSeqF a where
-  GetStaticSeqF :: (StaticByteSized z) => !ElemCount -> Get z -> (Seq z -> a) -> GetStaticSeqF a
+  GetStaticSeqF :: StaticByteSized z => !ElemCount -> Get z -> (Seq z -> a) -> GetStaticSeqF a
 
 instance Functor GetStaticSeqF where
   fmap f (GetStaticSeqF n g k) = GetStaticSeqF n g (f . k)
 
 data GetStaticArrayF a where
-  GetStaticArrayF :: (StaticByteSized z, LiftedPrim z) => !ElemCount -> Proxy z -> (LiftedPrimArray z -> a) -> GetStaticArrayF a
+  GetStaticArrayF :: LiftedPrim z => !ElemCount -> Proxy z -> (LiftedPrimArray z -> a) -> GetStaticArrayF a
 
 instance Functor GetStaticArrayF where
   fmap f (GetStaticArrayF n p k) = GetStaticArrayF n p (f . k)
@@ -124,7 +125,7 @@ instance Functor PutStaticSeqF where
   fmap f (PutStaticSeqF n z p s k) = PutStaticSeqF n z p s (f k)
 
 data PutStaticArrayF a where
-  PutStaticArrayF :: (StaticByteSized z, LiftedPrim z) => !ElemCount -> !(Maybe z) -> !(LiftedPrimArray z) -> a -> PutStaticArrayF a
+  PutStaticArrayF :: LiftedPrim z => !ElemCount -> !(Maybe z) -> !(LiftedPrimArray z) -> a -> PutStaticArrayF a
 
 instance Functor PutStaticArrayF where
   fmap f (PutStaticArrayF n z a k) = PutStaticArrayF n z a (f k)

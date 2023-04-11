@@ -20,6 +20,7 @@ module Dahdit
   , module Dahdit.Generic
   , module Dahdit.Iface
   , module Dahdit.LiftedPrim
+  , module Dahdit.LiftedPrimArray
   , module Dahdit.Nums
   , module Dahdit.Proxy
   , module Dahdit.Sizes
@@ -35,6 +36,7 @@ import Dahdit.Funs hiding (unsafePutStaticArrayN, unsafePutStaticSeqN)
 import Dahdit.Generic
 import Dahdit.Iface
 import Dahdit.LiftedPrim
+import Dahdit.LiftedPrimArray
 import Dahdit.Nums
 import Dahdit.Proxy
 import Dahdit.Run (GetError (..), prettyGetError, runCount)

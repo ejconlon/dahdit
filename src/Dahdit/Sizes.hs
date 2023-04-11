@@ -1,15 +1,15 @@
 module Dahdit.Sizes
-  ( StaticByteSized (..)
-  , byteSizeViaStatic
-  , ByteSized (..)
+  ( ByteSized (..)
+  , StaticByteSized (..)
   , ViaStaticByteSized (..)
   , byteSizeFoldable
   , staticByteSizeFoldable
+  , byteSizeViaStatic
   )
 where
 
 import Dahdit.Counts (ByteCount (..))
-import Dahdit.Fancy (BoolByte, ExactBytes, StaticArray (..), StaticBytes (..), StaticSeq (..), TermBytes (..))
+import Dahdit.Internal (ViaEndianPair (..), ViaFromIntegral (..))
 import Dahdit.Nums
   ( DoubleBE
   , DoubleLE
@@ -51,12 +51,11 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
-import GHC.TypeLits (KnownNat, KnownSymbol, natVal, symbolVal)
+
+-- ByteSized
 
 class ByteSized a where
   byteSize :: a -> ByteCount
-
--- Basic types
 
 instance ByteSized () where
   byteSize _ = 0
@@ -136,35 +135,31 @@ instance ByteSized FloatLE where
 instance ByteSized DoubleLE where
   byteSize _ = 8
 
-instance ByteSized Word16BE where
-  byteSize _ = 2
+instance StaticByteSized x => ByteSized (ViaFromIntegral x y) where
+  byteSize = byteSizeViaStatic
 
-instance ByteSized Int16BE where
-  byteSize _ = 2
+instance StaticByteSized le => ByteSized (ViaEndianPair le be) where
+  byteSize = byteSizeViaStatic
 
-instance ByteSized Word24BE where
-  byteSize _ = 3
+deriving via (ViaEndianPair Word16LE Word16BE) instance ByteSized Word16BE
 
-instance ByteSized Int24BE where
-  byteSize _ = 3
+deriving via (ViaEndianPair Int16LE Int16BE) instance ByteSized Int16BE
 
-instance ByteSized Word32BE where
-  byteSize _ = 4
+deriving via (ViaEndianPair Word24LE Word24BE) instance ByteSized Word24BE
 
-instance ByteSized Int32BE where
-  byteSize _ = 4
+deriving via (ViaEndianPair Int24LE Int24BE) instance ByteSized Int24BE
 
-instance ByteSized Word64BE where
-  byteSize _ = 8
+deriving via (ViaEndianPair Word32LE Word32BE) instance ByteSized Word32BE
 
-instance ByteSized Int64BE where
-  byteSize _ = 8
+deriving via (ViaEndianPair Int32LE Int32BE) instance ByteSized Int32BE
 
-instance ByteSized FloatBE where
-  byteSize _ = 4
+deriving via (ViaEndianPair Word64LE Word64BE) instance ByteSized Word64BE
 
-instance ByteSized DoubleBE where
-  byteSize _ = 8
+deriving via (ViaEndianPair Int64LE Int64BE) instance ByteSized Int64BE
+
+deriving via (ViaEndianPair FloatLE FloatBE) instance ByteSized FloatBE
+
+deriving via (ViaEndianPair DoubleLE DoubleBE) instance ByteSized DoubleBE
 
 instance ByteSized ShortByteString where
   byteSize = coerce . BSS.length
@@ -209,11 +204,10 @@ instance ByteSized IntSet where
 instance ByteSized v => ByteSized (IntMap v) where
   byteSize = byteSize . IntMap.toAscList
 
+-- StaticByteSized
+
 class ByteSized a => StaticByteSized a where
   staticByteSize :: Proxy a -> ByteCount
-
-byteSizeViaStatic :: StaticByteSized a => a -> ByteCount
-byteSizeViaStatic = staticByteSize . proxyFor
 
 instance StaticByteSized () where
   staticByteSize _ = 0
@@ -293,35 +287,31 @@ instance StaticByteSized FloatLE where
 instance StaticByteSized DoubleLE where
   staticByteSize _ = 8
 
-instance StaticByteSized Word16BE where
-  staticByteSize _ = 2
+instance StaticByteSized x => StaticByteSized (ViaFromIntegral x y) where
+  staticByteSize _ = staticByteSize (Proxy :: Proxy x)
 
-instance StaticByteSized Int16BE where
-  staticByteSize _ = 2
+instance StaticByteSized le => StaticByteSized (ViaEndianPair le be) where
+  staticByteSize _ = staticByteSize (Proxy :: Proxy le)
 
-instance StaticByteSized Word24BE where
-  staticByteSize _ = 3
+deriving via (ViaEndianPair Word16LE Word16BE) instance StaticByteSized Word16BE
 
-instance StaticByteSized Int24BE where
-  staticByteSize _ = 3
+deriving via (ViaEndianPair Int16LE Int16BE) instance StaticByteSized Int16BE
 
-instance StaticByteSized Word32BE where
-  staticByteSize _ = 4
+deriving via (ViaEndianPair Word24LE Word24BE) instance StaticByteSized Word24BE
 
-instance StaticByteSized Int32BE where
-  staticByteSize _ = 4
+deriving via (ViaEndianPair Int24LE Int24BE) instance StaticByteSized Int24BE
 
-instance StaticByteSized Word64BE where
-  staticByteSize _ = 8
+deriving via (ViaEndianPair Word32LE Word32BE) instance StaticByteSized Word32BE
 
-instance StaticByteSized Int64BE where
-  staticByteSize _ = 8
+deriving via (ViaEndianPair Int32LE Int32BE) instance StaticByteSized Int32BE
 
-instance StaticByteSized FloatBE where
-  staticByteSize _ = 4
+deriving via (ViaEndianPair Word64LE Word64BE) instance StaticByteSized Word64BE
 
-instance StaticByteSized DoubleBE where
-  staticByteSize _ = 8
+deriving via (ViaEndianPair Int64LE Int64BE) instance StaticByteSized Int64BE
+
+deriving via (ViaEndianPair FloatLE FloatBE) instance StaticByteSized FloatBE
+
+deriving via (ViaEndianPair DoubleLE DoubleBE) instance StaticByteSized DoubleBE
 
 -- Via
 
@@ -336,34 +326,5 @@ byteSizeFoldable = getSum . foldMap' (Sum . byteSize)
 staticByteSizeFoldable :: (Foldable f, StaticByteSized a) => f a -> ByteCount
 staticByteSizeFoldable fa = staticByteSize (proxyForF fa) * coerce (length fa)
 
--- Fancy
-
-instance ByteSized TermBytes where
-  byteSize (TermBytes sbs) =
-    let bc = byteSize sbs + 1
-    in  if even bc then bc else bc + 1
-
-deriving via (ViaStaticByteSized (StaticBytes n)) instance KnownNat n => ByteSized (StaticBytes n)
-
-instance KnownNat n => StaticByteSized (StaticBytes n) where
-  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n))
-
-deriving via (ViaStaticByteSized (StaticSeq n a)) instance (KnownNat n, StaticByteSized a) => ByteSized (StaticSeq n a)
-
-instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticSeq n a) where
-  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
-
-deriving via (ViaStaticByteSized (StaticArray n a)) instance (KnownNat n, StaticByteSized a) => ByteSized (StaticArray n a)
-
-instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) where
-  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
-
-deriving via (ViaStaticByteSized BoolByte) instance ByteSized BoolByte
-
-instance StaticByteSized BoolByte where
-  staticByteSize _ = 1
-
-deriving via (ViaStaticByteSized (ExactBytes s)) instance KnownSymbol s => ByteSized (ExactBytes s)
-
-instance KnownSymbol s => StaticByteSized (ExactBytes s) where
-  staticByteSize _ = coerce (length (symbolVal (Proxy :: Proxy s)))
+byteSizeViaStatic :: StaticByteSized a => a -> ByteCount
+byteSizeViaStatic = staticByteSize . proxyFor

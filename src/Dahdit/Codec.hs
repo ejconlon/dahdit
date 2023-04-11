@@ -114,7 +114,7 @@ deriving via (ViaBinary TermBytes) instance HasCodec TermBytes
 
 deriving via (ViaBinary (StaticSeq n a)) instance (KnownNat n, Binary a, StaticByteSized a, Default a) => HasCodec (StaticSeq n a)
 
-deriving via (ViaBinary (StaticArray n a)) instance (KnownNat n, LiftedPrim a, StaticByteSized a, Default a) => HasCodec (StaticArray n a)
+deriving via (ViaBinary (StaticArray n a)) instance (KnownNat n, LiftedPrim a, Default a) => HasCodec (StaticArray n a)
 
 deriving via (ViaBinary BoolByte) instance HasCodec BoolByte
 

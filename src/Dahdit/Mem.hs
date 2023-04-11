@@ -20,6 +20,7 @@ import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Dahdit.Counts (ByteCount (..))
 import Dahdit.LiftedPrim (LiftedPrim (..), setByteArrayLifted)
 import Dahdit.Proxy (proxyFor)
+import Dahdit.Sizes (staticByteSize)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BSI
 import Data.ByteString.Short.Internal (ShortByteString (..))
@@ -95,7 +96,7 @@ copyPtr arr arrOff arrLen ptr off =
 
 setPtr :: LiftedPrim a => ByteCount -> a -> Ptr Word8 -> ByteCount -> ST s ()
 setPtr len val ptr off = do
-  let elemSize = elemSizeLifted (proxyFor val)
+  let elemSize = staticByteSize (proxyFor val)
       elemLen = div (coerce len) elemSize
   for_ [0 .. elemLen - 1] $ \pos ->
     writePtrLiftedInBytes ptr (off + pos * elemSize) val

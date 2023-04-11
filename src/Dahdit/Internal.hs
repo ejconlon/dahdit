@@ -127,3 +127,17 @@ mkDoubleLE b0 b1 b2 b3 b4 b5 b6 b7 = castWord64ToDouble (mkWord64LE b0 b1 b2 b3 
 
 unMkDoubleLE :: Double -> (Word8, Word8, Word8, Word8, Word8, Word8, Word8, Word8)
 unMkDoubleLE f = unMkWord64LE (castDoubleToWord64 f)
+
+class (Num le, Num be) => EndianPair le be | le -> be, be -> le where
+  toLittleEndian :: be -> le
+  toBigEndian :: le -> be
+
+newtype ViaEndianPair le be = ViaEndianPair {unViaEndianPair :: be}
+
+instance EndianPair Word8 Word8 where
+  toLittleEndian = id
+  toBigEndian = id
+
+instance EndianPair Int8 Int8 where
+  toLittleEndian = id
+  toBigEndian = id

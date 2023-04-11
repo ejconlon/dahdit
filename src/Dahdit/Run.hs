@@ -36,7 +36,7 @@ import Dahdit.Free
   , PutStaticSeqF (..)
   , ScopeMode (..)
   )
-import Dahdit.LiftedPrim (LiftedPrimArray (..), sizeofLiftedPrimArray)
+import Dahdit.LiftedPrimArray (LiftedPrimArray (..), sizeofLiftedPrimArray)
 import Dahdit.Mem (ReadMem (..), WriteMem (..), readSBSMem, writeSBSMem)
 import Dahdit.Nums
   ( DoubleBE

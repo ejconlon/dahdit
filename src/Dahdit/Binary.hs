@@ -3,15 +3,11 @@ module Dahdit.Binary
   )
 where
 
-import Control.Monad (unless)
-import Dahdit.Counts (ByteCount (..), ElemCount (..))
-import Dahdit.Fancy (BoolByte (..), ExactBytes (..), StaticArray (..), StaticBytes (..), StaticSeq (..), TermBytes (..))
+import Dahdit.Counts (ElemCount (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs
-  ( getByteString
-  , getDoubleBE
+  ( getDoubleBE
   , getDoubleLE
-  , getExpect
   , getFloatBE
   , getFloatLE
   , getInt16BE
@@ -25,8 +21,6 @@ import Dahdit.Funs
   , getInt8
   , getList
   , getSeq
-  , getStaticArray
-  , getStaticSeq
   , getWord16BE
   , getWord16LE
   , getWord24BE
@@ -36,10 +30,8 @@ import Dahdit.Funs
   , getWord64BE
   , getWord64LE
   , getWord8
-  , putByteString
   , putDoubleBE
   , putDoubleLE
-  , putFixedString
   , putFloatBE
   , putFloatLE
   , putInt16BE
@@ -62,10 +54,7 @@ import Dahdit.Funs
   , putWord64BE
   , putWord64LE
   , putWord8
-  , unsafePutStaticArrayN
-  , unsafePutStaticSeqN
   )
-import Dahdit.LiftedPrim (LiftedPrim)
 import Dahdit.Nums
   ( DoubleBE (..)
   , DoubleLE (..)
@@ -88,12 +77,8 @@ import Dahdit.Nums
   , Word64BE (..)
   , Word64LE (..)
   )
-import Dahdit.Sizes (StaticByteSized)
 import Data.ByteString.Internal (c2w, w2c)
-import qualified Data.ByteString.Short as BSS
-import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
-import Data.Default (Default (..))
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -101,15 +86,12 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Primitive.ByteArray (ByteArray (..), byteArrayFromListN)
-import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
-import GHC.TypeLits (KnownNat, KnownSymbol, natVal, symbolVal)
 
 class Binary a where
   get :: Get a
@@ -229,6 +211,10 @@ deriving via FloatLE instance Binary Float
 
 deriving via DoubleLE instance Binary Double
 
+instance Binary Bool where
+  get = fmap (/= 0) getWord8
+  put b = putWord8 (if b then 1 else 0)
+
 instance Binary Char where
   get = fmap w2c getWord8
   put = putWord8 . c2w
@@ -320,58 +306,3 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a, b, c, 
     e <- get
     pure (a, b, c, d, e)
   put (a, b, c, d, e) = put a *> put b *> put c *> put d *> put e
-
--- Fancy
-
-getUntilNull :: Get (ByteCount, [Word8])
-getUntilNull = go 0 []
- where
-  go !i !racc = do
-    w <- getWord8
-    if w == 0
-      then pure (i, reverse racc)
-      else go (i + 1) (w : racc)
-
-mkSBS :: ByteCount -> [Word8] -> ShortByteString
-mkSBS n bs = let !(ByteArray ba) = byteArrayFromListN (coerce n) bs in SBS ba
-
-instance Binary TermBytes where
-  get = do
-    (i, acc) <- getUntilNull
-    unless (odd i) $ do
-      w <- getWord8
-      unless (w == 0) (fail "TermBytes missing word pad")
-    let sbs = mkSBS i acc
-    pure (TermBytes sbs)
-
-  put (TermBytes sbs) = do
-    putByteString sbs
-    putWord8 0
-    unless (odd (BSS.length sbs)) (putWord8 0)
-
-instance KnownNat n => Binary (StaticBytes n) where
-  get = fmap StaticBytes (getByteString (fromInteger (natVal (Proxy :: Proxy n))))
-  put fb@(StaticBytes sbs) = putFixedString 0 (fromInteger (natVal fb)) sbs
-
-instance (KnownNat n, Binary a, StaticByteSized a, Default a) => Binary (StaticSeq n a) where
-  get = fmap StaticSeq (getStaticSeq (fromInteger (natVal (Proxy :: Proxy n))) get)
-  put = unsafePutStaticSeqN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
-
-instance (KnownNat n, LiftedPrim a, StaticByteSized a, Default a) => Binary (StaticArray n a) where
-  get = fmap StaticArray (getStaticArray (fromInteger (natVal (Proxy :: Proxy n))))
-  put = unsafePutStaticArrayN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
-
-instance Binary BoolByte where
-  get = fmap (BoolByte . (/= 0)) getWord8
-  put (BoolByte b) = putWord8 (if b then 1 else 0)
-
-instance KnownSymbol s => Binary (ExactBytes s) where
-  get = do
-    let s = symbolVal (Proxy :: Proxy s)
-        bc = coerce (length s)
-        bs = BSS.pack (fmap c2w s)
-    getExpect s (getByteString bc) bs
-    pure (ExactBytes ())
-  put _ = do
-    let s = symbolVal (Proxy :: Proxy s)
-    putByteString (BSS.pack (fmap c2w s))

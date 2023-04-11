@@ -40,6 +40,7 @@ library
       Dahdit.Iface
       Dahdit.Internal
       Dahdit.LiftedPrim
+      Dahdit.LiftedPrimArray
       Dahdit.Mem
       Dahdit.Nums
       Dahdit.Proxy

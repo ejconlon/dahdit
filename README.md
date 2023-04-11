@@ -13,3 +13,9 @@ This differs from `binary` in a few ways:
 * Optionally, types implementing `Binary` can also implement or derive `ByteSized` for size calculation.
 * Known-statically-sized types can implement `StaticByteSized` for size speedups.
 * Provides several additional types representing fixed-length strings or sequences (using `TypeLits`).
+
+## TODO
+
+* Remaining get/put tests
+* Get/put with offset
+* Mutable get/put
