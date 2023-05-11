@@ -1,7 +1,6 @@
 module Dahdit.Iface
   ( BinaryTarget (..)
   , getTarget
-  , putTarget
   , decode
   , decodeFile
   , encode
@@ -24,26 +23,23 @@ import qualified Data.Vector.Storable as VS
 import Data.Word (Word8)
 
 class BinaryTarget z where
+  putTarget :: Put -> ByteCount -> z
   getTargetOffset :: ByteCount -> Get a -> z -> (Either GetError a, ByteCount)
-  putTargetOffset :: ByteCount -> Put -> ByteCount -> z
 
 getTarget :: BinaryTarget z => Get a -> z -> (Either GetError a, ByteCount)
 getTarget = getTargetOffset 0
 
-putTarget :: BinaryTarget z => Put -> ByteCount -> z
-putTarget = putTargetOffset 0
-
 instance BinaryTarget ShortByteString where
   getTargetOffset = runGetSBS
-  putTargetOffset = runPutSBS
+  putTarget = runPutSBS
 
 instance BinaryTarget ByteString where
   getTargetOffset = runGetBS
-  putTargetOffset = runPutBS
+  putTarget = runPutBS
 
 instance BinaryTarget (Vector Word8) where
   getTargetOffset = runGetVec
-  putTargetOffset = runPutVec
+  putTarget = runPutVec
 
 decode :: (Binary a, BinaryTarget z) => z -> (Either GetError a, ByteCount)
 decode = getTarget get
@@ -71,16 +67,16 @@ runGetFile act fp = do
   bs <- BS.readFile fp
   pure (runGetBS 0 act bs)
 
-runPutSBS :: ByteCount -> Put -> ByteCount -> ShortByteString
-runPutSBS off act cap = runPutInternal off act cap allocArrayMem freezeSBSMem
+runPutSBS :: Put -> ByteCount -> ShortByteString
+runPutSBS act cap = runPutInternal act cap allocArrayMem freezeSBSMem
 
-runPutBS :: ByteCount -> Put -> ByteCount -> ByteString
-runPutBS off act cap = runPutInternal off act cap allocPtrMem freezeBSMem
+runPutBS :: Put -> ByteCount -> ByteString
+runPutBS act cap = runPutInternal act cap allocPtrMem freezeBSMem
 
-runPutVec :: ByteCount -> Put -> ByteCount -> Vector Word8
-runPutVec off act cap = runPutInternal off act cap allocPtrMem freezeVecMem
+runPutVec :: Put -> ByteCount -> Vector Word8
+runPutVec act cap = runPutInternal act cap allocPtrMem freezeVecMem
 
 runPutFile :: Put -> ByteCount -> FilePath -> IO ()
 runPutFile act cap fp =
-  let bs = runPutBS 0 act cap
+  let bs = runPutBS act cap
   in  BS.writeFile fp bs

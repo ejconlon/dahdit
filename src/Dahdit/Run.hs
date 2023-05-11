@@ -104,18 +104,18 @@ prettyGetError = \case
   GetErrorFail msg -> "User error: " ++ msg
 
 data GetEnv s r = GetEnv
-  { geLen :: !ByteCount
-  -- ^ Remaining length of buffer segment
-  , geOff :: !(STRef s ByteCount)
+  { geOff :: !(STRef s ByteCount)
   -- ^ Offset from buffer start (in bytes)
+  , geCap :: !ByteCount
+  -- ^ Capacity of buffer segment
   , geArray :: !r
   -- ^ Source buffer
   }
 
-newGetEnv :: ByteCount -> r -> ST s (GetEnv s r)
-newGetEnv len mem = do
-  off <- newSTRef 0
-  pure (GetEnv len off mem)
+newGetEnv :: ByteCount -> ByteCount -> r -> ST s (GetEnv s r)
+newGetEnv off cap mem = do
+  offRef <- newSTRef off
+  pure (GetEnv offRef cap mem)
 
 newtype GetEff s r a = GetEff {unGetEff :: ReaderT (GetEnv s r) (ExceptT GetError (ST s)) a}
   deriving newtype (Functor, Applicative, Monad, MonadReader (GetEnv s r), MonadError GetError)
@@ -134,9 +134,9 @@ newtype GetRun s r a = GetRun {unGetRun :: FreeT GetF (GetEff s r) a}
 
 guardReadBytes :: String -> ByteCount -> GetEff s r ByteCount
 guardReadBytes nm bc = do
-  GetEnv len offRef _ <- ask
+  GetEnv offRef cap _ <- ask
   off <- stGetEff (readSTRef offRef)
-  let ac = len - off
+  let ac = cap - off
   if bc > ac
     then throwError (GetErrorParseNeed nm ac bc)
     else pure off
@@ -144,7 +144,7 @@ guardReadBytes nm bc = do
 readBytes :: String -> ByteCount -> (r -> ByteCount -> a) -> GetEff s r a
 readBytes nm bc f = do
   off <- guardReadBytes nm bc
-  GetEnv _ offRef mem <- ask
+  GetEnv offRef _ mem <- ask
   stGetEff $ do
     let a = f mem off
         newOff = off + bc
@@ -153,14 +153,14 @@ readBytes nm bc f = do
 
 readScope :: ReadMem r => GetScopeF (GetEff s r a) -> GetEff s r a
 readScope (GetScopeF sm bc g k) = do
-  GetEnv oldLen offRef _ <- ask
+  GetEnv offRef oldCap _ <- ask
   oldOff <- stGetEff (readSTRef offRef)
-  let oldAvail = oldLen - oldOff
+  let oldAvail = oldCap - oldOff
   if bc > oldAvail
     then throwError (GetErrorParseNeed "scope" oldAvail bc)
     else do
-      let newLen = oldOff + bc
-      a <- local (\ge -> ge {geLen = newLen}) (mkGetEff g)
+      let newCap = oldOff + bc
+      a <- local (\ge -> ge {geCap = newCap}) (mkGetEff g)
       case sm of
         ScopeModeWithin -> k a
         ScopeModeExact -> do
@@ -225,9 +225,9 @@ execGetRun = \case
   GetFSkip bc k -> readBytes "skip" bc (\_ _ -> ()) *> k
   GetFLookAhead gla -> readLookAhead gla
   GetFRemainingSize k -> do
-    GetEnv len offRef _ <- ask
+    GetEnv offRef cap _ <- ask
     off <- stGetEff (readSTRef offRef)
-    k (len - off)
+    k (cap - off)
   GetFFail msg -> fail msg
 
 runGetRun :: ReadMem r => GetRun s r a -> GetEnv s r -> ST s (Either GetError a)
@@ -242,11 +242,10 @@ mkGetRun (Get (F w)) = GetRun (w pure wrap)
 mkGetEff :: ReadMem r => Get a -> GetEff s r a
 mkGetEff = iterGetRun . mkGetRun
 
--- TODO use offset
 runGetInternal :: ReadMem r => ByteCount -> Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
-runGetInternal _off act len mem = runST $ do
+runGetInternal off act cap mem = runST $ do
   let eff = mkGetEff act
-  env <- newGetEnv len mem
+  env <- newGetEnv off cap mem
   ea <- runGetEff eff env
   bc <- readSTRef (geOff env)
   pure (ea, bc)
@@ -254,18 +253,18 @@ runGetInternal _off act len mem = runST $ do
 -- Put unsafe:
 
 data PutEnv s q = PutEnv
-  { peLen :: !ByteCount
-  -- ^ Remaining capacity in buffer segment
-  , peOff :: !(STRef s ByteCount)
+  { peOff :: !(STRef s ByteCount)
   -- ^ Offset in bytes from start of buffer
+  , peCap :: !ByteCount
+  -- ^ Capacity of buffer segment
   , peArray :: !(q s)
   -- ^ Destination buffer
   }
 
 newPutEnv :: ByteCount -> q s -> ST s (PutEnv s q)
-newPutEnv len mem = do
+newPutEnv cap mem = do
   offRef <- newSTRef 0
-  pure (PutEnv len offRef mem)
+  pure (PutEnv offRef cap mem)
 
 newtype PutEff s q a = PutEff {unPutEff :: ReaderT (PutEnv s q) (ST s) a}
   deriving newtype (Functor, Applicative, Monad, MonadReader (PutEnv s q))
@@ -281,7 +280,7 @@ newtype PutRun s q a = PutRun {unPutRun :: FreeT PutF (PutEff s q) a}
 
 writeBytes :: ByteCount -> (q s -> ByteCount -> ST s ()) -> PutEff s q ()
 writeBytes bc f = do
-  PutEnv _ offRef mem <- ask
+  PutEnv offRef _ mem <- ask
   stPutEff $ do
     off <- readSTRef offRef
     f mem off
@@ -360,7 +359,7 @@ mkPutEff = iterPutRun . mkPutRun
 runPutUnsafe :: WriteMem q => Put -> ByteCount -> q s -> ST s ByteCount
 runPutUnsafe act len mem = do
   let eff = mkPutRun act
-  st@(PutEnv _ offRef _) <- newPutEnv len mem
+  st@(PutEnv offRef _ _) <- newPutEnv len mem
   runPutRun eff st
   readSTRef offRef
 
@@ -429,9 +428,8 @@ runCount act =
 
 -- Put safe:
 
--- TODO use offset
-runPutInternal :: WriteMem q => ByteCount -> Put -> ByteCount -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
-runPutInternal _off act cap mkMem useMem = runST $ do
+runPutInternal :: WriteMem q => Put -> ByteCount -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
+runPutInternal act cap mkMem useMem = runST $ do
   mem <- mkMem cap
   case releaseMem mem of
     Nothing -> runPutUnsafe act cap mem >>= useMem mem cap
