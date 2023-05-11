@@ -242,8 +242,9 @@ mkGetRun (Get (F w)) = GetRun (w pure wrap)
 mkGetEff :: ReadMem r => Get a -> GetEff s r a
 mkGetEff = iterGetRun . mkGetRun
 
-runGetInternal :: ReadMem r => Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
-runGetInternal act len mem = runST $ do
+-- TODO use offset
+runGetInternal :: ReadMem r => ByteCount -> Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
+runGetInternal _off act len mem = runST $ do
   let eff = mkGetEff act
   env <- newGetEnv len mem
   ea <- runGetEff eff env
@@ -428,8 +429,9 @@ runCount act =
 
 -- Put safe:
 
-runPutInternal :: WriteMem q => Put -> ByteCount -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
-runPutInternal act cap mkMem useMem = runST $ do
+-- TODO use offset
+runPutInternal :: WriteMem q => ByteCount -> Put -> ByteCount -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
+runPutInternal _off act cap mkMem useMem = runST $ do
   mem <- mkMem cap
   case releaseMem mem of
     Nothing -> runPutUnsafe act cap mem >>= useMem mem cap

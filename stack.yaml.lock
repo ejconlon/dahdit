@@ -13,7 +13,7 @@ packages:
     hackage: data-sword-0.2.0.3
 snapshots:
 - completed:
-    sha256: 14ca51a9a597c32dd7804c10d079feea3d0ae40c5fbbb346cbd67b3ae49f6d01
-    size: 649598
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/17.yaml
-  original: lts-20.17
+    sha256: 126fa33ceb11f5e85ceb4e86d434756bd9a8439e2e5776d306a15fbc63b01e89
+    size: 650041
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/20.yaml
+  original: lts-20.20

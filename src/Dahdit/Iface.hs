@@ -1,17 +1,11 @@
 module Dahdit.Iface
   ( BinaryTarget (..)
+  , getTarget
+  , putTarget
   , decode
   , decodeFile
   , encode
   , encodeFile
-  , runGetSBS
-  , runGetBS
-  , runGetVec
-  , runGetFile
-  , runPutSBS
-  , runPutBS
-  , runPutVec
-  , runPutFile
   )
 where
 
@@ -29,22 +23,27 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
 import Data.Word (Word8)
 
--- TODO support get/put with offset
 class BinaryTarget z where
-  getTarget :: Get a -> z -> (Either GetError a, ByteCount)
-  putTarget :: Put -> ByteCount -> z
+  getTargetOffset :: ByteCount -> Get a -> z -> (Either GetError a, ByteCount)
+  putTargetOffset :: ByteCount -> Put -> ByteCount -> z
+
+getTarget :: BinaryTarget z => Get a -> z -> (Either GetError a, ByteCount)
+getTarget = getTargetOffset 0
+
+putTarget :: BinaryTarget z => Put -> ByteCount -> z
+putTarget = putTargetOffset 0
 
 instance BinaryTarget ShortByteString where
-  getTarget = runGetSBS
-  putTarget = runPutSBS
+  getTargetOffset = runGetSBS
+  putTargetOffset = runPutSBS
 
 instance BinaryTarget ByteString where
-  getTarget = runGetBS
-  putTarget = runPutBS
+  getTargetOffset = runGetBS
+  putTargetOffset = runPutBS
 
 instance BinaryTarget (Vector Word8) where
-  getTarget = runGetVec
-  putTarget = runPutVec
+  getTargetOffset = runGetVec
+  putTargetOffset = runPutVec
 
 decode :: (Binary a, BinaryTarget z) => z -> (Either GetError a, ByteCount)
 decode = getTarget get
@@ -58,30 +57,30 @@ encode a = putTarget (put a) (byteSize a)
 encodeFile :: (Binary a, ByteSized a) => a -> FilePath -> IO ()
 encodeFile a = runPutFile (put a) (byteSize a)
 
-runGetSBS :: Get a -> ShortByteString -> (Either GetError a, ByteCount)
-runGetSBS act sbs = runGetInternal act (coerce (BSS.length sbs)) (viewSBSMem sbs)
+runGetSBS :: ByteCount -> Get a -> ShortByteString -> (Either GetError a, ByteCount)
+runGetSBS off act sbs = runGetInternal off act (coerce (BSS.length sbs)) (viewSBSMem sbs)
 
-runGetBS :: Get a -> ByteString -> (Either GetError a, ByteCount)
-runGetBS act bs = runGetInternal act (coerce (BS.length bs)) (viewBSMem bs)
+runGetBS :: ByteCount -> Get a -> ByteString -> (Either GetError a, ByteCount)
+runGetBS off act bs = runGetInternal off act (coerce (BS.length bs)) (viewBSMem bs)
 
-runGetVec :: Get a -> Vector Word8 -> (Either GetError a, ByteCount)
-runGetVec act vec = runGetInternal act (coerce (VS.length vec)) (viewVecMem vec)
+runGetVec :: ByteCount -> Get a -> Vector Word8 -> (Either GetError a, ByteCount)
+runGetVec off act vec = runGetInternal off act (coerce (VS.length vec)) (viewVecMem vec)
 
 runGetFile :: Get a -> FilePath -> IO (Either GetError a, ByteCount)
 runGetFile act fp = do
   bs <- BS.readFile fp
-  pure (runGetBS act bs)
+  pure (runGetBS 0 act bs)
 
-runPutSBS :: Put -> ByteCount -> ShortByteString
-runPutSBS act cap = runPutInternal act cap allocArrayMem freezeSBSMem
+runPutSBS :: ByteCount -> Put -> ByteCount -> ShortByteString
+runPutSBS off act cap = runPutInternal off act cap allocArrayMem freezeSBSMem
 
-runPutBS :: Put -> ByteCount -> ByteString
-runPutBS act cap = runPutInternal act cap allocPtrMem freezeBSMem
+runPutBS :: ByteCount -> Put -> ByteCount -> ByteString
+runPutBS off act cap = runPutInternal off act cap allocPtrMem freezeBSMem
 
-runPutVec :: Put -> ByteCount -> Vector Word8
-runPutVec act cap = runPutInternal act cap allocPtrMem freezeVecMem
+runPutVec :: ByteCount -> Put -> ByteCount -> Vector Word8
+runPutVec off act cap = runPutInternal off act cap allocPtrMem freezeVecMem
 
 runPutFile :: Put -> ByteCount -> FilePath -> IO ()
 runPutFile act cap fp =
-  let bs = runPutBS act cap
+  let bs = runPutBS 0 act cap
   in  BS.writeFile fp bs

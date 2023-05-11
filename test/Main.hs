@@ -60,6 +60,7 @@ import Dahdit
   , getSkip
   , getStaticArray
   , getStaticSeq
+  , getTarget
   , getWithin
   , getWord16BE
   , getWord16LE
@@ -91,6 +92,7 @@ import Dahdit
   , putSeq
   , putStaticArray
   , putStaticSeq
+  , putTarget
   , putWord16BE
   , putWord16LE
   , putWord24BE
