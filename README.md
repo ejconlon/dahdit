@@ -14,8 +14,3 @@ This differs from `binary` in a few ways:
 * Known-statically-sized types can implement `StaticByteSized` for size speedups.
 * Provides several additional types representing fixed-length strings or sequences (using `TypeLits`).
 
-## TODO
-
-* Remaining get/put tests
-* Get/put with offset
-* Mutable get/put
