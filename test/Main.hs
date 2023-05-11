@@ -13,6 +13,7 @@ import Dahdit
   , FloatLE (..)
   , Generic
   , Get
+  , GetError (..)
   , Int16BE
   , Int16LE
   , Int24BE
@@ -92,7 +93,6 @@ import Dahdit
   , putSeq
   , putStaticArray
   , putStaticSeq
-  , putTarget
   , putWord16BE
   , putWord16LE
   , putWord24BE
@@ -174,14 +174,14 @@ runPutCase p putter expecList = do
       expecBs = expecList
       estBc = runCount putter
   estBc @?= expecBc
-  let actSink = putTarget putter estBc `asProxyTypeOf` p
+  let actSink = putTargetUnsafe putter estBc `asProxyTypeOf` p
       actBs = consumeSink actSink
       actBc = coerce (length actBs)
   actBs @?= expecBs
   actBc @?= expecBc
 
-testDahditByteSize :: TestTree
-testDahditByteSize =
+testByteSize :: TestTree
+testByteSize =
   testGroup
     "byteSize"
     [ testCase "Word8" (byteSize @Word8 0 @?= 1)
@@ -230,8 +230,8 @@ testDahditByteSize =
     , testCase "TagFoo (two)" (byteSize (TagFooTwo 7) @?= 3)
     ]
 
-testDahditStaticByteSize :: TestTree
-testDahditStaticByteSize =
+testStaticByteSize :: TestTree
+testStaticByteSize =
   testGroup
     "staticByteSize"
     [ testCase "Word8" (staticByteSize @Word8 Proxy @?= 1)
@@ -275,8 +275,8 @@ testDahditStaticByteSize =
     , testCase "StaBytes" (staticByteSize @StaBytes Proxy @?= 2)
     ]
 
-testDahditGet :: CaseTarget z => String -> Proxy z -> TestTree
-testDahditGet n p =
+testGet :: CaseTarget z => String -> Proxy z -> TestTree
+testGet n p =
   testGroup
     ("get (" ++ n ++ ")")
     [ testCase "Word8 zero" (runGetCase p getWord8 Nothing [])
@@ -332,8 +332,8 @@ testDahditGet n p =
     , testCase "TagFoo (two)" (runGetCase p (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00])
     ]
 
-testDahditPut :: CaseTarget z => String -> Proxy z -> TestTree
-testDahditPut n p =
+testPut :: CaseTarget z => String -> Proxy z -> TestTree
+testPut n p =
   testGroup
     ("put (" ++ n ++ ")")
     [ testCase "Word8" (runPutCase p (putWord8 0x5D) [0x5D])
@@ -377,26 +377,43 @@ testDahditPut n p =
     , testCase "TagFoo (two)" (runPutCase p (put (TagFooTwo 7)) [0x01, 0x07, 0x00])
     ]
 
-testDahditLiftedPrimArray :: TestTree
-testDahditLiftedPrimArray = testCase "liftedPrimArray" $ do
+testLiftedPrimArray :: TestTree
+testLiftedPrimArray = testCase "liftedPrimArray" $ do
   let arr = LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]) :: LiftedPrimArray Word16LE
   liftedPrimArrayFromList [0xFD, 0x6E, 0xEC] @?= arr
   sizeofLiftedPrimArray arr @?= 6
   lengthLiftedPrimArray arr @?= 3
 
+testGetWithOffset :: CaseTarget z => String -> Proxy z -> TestTree
+testGetWithOffset n p = testCase ("get with offset (" ++ n ++ ")") $ do
+  let buf = [0x12, 0x34, 0x56, 0x78]
+      src = initSource buf `asProxyTypeOf` p
+      (ez1, c1) = getTargetOffset 0 getWord8 src
+  ez1 @?= Right 0x12
+  c1 @?= 1
+  let (ez2, c2) = getTargetOffset 1 getWord16LE src
+  ez2 @?= Right 0x5634
+  c2 @?= 3
+  let (ez3, c3) = getTargetOffset 3 getWord16LE src
+  ez3 @?= Left (GetErrorParseNeed "Word16LE" 1 2)
+  c3 @?= 3
+
 testDahdit :: TestTree
 testDahdit =
   testGroup
     "Dahdit"
-    [ testDahditByteSize
-    , testDahditStaticByteSize
-    , testDahditGet "ShortByteString" (Proxy :: Proxy ShortByteString)
-    , testDahditGet "ByteString" (Proxy :: Proxy ByteString)
-    , testDahditGet "Vector" (Proxy :: Proxy (Vector Word8))
-    , testDahditPut "ShortByteString" (Proxy :: Proxy ShortByteString)
-    , testDahditPut "ByteString" (Proxy :: Proxy ByteString)
-    , testDahditPut "Vector" (Proxy :: Proxy (Vector Word8))
-    , testDahditLiftedPrimArray
+    [ testByteSize
+    , testStaticByteSize
+    , testGet "ShortByteString" (Proxy :: Proxy ShortByteString)
+    , testGet "ByteString" (Proxy :: Proxy ByteString)
+    , testGet "Vector" (Proxy :: Proxy (Vector Word8))
+    , testPut "ShortByteString" (Proxy :: Proxy ShortByteString)
+    , testPut "ByteString" (Proxy :: Proxy ByteString)
+    , testPut "Vector" (Proxy :: Proxy (Vector Word8))
+    , testLiftedPrimArray
+    , testGetWithOffset "ShortByteString" (Proxy :: Proxy ShortByteString)
+    , testGetWithOffset "ByteString" (Proxy :: Proxy ByteString)
+    , testGetWithOffset "Vector" (Proxy :: Proxy (Vector Word8))
     ]
 
 main :: IO ()
