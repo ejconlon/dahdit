@@ -117,14 +117,6 @@ instance PrimMonad m => WriteMem IxPtr m where
 writeSBSMem :: WriteMem q m => ShortByteString -> ByteCount -> q (PrimState m) -> ByteCount -> m ()
 writeSBSMem (SBS harr) = copyArrayMemInBytes (ByteArray harr) 0
 
--- TODO resurrect
--- guardedFreeze :: (q (PrimState m) -> ByteCount -> m z) -> q (PrimState m) -> ByteCount -> ByteCount -> m z
--- guardedFreeze freeze arr len off =
---   -- This is a sanity check - if it goes wrong then there's a bug in the library
---   if off /= len
---     then error ("Invalid put length: (given " ++ show len ++ ", used " ++ show off ++ ")")
---     else freeze arr len
-
 freezeBAMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m ByteArray
 freezeBAMem marr (ByteCount startOff) (ByteCount endOff) =
   if startOff == 0 && endOff == sizeofMutableByteArray marr
