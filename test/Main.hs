@@ -160,8 +160,11 @@ type StaBytes = StaticBytes 2
 mkStaBytes :: String -> StaBytes
 mkStaBytes = StaticBytes . BSS.toShort . BSC.pack
 
-runGetCase :: (Show a, Eq a, CaseTarget z) => Proxy z -> Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> IO ()
-runGetCase p getter mayRes buf = do
+data GetCase where
+  GetCase :: (Show a, Eq a) => String -> Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> GetCase
+
+runGetCase :: CaseTarget z => Proxy z -> GetCase -> TestTree
+runGetCase p (GetCase name getter mayRes buf) = testCase name $ do
   let src = initSource buf `asProxyTypeOf` p
       totLen = coerce (length buf)
       (result, actOff) = getTarget getter src
@@ -174,8 +177,11 @@ runGetCase p getter mayRes buf = do
       actOff @?= expecOff
       totLen - actOff @?= expecLeft
 
-runPutCase :: CaseTarget z => Proxy z -> Put -> [Word8] -> IO ()
-runPutCase p putter expecList = do
+data PutCase where
+  PutCase :: String -> Put -> [Word8] -> PutCase
+
+runPutCase :: CaseTarget z => Proxy z -> PutCase -> TestTree
+runPutCase p (PutCase name putter expecList) = testCase name $ do
   let expecBc = coerce (length expecList)
       expecBs = expecList
       estBc = runCount putter
@@ -281,107 +287,109 @@ testStaticByteSize =
     , testCase "StaBytes" (staticByteSize @StaBytes Proxy @?= 2)
     ]
 
+getCases :: [GetCase]
+getCases =
+  [ GetCase "Word8 zero" getWord8 Nothing []
+  , GetCase "Word8 one" getWord8 (Just (1, 0, 0x5D)) [0x5D]
+  , GetCase "Word8 two" getWord8 (Just (1, 1, 0x5D)) [0x5D, 0xBB]
+  , GetCase "Int8" getInt8 (Just (1, 0, 0x5D)) [0x5D]
+  , GetCase "Word16LE zero" getWord16LE Nothing []
+  , GetCase "Word16LE one" getWord16LE Nothing [0x5D]
+  , GetCase "Word16LE two" getWord16LE (Just (2, 0, 0x5DEC)) [0xEC, 0x5D]
+  , GetCase "Word16LE three" getWord16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
+  , GetCase "Int16LE" getInt16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
+  , GetCase "Word16BE" getWord16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB]
+  , GetCase "Int16BE" getInt16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB]
+  , GetCase "Word24LE" getWord24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "Int24LE" getInt24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "Word24BE" getWord24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
+  , GetCase "Int24BE" getInt24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
+  , GetCase "Word32LE" getWord32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "Int32LE" getInt32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "Word32BE" getWord32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD]
+  , GetCase "Int32BE" getInt32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD]
+  , GetCase "Word64LE" getWord64LE (Just (8, 0, 0x5DEC6EFD12345678)) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "Word64BE" getWord64BE (Just (8, 0, 0x5DEC6EFD12345678)) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , GetCase "Int64LE" getInt64LE (Just (8, 0, 0x5DEC6EFD12345678)) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "Int64BE" getInt64BE (Just (8, 0, 0x5DEC6EFD12345678)) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , GetCase "FloatLE" getFloatLE (Just (4, 0, FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "FloatBE" getFloatBE (Just (4, 0, FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD]
+  , GetCase "DoubleLE" getDoubleLE (Just (8, 0, DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "DoubleBE" getDoubleBE (Just (8, 0, DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , GetCase "ShortByteString" (getByteString 2) (Just (2, 1, BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D, 0xBB]
+  , GetCase "Two Word8" ((,) <$> getWord8 <*> getWord8) (Just (2, 0, (0x5D, 0xBB))) [0x5D, 0xBB]
+  , GetCase "Two Word16LE" ((,) <$> getWord16LE <*> getWord16LE) (Just (4, 0, (0x5DEC, 0x4020))) [0xEC, 0x5D, 0x20, 0x40]
+  , GetCase "Seq" (getSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , GetCase "StaticSeq" (getStaticSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , GetCase "StaticArray" (getStaticArray @Word16LE 2) (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , GetCase "DynFoo" (get @DynFoo) (Just (3, 0, DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
+  , GetCase "StaFoo" (get @StaFoo) (Just (3, 0, StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
+  , GetCase "getRemainingSize" getRemainingSize (Just (0, 3, 3)) [0xBB, 0xEC, 0x5D]
+  , GetCase "getSkip" (getSkip 2) (Just (2, 1, ())) [0xBB, 0xEC, 0x5D]
+  , GetCase "getLookAhead" (getLookAhead getWord16LE) (Just (0, 3, 0x5DEC)) [0xEC, 0x5D, 0xBB]
+  , GetCase "getExact eq" (getExact 2 getWord16LE) (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
+  , GetCase "getExact lt" (getExact 1 getWord16LE) Nothing [0xEC, 0x5D, 0xBB]
+  , GetCase "getExact gt" (getExact 3 getWord16LE) Nothing [0xEC, 0x5D, 0xBB]
+  , GetCase "getWithin eq" (getWithin 2 getWord16LE) (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
+  , GetCase "getWithin lt" (getWithin 1 getWord16LE) Nothing [0xEC, 0x5D, 0xBB]
+  , GetCase "getWithin gt" (getWithin 3 getWord16LE) (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
+  , GetCase "BoolByte True" (get @BoolByte) (Just (1, 0, BoolByte True)) [0x01]
+  , GetCase "BoolByte False" (get @BoolByte) (Just (1, 0, BoolByte False)) [0x00]
+  , GetCase "getByteArray" (getByteArray 3) (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase "getLiftedPrimArray" (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D]
+  , GetCase "StaBytes" (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21]
+  , GetCase "TagFoo (one)" (get @TagFoo) (Just (2, 0, TagFooOne 7)) [0x00, 0x07]
+  , GetCase "TagFoo (two)" (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00]
+  ]
+
 testGet :: CaseTarget z => String -> Proxy z -> TestTree
-testGet n p =
-  testGroup
-    ("get (" ++ n ++ ")")
-    [ testCase "Word8 zero" (runGetCase p getWord8 Nothing [])
-    , testCase "Word8 one" (runGetCase p getWord8 (Just (1, 0, 0x5D)) [0x5D])
-    , testCase "Word8 two" (runGetCase p getWord8 (Just (1, 1, 0x5D)) [0x5D, 0xBB])
-    , testCase "Int8" (runGetCase p getInt8 (Just (1, 0, 0x5D)) [0x5D])
-    , testCase "Word16LE zero" (runGetCase p getWord16LE Nothing [])
-    , testCase "Word16LE one" (runGetCase p getWord16LE Nothing [0x5D])
-    , testCase "Word16LE two" (runGetCase p getWord16LE (Just (2, 0, 0x5DEC)) [0xEC, 0x5D])
-    , testCase "Word16LE three" (runGetCase p getWord16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB])
-    , testCase "Int16LE" (runGetCase p getInt16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB])
-    , testCase "Word16BE" (runGetCase p getWord16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB])
-    , testCase "Int16BE" (runGetCase p getInt16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB])
-    , testCase "Word24LE" (runGetCase p getWord24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Int24LE" (runGetCase p getInt24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Word24BE" (runGetCase p getWord24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D])
-    , testCase "Int24BE" (runGetCase p getInt24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D])
-    , testCase "Word32LE" (runGetCase p getWord32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Int32LE" (runGetCase p getInt32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Word32BE" (runGetCase p getWord32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD])
-    , testCase "Int32BE" (runGetCase p getInt32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD])
-    , testCase "Word64LE" (runGetCase p getWord64LE (Just (8, 0, 0x5DEC6EFD12345678)) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Word64BE" (runGetCase p getWord64BE (Just (8, 0, 0x5DEC6EFD12345678)) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78])
-    , testCase "Int64LE" (runGetCase p getInt64LE (Just (8, 0, 0x5DEC6EFD12345678)) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Int64BE" (runGetCase p getInt64BE (Just (8, 0, 0x5DEC6EFD12345678)) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78])
-    , testCase "FloatLE" (runGetCase p getFloatLE (Just (4, 0, FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "FloatBE" (runGetCase p getFloatBE (Just (4, 0, FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD])
-    , testCase "DoubleLE" (runGetCase p getDoubleLE (Just (8, 0, DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "DoubleBE" (runGetCase p getDoubleBE (Just (8, 0, DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78])
-    , testCase "ShortByteString" (runGetCase p (getByteString 2) (Just (2, 1, BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D, 0xBB])
-    , testCase "Two Word8" (runGetCase p ((,) <$> getWord8 <*> getWord8) (Just (2, 0, (0x5D, 0xBB))) [0x5D, 0xBB])
-    , testCase "Two Word16LE" (runGetCase p ((,) <$> getWord16LE <*> getWord16LE) (Just (4, 0, (0x5DEC, 0x4020))) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "Seq" (runGetCase p (getSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "StaticSeq" (runGetCase p (getStaticSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "StaticArray" (runGetCase p (getStaticArray @Word16LE 2) (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "DynFoo" (runGetCase p (get @DynFoo) (Just (3, 0, DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
-    , testCase "StaFoo" (runGetCase p (get @StaFoo) (Just (3, 0, StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
-    , testCase "getRemainingSize" (runGetCase p getRemainingSize (Just (0, 3, 3)) [0xBB, 0xEC, 0x5D])
-    , testCase "getSkip" (runGetCase p (getSkip 2) (Just (2, 1, ())) [0xBB, 0xEC, 0x5D])
-    , testCase "getLookAhead" (runGetCase p (getLookAhead getWord16LE) (Just (0, 3, 0x5DEC)) [0xEC, 0x5D, 0xBB])
-    , testCase "getExact eq" (runGetCase p (getExact 2 getWord16LE) (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB])
-    , testCase "getExact lt" (runGetCase p (getExact 1 getWord16LE) Nothing [0xEC, 0x5D, 0xBB])
-    , testCase "getExact gt" (runGetCase p (getExact 3 getWord16LE) Nothing [0xEC, 0x5D, 0xBB])
-    , testCase "getWithin eq" (runGetCase p (getWithin 2 getWord16LE) (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB])
-    , testCase "getWithin lt" (runGetCase p (getWithin 1 getWord16LE) Nothing [0xEC, 0x5D, 0xBB])
-    , testCase "getWithin gt" (runGetCase p (getWithin 3 getWord16LE) (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB])
-    , testCase "BoolByte True" (runGetCase p (get @BoolByte) (Just (1, 0, BoolByte True)) [0x01])
-    , testCase "BoolByte False" (runGetCase p (get @BoolByte) (Just (1, 0, BoolByte False)) [0x00])
-    , testCase "getByteArray" (runGetCase p (getByteArray 3) (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "getLiftedPrimArray" (runGetCase p (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D])
-    , testCase "StaBytes" (runGetCase p (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21])
-    , testCase "TagFoo (one)" (runGetCase p (get @TagFoo) (Just (2, 0, TagFooOne 7)) [0x00, 0x07])
-    , testCase "TagFoo (two)" (runGetCase p (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00])
-    ]
+testGet n p = testGroup ("get (" ++ n ++ ")") (fmap (runGetCase p) getCases)
+
+putCases :: [PutCase]
+putCases =
+  [ PutCase "Word8" (putWord8 0x5D) [0x5D]
+  , PutCase "Int8" (putInt8 0x5D) [0x5D]
+  , PutCase "Word16LE" (putWord16LE 0x5DEC) [0xEC, 0x5D]
+  , PutCase "Int16LE" (putInt16LE 0x5DEC) [0xEC, 0x5D]
+  , PutCase "Word16BE" (putWord16BE 0x5DEC) [0x5D, 0xEC]
+  , PutCase "Int16BE" (putInt16BE 0x5DEC) [0x5D, 0xEC]
+  , PutCase "Word24LE" (putWord24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
+  , PutCase "Int24LE" (putInt24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
+  , PutCase "Word24BE" (putWord24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
+  , PutCase "Int24BE" (putInt24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
+  , PutCase "Word32LE" (putWord32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D]
+  , PutCase "Int32LE" (putInt32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D]
+  , PutCase "Word32BE" (putWord32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD]
+  , PutCase "Int32BE" (putInt32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD]
+  , PutCase "Word64LE" (putWord64LE 0x5DEC6EFD12345678) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , PutCase "Int64LE" (putInt64LE 0x5DEC6EFD12345678) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , PutCase "Word64BE" (putWord64BE 0x5DEC6EFD12345678) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , PutCase "Int64BE" (putInt64BE 0x5DEC6EFD12345678) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , PutCase "FloatLE" (putFloatLE (FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D]
+  , PutCase "FloatBE" (putFloatBE (FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD]
+  , PutCase "DoubleLE" (putDoubleLE (DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , PutCase "DoubleBE" (putDoubleBE (DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , PutCase "ShortByteString" (putByteString (BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D]
+  , PutCase "Two Word8" (putWord8 0x5D *> putWord8 0xBB) [0x5D, 0xBB]
+  , PutCase "Two Word16LE" (putWord16LE 0x5DEC *> putWord16LE 0x4020) [0xEC, 0x5D, 0x20, 0x40]
+  , PutCase "Seq" (putSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , PutCase "StaticSeq" (putStaticSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , PutCase "StaticArray" (putStaticArray @Word16LE (liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , PutCase "DynFoo" (put (DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
+  , PutCase "StaFoo" (put (StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
+  , PutCase "BoolByte True" (put (BoolByte True)) [0x01]
+  , PutCase "BoolByte False" (put (BoolByte False)) [0x00]
+  , PutCase "putByteArray" (putByteArray (byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC]
+  , PutCase "putLiftedPrimArray" (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]
+  , PutCase "StaBytes" (put (mkStaBytes "hi")) [0x68, 0x69]
+  , PutCase "StaBytes (less)" (put (mkStaBytes "h")) [0x68, 0x00]
+  , PutCase "StaBytes (more)" (put (mkStaBytes "hi!")) [0x68, 0x69]
+  , PutCase "TagFoo (one)" (put (TagFooOne 7)) [0x00, 0x07]
+  , PutCase "TagFoo (two)" (put (TagFooTwo 7)) [0x01, 0x07, 0x00]
+  ]
 
 testPut :: CaseTarget z => String -> Proxy z -> TestTree
-testPut n p =
-  testGroup
-    ("put (" ++ n ++ ")")
-    [ testCase "Word8" (runPutCase p (putWord8 0x5D) [0x5D])
-    , testCase "Int8" (runPutCase p (putInt8 0x5D) [0x5D])
-    , testCase "Word16LE" (runPutCase p (putWord16LE 0x5DEC) [0xEC, 0x5D])
-    , testCase "Int16LE" (runPutCase p (putInt16LE 0x5DEC) [0xEC, 0x5D])
-    , testCase "Word16BE" (runPutCase p (putWord16BE 0x5DEC) [0x5D, 0xEC])
-    , testCase "Int16BE" (runPutCase p (putInt16BE 0x5DEC) [0x5D, 0xEC])
-    , testCase "Word24LE" (runPutCase p (putWord24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC])
-    , testCase "Int24LE" (runPutCase p (putInt24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC])
-    , testCase "Word24BE" (runPutCase p (putWord24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD])
-    , testCase "Int24BE" (runPutCase p (putInt24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD])
-    , testCase "Word32LE" (runPutCase p (putWord32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Int32LE" (runPutCase p (putInt32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Word32BE" (runPutCase p (putWord32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD])
-    , testCase "Int32BE" (runPutCase p (putInt32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD])
-    , testCase "Word64LE" (runPutCase p (putWord64LE 0x5DEC6EFD12345678) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Int64LE" (runPutCase p (putInt64LE 0x5DEC6EFD12345678) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "Word64BE" (runPutCase p (putWord64BE 0x5DEC6EFD12345678) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78])
-    , testCase "Int64BE" (runPutCase p (putInt64BE 0x5DEC6EFD12345678) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78])
-    , testCase "FloatLE" (runPutCase p (putFloatLE (FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "FloatBE" (runPutCase p (putFloatBE (FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD])
-    , testCase "DoubleLE" (runPutCase p (putDoubleLE (DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D])
-    , testCase "DoubleBE" (runPutCase p (putDoubleBE (DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78])
-    , testCase "ShortByteString" (runPutCase p (putByteString (BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D])
-    , testCase "Two Word8" (runPutCase p (putWord8 0x5D *> putWord8 0xBB) [0x5D, 0xBB])
-    , testCase "Two Word16LE" (runPutCase p (putWord16LE 0x5DEC *> putWord16LE 0x4020) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "Seq" (runPutCase p (putSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "StaticSeq" (runPutCase p (putStaticSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "StaticArray" (runPutCase p (putStaticArray @Word16LE (liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40])
-    , testCase "DynFoo" (runPutCase p (put (DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
-    , testCase "StaFoo" (runPutCase p (put (StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D])
-    , testCase "BoolByte True" (runPutCase p (put (BoolByte True)) [0x01])
-    , testCase "BoolByte False" (runPutCase p (put (BoolByte False)) [0x00])
-    , testCase "putByteArray" (runPutCase p (putByteArray (byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC])
-    , testCase "putLiftedPrimArray" (runPutCase p (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00])
-    , testCase "StaBytes" (runPutCase p (put (mkStaBytes "hi")) [0x68, 0x69])
-    , testCase "StaBytes (less)" (runPutCase p (put (mkStaBytes "h")) [0x68, 0x00])
-    , testCase "StaBytes (more)" (runPutCase p (put (mkStaBytes "hi!")) [0x68, 0x69])
-    , testCase "TagFoo (one)" (runPutCase p (put (TagFooOne 7)) [0x00, 0x07])
-    , testCase "TagFoo (two)" (runPutCase p (put (TagFooTwo 7)) [0x01, 0x07, 0x00])
-    ]
+testPut n p = testGroup ("put (" ++ n ++ ")") (fmap (runPutCase p) putCases)
 
 testLiftedPrimArray :: TestTree
 testLiftedPrimArray = testCase "liftedPrimArray" $ do
