@@ -76,6 +76,7 @@ import Dahdit
   , getWord8
   , lengthLiftedPrimArray
   , liftedPrimArrayFromList
+  , mutPutTarget
   , mutPutTargetOffset
   , putByteArray
   , putByteString
@@ -143,6 +144,18 @@ instance CaseTarget (Vector Word8) where
   initSource = VS.fromList
   consumeSink = VS.toList
 
+class MutBinaryTarget IO u => MutCaseTarget u where
+  newSink :: ByteCount -> IO u
+  freezeSink :: u -> IO [Word8]
+
+instance (s ~ PrimState IO) => MutCaseTarget (MutableByteArray s) where
+  newSink = newByteArray . unByteCount
+  freezeSink u = fmap (\(ByteArray arr) -> BSS.unpack (SBS arr)) (freezeByteArray u 0 (sizeofMutableByteArray u))
+
+instance (s ~ PrimState IO) => MutCaseTarget (MVector s Word8) where
+  newSink = VSM.new . unByteCount
+  freezeSink = fmap consumeSink . VS.freeze
+
 data DynFoo = DynFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
   deriving (ByteSized, Binary) via (ViaGeneric DynFoo)
@@ -181,14 +194,24 @@ data PutCase where
   PutCase :: String -> Put -> [Word8] -> PutCase
 
 runPutCase :: CaseTarget z => Proxy z -> PutCase -> TestTree
-runPutCase p (PutCase name putter expecList) = testCase name $ do
-  let expecBc = coerce (length expecList)
-      expecBs = expecList
+runPutCase p (PutCase name putter expecBs) = testCase name $ do
+  let expecBc = coerce (length expecBs)
       estBc = runCount putter
   estBc @?= expecBc
-  let actSink = putTargetUnsafe putter estBc `asProxyTypeOf` p
+  let actSink = putTargetUnsafe putter expecBc `asProxyTypeOf` p
       actBs = consumeSink actSink
       actBc = coerce (length actBs)
+  actBs @?= expecBs
+  actBc @?= expecBc
+
+mutRunPutCase :: MutCaseTarget z => Proxy z -> PutCase -> TestTree
+mutRunPutCase p (PutCase name putter expecBs) = testCase name $ do
+  let expecBc = coerce (length expecBs)
+  actSink <- fmap (`asProxyTypeOf` p) (newSink expecBc)
+  endOff <- mutPutTarget putter actSink
+  endOff @?= expecBc
+  actBs <- freezeSink actSink
+  let actBc = coerce (length actBs)
   actBs @?= expecBs
   actBc @?= expecBc
 
@@ -412,17 +435,8 @@ testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
   ez3 @?= Left (GetErrorParseNeed "Word16LE" 1 2)
   c3 @?= 3
 
-class MutBinaryTarget IO u => MutCaseTarget u where
-  newSink :: ByteCount -> IO u
-  freezeSink :: u -> IO [Word8]
-
-instance (s ~ PrimState IO) => MutCaseTarget (MutableByteArray s) where
-  newSink = newByteArray . unByteCount
-  freezeSink u = fmap (\(ByteArray arr) -> BSS.unpack (SBS arr)) (freezeByteArray u 0 (sizeofMutableByteArray u))
-
-instance (s ~ PrimState IO) => MutCaseTarget (MVector s Word8) where
-  newSink = VSM.new . unByteCount
-  freezeSink = fmap consumeSink . VS.freeze
+testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
+testMutPut n p = testGroup ("mut put (" ++ n ++ ")") (fmap (mutRunPutCase p) putCases)
 
 testMutPutOffset :: MutCaseTarget u => String -> Proxy u -> TestTree
 testMutPutOffset n p = testCase ("mut put offset (" ++ n ++ ")") $ do
@@ -467,7 +481,8 @@ testDahdit = testGroup "Dahdit" trees
       ]
   mutTargetTrees =
     mutTargets >>= \(MutTargetDef name prox) ->
-      [ testMutPutOffset name prox
+      [ testMutPut name prox
+      , testMutPutOffset name prox
       ]
 
 main :: IO ()
