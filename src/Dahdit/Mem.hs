@@ -7,16 +7,21 @@ module Dahdit.Mem
   , viewVecMem
   , WriteMem (..)
   , writeSBSMem
-  , allocArrayMem
+  , allocBAMem
   , allocPtrMem
+  , freezeBAMem
   , freezeSBSMem
   , freezeBSMem
   , freezeVecMem
+  , mutAllocBAMem
+  , mutFreezeBAMem
+  , mutAllocVecMem
+  , mutFreezeVecMem
   )
 where
 
-import Control.Monad.ST (ST, runST)
-import Control.Monad.ST.Unsafe (unsafeIOToST)
+import Control.Monad.Primitive (PrimMonad (..), unsafeIOToPrim)
+import Control.Monad.ST (runST)
 import Dahdit.LiftedPrim (LiftedPrim (..), setByteArrayLifted)
 import Dahdit.Proxy (proxyFor)
 import Dahdit.Sizes (ByteCount (..), staticByteSize)
@@ -26,10 +31,11 @@ import Data.ByteString.Short.Internal (ShortByteString (..))
 import qualified Data.ByteString.Unsafe as BSU
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, unsafeFreezeByteArray)
+import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, sizeofMutableByteArray, unsafeFreezeByteArray)
 import Data.Primitive.Ptr (copyPtrToMutableByteArray)
-import Data.Vector.Storable (Vector)
+import Data.Vector.Storable (MVector, Vector)
 import qualified Data.Vector.Storable as VS
+import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word8)
 import Foreign.ForeignPtr (newForeignPtr)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
@@ -76,58 +82,89 @@ viewVecMem vec =
   let (fp, _) = VS.unsafeToForeignPtr0 vec
   in  unsafeForeignPtrToPtr fp
 
-class WriteMem q where
-  writeMemInBytes :: LiftedPrim a => a -> q s -> ByteCount -> ST s ()
-  copyArrayMemInBytes :: ByteArray -> ByteCount -> ByteCount -> q s -> ByteCount -> ST s ()
-  setMemInBytes :: LiftedPrim a => ByteCount -> a -> q s -> ByteCount -> ST s ()
-  releaseMem :: q s -> Maybe (IO ())
+mutViewVecMem :: MVector s Word8 -> Ptr Word8
+mutViewVecMem mvec =
+  let (fp, _) = VSM.unsafeToForeignPtr0 mvec
+  in  unsafeForeignPtrToPtr fp
 
-instance WriteMem MutableByteArray where
+class PrimMonad m => WriteMem q m where
+  writeMemInBytes :: LiftedPrim a => a -> q (PrimState m) -> ByteCount -> m ()
+  copyArrayMemInBytes :: ByteArray -> ByteCount -> ByteCount -> q (PrimState m) -> ByteCount -> m ()
+  setMemInBytes :: LiftedPrim a => ByteCount -> a -> q (PrimState m) -> ByteCount -> m ()
+
+instance PrimMonad m => WriteMem MutableByteArray m where
   writeMemInBytes val mem off = writeArrayLiftedInBytes mem off val
   copyArrayMemInBytes arr arrOff arrLen mem off = copyByteArray mem (coerce off) arr (coerce arrOff) (coerce arrLen)
   setMemInBytes len val mem off = setByteArrayLifted mem off len val
-  releaseMem = const Nothing
 
-copyPtr :: ByteArray -> ByteCount -> ByteCount -> Ptr Word8 -> ByteCount -> ST s ()
+copyPtr :: PrimMonad m => ByteArray -> ByteCount -> ByteCount -> Ptr Word8 -> ByteCount -> m ()
 copyPtr arr arrOff arrLen ptr off =
   let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
   in  copyByteArrayToPtr wptr arr (coerce arrOff) (coerce arrLen)
 
-setPtr :: LiftedPrim a => ByteCount -> a -> Ptr Word8 -> ByteCount -> ST s ()
+setPtr :: (PrimMonad m, LiftedPrim a) => ByteCount -> a -> Ptr Word8 -> ByteCount -> m ()
 setPtr len val ptr off = do
   let elemSize = staticByteSize (proxyFor val)
       elemLen = div (coerce len) elemSize
   for_ [0 .. elemLen - 1] $ \pos ->
     writePtrLiftedInBytes ptr (off + pos * elemSize) val
 
-instance WriteMem IxPtr where
+instance PrimMonad m => WriteMem IxPtr m where
   writeMemInBytes val mem off = writePtrLiftedInBytes (unIxPtr mem) off val
   copyArrayMemInBytes arr arrOff arrLen = copyPtr arr arrOff arrLen . unIxPtr
   setMemInBytes len val = setPtr len val . unIxPtr
-  releaseMem = Just . free . unIxPtr
 
-writeSBSMem :: WriteMem q => ShortByteString -> ByteCount -> q s -> ByteCount -> ST s ()
+writeSBSMem :: WriteMem q m => ShortByteString -> ByteCount -> q (PrimState m) -> ByteCount -> m ()
 writeSBSMem (SBS harr) = copyArrayMemInBytes (ByteArray harr) 0
 
-guardedFreeze :: (q s -> ByteCount -> ST s z) -> q s -> ByteCount -> ByteCount -> ST s z
-guardedFreeze freeze arr len off =
-  -- This is a sanity check - if it goes wrong then there's a bug in the library
-  if off /= len
-    then error ("Invalid put length: (given " ++ show len ++ ", used " ++ show off ++ ")")
-    else freeze arr len
+-- TODO resurrect
+-- guardedFreeze :: (q (PrimState m) -> ByteCount -> m z) -> q (PrimState m) -> ByteCount -> ByteCount -> m z
+-- guardedFreeze freeze arr len off =
+--   -- This is a sanity check - if it goes wrong then there's a bug in the library
+--   if off /= len
+--     then error ("Invalid put length: (given " ++ show len ++ ", used " ++ show off ++ ")")
+--     else freeze arr len
 
-freezeSBSMem :: MutableByteArray s -> ByteCount -> ByteCount -> ST s ShortByteString
-freezeSBSMem marr cap len = fmap (\(ByteArray harr) -> SBS harr) (if cap == len then unsafeFreezeByteArray marr else freezeByteArray marr 0 (coerce len))
+freezeBAMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m ByteArray
+freezeBAMem marr (ByteCount startOff) (ByteCount endOff) =
+  if startOff == 0 && endOff == sizeofMutableByteArray marr
+    then unsafeFreezeByteArray marr
+    else freezeByteArray marr startOff (endOff - startOff)
 
-freezeBSMem :: IxPtr s -> ByteCount -> ByteCount -> ST s ByteString
-freezeBSMem (IxPtr ptr) _ len =
-  unsafeIOToST (BSU.unsafePackCStringFinalizer ptr (coerce len) (free ptr))
+freezeSBSMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m ShortByteString
+freezeSBSMem marr startOff endOff = fmap (\(ByteArray harr) -> SBS harr) (freezeBAMem marr startOff endOff)
 
-freezeVecMem :: IxPtr s -> ByteCount -> ByteCount -> ST s (Vector Word8)
-freezeVecMem (IxPtr ptr) _ len = unsafeIOToST (fmap (\fp -> VS.unsafeFromForeignPtr0 fp (coerce len)) (newForeignPtr finalizerFree ptr))
+freezeBSMem :: PrimMonad m => IxPtr (PrimState m) -> ByteCount -> ByteCount -> m ByteString
+freezeBSMem (IxPtr ptr) startOff endOff =
+  unsafeIOToPrim $
+    BSU.unsafePackCStringFinalizer
+      (plusPtr ptr (unByteCount startOff))
+      (unByteCount (endOff - startOff))
+      (free ptr)
 
-allocPtrMem :: ByteCount -> ST s (IxPtr s)
-allocPtrMem = fmap IxPtr . unsafeIOToST . callocBytes . coerce
+freezeVecMem :: PrimMonad m => IxPtr (PrimState m) -> ByteCount -> ByteCount -> m (Vector Word8)
+freezeVecMem (IxPtr ptr) _ len = unsafeIOToPrim (fmap (\fp -> VS.unsafeFromForeignPtr0 fp (coerce len)) (newForeignPtr finalizerFree ptr))
 
-allocArrayMem :: ByteCount -> ST s (MutableByteArray s)
-allocArrayMem = newByteArray . coerce
+allocPtrMem :: PrimMonad m => ByteCount -> ByteCount -> m (IxPtr (PrimState m), Maybe (IO ()))
+allocPtrMem off len = do
+  let cap = off + len
+  ptr <- unsafeIOToPrim (callocBytes (unByteCount cap))
+  pure (IxPtr ptr, Just (free ptr))
+
+allocBAMem :: PrimMonad m => ByteCount -> ByteCount -> m (MutableByteArray (PrimState m), Maybe (IO ()))
+allocBAMem off len = do
+  let cap = off + len
+  arr <- newByteArray (unByteCount cap)
+  pure (arr, Nothing)
+
+mutAllocBAMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m (MutableByteArray (PrimState m), Maybe (IO ()))
+mutAllocBAMem u _ _ = pure (u, Nothing)
+
+mutFreezeBAMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m ByteCount
+mutFreezeBAMem _ _ = pure
+
+mutAllocVecMem :: PrimMonad m => MVector (PrimState m) Word8 -> ByteCount -> ByteCount -> m (IxPtr (PrimState m), Maybe (IO ()))
+mutAllocVecMem u _ _ = pure (IxPtr (mutViewVecMem u), Nothing)
+
+mutFreezeVecMem :: PrimMonad m => IxPtr (PrimState m) -> ByteCount -> ByteCount -> m ByteCount
+mutFreezeVecMem _ _ = pure

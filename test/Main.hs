@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Control.Monad.Primitive (PrimState)
 import Dahdit
   ( Binary (..)
   , BinaryTarget (..)
@@ -23,6 +24,7 @@ import Dahdit
   , Int64BE
   , Int64LE
   , LiftedPrimArray (..)
+  , MutBinaryTarget (..)
   , Proxy (..)
   , Put
   , ShortByteString
@@ -74,6 +76,7 @@ import Dahdit
   , getWord8
   , lengthLiftedPrimArray
   , liftedPrimArrayFromList
+  , mutPutTargetOffset
   , putByteArray
   , putByteString
   , putDoubleBE
@@ -107,15 +110,18 @@ import Dahdit
   )
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
+import Data.ByteString.Short (ShortByteString (..))
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
 import Data.Int (Int16, Int32, Int64, Int8)
-import Data.Primitive.ByteArray (byteArrayFromList)
+import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, byteArrayFromList, freezeByteArray, newByteArray, sizeofMutableByteArray)
 import Data.Proxy (asProxyTypeOf)
 import qualified Data.Sequence as Seq
 import Data.ShortWord (Int24, Word24)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
+import Data.Vector.Storable.Mutable (MVector)
+import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
 import Test.Tasty (TestTree, defaultMain, testGroup)
@@ -384,8 +390,8 @@ testLiftedPrimArray = testCase "liftedPrimArray" $ do
   sizeofLiftedPrimArray arr @?= 6
   lengthLiftedPrimArray arr @?= 3
 
-testGetWithOffset :: CaseTarget z => String -> Proxy z -> TestTree
-testGetWithOffset n p = testCase ("get with offset (" ++ n ++ ")") $ do
+testGetOffset :: CaseTarget z => String -> Proxy z -> TestTree
+testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
   let buf = [0x12, 0x34, 0x56, 0x78]
       src = initSource buf `asProxyTypeOf` p
       (ez1, c1) = getTargetOffset 0 getWord8 src
@@ -398,23 +404,63 @@ testGetWithOffset n p = testCase ("get with offset (" ++ n ++ ")") $ do
   ez3 @?= Left (GetErrorParseNeed "Word16LE" 1 2)
   c3 @?= 3
 
+class MutBinaryTarget IO u => MutCaseTarget u where
+  newSink :: ByteCount -> IO u
+  freezeSink :: u -> IO [Word8]
+
+instance (s ~ PrimState IO) => MutCaseTarget (MutableByteArray s) where
+  newSink = newByteArray . unByteCount
+  freezeSink u = fmap (\(ByteArray arr) -> BSS.unpack (SBS arr)) (freezeByteArray u 0 (sizeofMutableByteArray u))
+
+instance (s ~ PrimState IO) => MutCaseTarget (MVector s Word8) where
+  newSink = VSM.new . unByteCount
+  freezeSink = fmap consumeSink . VS.freeze
+
+testMutPutOffset :: MutCaseTarget u => String -> Proxy u -> TestTree
+testMutPutOffset n p = testCase ("mut put offset (" ++ n ++ ")") $ do
+  u <- newSink 4
+  c1 <- mutPutTargetOffset 0 (putWord8 0x12) u
+  c1 @?= 1
+  c2 <- mutPutTargetOffset 1 (putWord16LE 0x5634) u
+  c2 @?= 3
+  x <- freezeSink (u `asProxyTypeOf` p)
+  x @?= [0x12, 0x34, 0x56, 0]
+  pure ()
+
+data TargetDef where
+  TargetDef :: CaseTarget z => String -> Proxy z -> TargetDef
+
+targets :: [TargetDef]
+targets =
+  [ TargetDef "ShortByteString" (Proxy :: Proxy ShortByteString)
+  , TargetDef "ByteString" (Proxy :: Proxy ByteString)
+  , TargetDef "Vector" (Proxy :: Proxy (Vector Word8))
+  ]
+
+data MutTargetDef where
+  MutTargetDef :: MutCaseTarget u => String -> Proxy u -> MutTargetDef
+
+mutTargets :: [MutTargetDef]
+mutTargets =
+  [ MutTargetDef "MutableByteArray" (Proxy :: Proxy (MutableByteArray (PrimState IO)))
+  , MutTargetDef "MVector" (Proxy :: Proxy (MVector (PrimState IO) Word8))
+  ]
+
 testDahdit :: TestTree
-testDahdit =
-  testGroup
-    "Dahdit"
-    [ testByteSize
-    , testStaticByteSize
-    , testGet "ShortByteString" (Proxy :: Proxy ShortByteString)
-    , testGet "ByteString" (Proxy :: Proxy ByteString)
-    , testGet "Vector" (Proxy :: Proxy (Vector Word8))
-    , testPut "ShortByteString" (Proxy :: Proxy ShortByteString)
-    , testPut "ByteString" (Proxy :: Proxy ByteString)
-    , testPut "Vector" (Proxy :: Proxy (Vector Word8))
-    , testLiftedPrimArray
-    , testGetWithOffset "ShortByteString" (Proxy :: Proxy ShortByteString)
-    , testGetWithOffset "ByteString" (Proxy :: Proxy ByteString)
-    , testGetWithOffset "Vector" (Proxy :: Proxy (Vector Word8))
-    ]
+testDahdit = testGroup "Dahdit" trees
+ where
+  trees = baseTrees ++ targetTrees ++ mutTargetTrees
+  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray]
+  targetTrees =
+    targets >>= \(TargetDef name prox) ->
+      [ testGet name prox
+      , testPut name prox
+      , testGetOffset name prox
+      ]
+  mutTargetTrees =
+    mutTargets >>= \(MutTargetDef name prox) ->
+      [ testMutPutOffset name prox
+      ]
 
 main :: IO ()
 main = defaultMain testDahdit

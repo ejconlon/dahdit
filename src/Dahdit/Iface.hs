@@ -2,16 +2,22 @@ module Dahdit.Iface
   ( BinaryTarget (..)
   , getTarget
   , putTarget
+  , MutBinaryTarget (..)
+  , mutPutTargetOffset
+  , mutPutTarget
   , decode
   , decodeFile
   , encode
   , encodeFile
+  , mutEncode
   )
 where
 
+import Control.Monad.Primitive (PrimBase, PrimMonad (..))
+import Control.Monad.ST (runST)
 import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
-import Dahdit.Mem (allocArrayMem, allocPtrMem, freezeBSMem, freezeSBSMem, freezeVecMem, viewBSMem, viewSBSMem, viewVecMem)
+import Dahdit.Mem (allocBAMem, allocPtrMem, freezeBAMem, freezeBSMem, freezeSBSMem, freezeVecMem, mutAllocBAMem, mutAllocVecMem, mutFreezeBAMem, mutFreezeVecMem, viewBSMem, viewSBSMem, viewVecMem)
 import Dahdit.Run (GetError, runCount, runGetInternal, runPutInternal)
 import Dahdit.Sizes (ByteCount (..), ByteSized (..))
 import Data.ByteString (ByteString)
@@ -19,13 +25,15 @@ import qualified Data.ByteString as BS
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
+import Data.Primitive.ByteArray (ByteArray, MutableByteArray, sizeofByteArray)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
+import Data.Vector.Storable.Mutable (MVector)
 import Data.Word (Word8)
 
 -- | Abstracts over the sources we can read from / sinks we can render to.
 class BinaryTarget z where
-  -- | Put an action to the sink with the given capacity.
+  -- | Put an action to the sink with the given length.
   -- Prefer 'putTarget' to safely count capacity, or use 'encode' to use byte size.
   putTargetUnsafe :: Put -> ByteCount -> z
 
@@ -41,6 +49,15 @@ getTarget = getTargetOffset 0
 putTarget :: BinaryTarget z => Put -> z
 putTarget p = putTargetUnsafe p (runCount p)
 
+class MutBinaryTarget m z where
+  mutPutTargetOffsetUnsafe :: ByteCount -> Put -> ByteCount -> z -> m ByteCount
+
+mutPutTargetOffset :: MutBinaryTarget m z => ByteCount -> Put -> z -> m ByteCount
+mutPutTargetOffset off p = mutPutTargetOffsetUnsafe off p (runCount p)
+
+mutPutTarget :: MutBinaryTarget m z => Put -> z -> m ByteCount
+mutPutTarget = mutPutTargetOffset 0
+
 instance BinaryTarget ShortByteString where
   getTargetOffset = runGetSBS
   putTargetUnsafe = runPutSBS
@@ -49,9 +66,19 @@ instance BinaryTarget ByteString where
   getTargetOffset = runGetBS
   putTargetUnsafe = runPutBS
 
+instance BinaryTarget ByteArray where
+  getTargetOffset = runGetBA
+  putTargetUnsafe = runPutBA
+
 instance BinaryTarget (Vector Word8) where
   getTargetOffset = runGetVec
   putTargetUnsafe = runPutVec
+
+instance (PrimBase m, s ~ PrimState m) => MutBinaryTarget m (MutableByteArray s) where
+  mutPutTargetOffsetUnsafe = runMutPutBA
+
+instance (PrimBase m, s ~ PrimState m) => MutBinaryTarget m (MVector s Word8) where
+  mutPutTargetOffsetUnsafe = runMutPutVec
 
 -- | Decode a value from a source returning a result and consumed byte count.
 decode :: (Binary a, BinaryTarget z) => z -> (Either GetError a, ByteCount)
@@ -69,6 +96,13 @@ encode a = putTargetUnsafe (put a) (byteSize a)
 encodeFile :: (Binary a, ByteSized a) => a -> FilePath -> IO ()
 encodeFile a = runPutFile (put a) (byteSize a)
 
+-- | Encode a value to a mutable buffer, returning number of bytes filled.
+mutEncode :: (Binary a, ByteSized a, MutBinaryTarget m z) => a -> z -> m ByteCount
+mutEncode a = mutPutTargetOffsetUnsafe 0 (put a) (byteSize a)
+
+runGetBA :: ByteCount -> Get a -> ByteArray -> (Either GetError a, ByteCount)
+runGetBA off act ba = runGetInternal off act (coerce (sizeofByteArray ba)) ba
+
 runGetSBS :: ByteCount -> Get a -> ShortByteString -> (Either GetError a, ByteCount)
 runGetSBS off act sbs = runGetInternal off act (coerce (BSS.length sbs)) (viewSBSMem sbs)
 
@@ -83,16 +117,25 @@ runGetFile act fp = do
   bs <- BS.readFile fp
   pure (runGetBS 0 act bs)
 
+runPutBA :: Put -> ByteCount -> ByteArray
+runPutBA act len = runST (runPutInternal 0 act len allocBAMem freezeBAMem)
+
 runPutSBS :: Put -> ByteCount -> ShortByteString
-runPutSBS act cap = runPutInternal act cap allocArrayMem freezeSBSMem
+runPutSBS act len = runST (runPutInternal 0 act len allocBAMem freezeSBSMem)
 
 runPutBS :: Put -> ByteCount -> ByteString
-runPutBS act cap = runPutInternal act cap allocPtrMem freezeBSMem
+runPutBS act len = runST (runPutInternal 0 act len allocPtrMem freezeBSMem)
 
 runPutVec :: Put -> ByteCount -> Vector Word8
-runPutVec act cap = runPutInternal act cap allocPtrMem freezeVecMem
+runPutVec act len = runST (runPutInternal 0 act len allocPtrMem freezeVecMem)
 
 runPutFile :: Put -> ByteCount -> FilePath -> IO ()
 runPutFile act cap fp =
   let bs = runPutBS act cap
   in  BS.writeFile fp bs
+
+runMutPutBA :: PrimBase m => ByteCount -> Put -> ByteCount -> MutableByteArray (PrimState m) -> m ByteCount
+runMutPutBA off act len marr = runPutInternal off act len (mutAllocBAMem marr) mutFreezeBAMem
+
+runMutPutVec :: PrimBase m => ByteCount -> Put -> ByteCount -> MVector (PrimState m) Word8 -> m ByteCount
+runMutPutVec off act len mvec = runPutInternal off act len (mutAllocVecMem mvec) mutFreezeVecMem

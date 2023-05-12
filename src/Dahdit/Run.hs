@@ -1,3 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-}
+
 module Dahdit.Run
   ( GetError (..)
   , prettyGetError
@@ -12,9 +14,9 @@ import Control.Exception (Exception (..), onException)
 import Control.Monad (replicateM_, unless)
 import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.Free.Church (F (..))
+import Control.Monad.Primitive (PrimBase, PrimMonad (..), unsafeIOToPrim, unsafePrimToIO)
 import Control.Monad.Reader (MonadReader (..), ReaderT (..), asks)
 import Control.Monad.ST.Strict (ST, runST)
-import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeSTToIO)
 import Control.Monad.State.Strict (MonadState, State, runState)
 import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (lift)
@@ -65,6 +67,7 @@ import Data.Coerce (coerce)
 import Data.Foldable (for_, toList)
 import Data.Int (Int8)
 import Data.Maybe (fromJust)
+import Data.Primitive.MutVar (MutVar, newMutVar, readMutVar, writeMutVar)
 import Data.STRef.Strict (STRef, newSTRef, readSTRef, writeSTRef)
 import qualified Data.Sequence as Seq
 import Data.Word (Word8)
@@ -253,7 +256,7 @@ runGetInternal off act cap mem = runST $ do
 -- Put unsafe:
 
 data PutEnv s q = PutEnv
-  { peOff :: !(STRef s ByteCount)
+  { peOff :: !(MutVar s ByteCount)
   -- ^ Offset in bytes from start of buffer
   , peCap :: !ByteCount
   -- ^ Capacity of buffer segment
@@ -261,33 +264,35 @@ data PutEnv s q = PutEnv
   -- ^ Destination buffer
   }
 
-newPutEnv :: ByteCount -> q s -> ST s (PutEnv s q)
-newPutEnv cap mem = do
-  offRef <- newSTRef 0
+newPutEnv :: PrimMonad m => ByteCount -> ByteCount -> q (PrimState m) -> m (PutEnv (PrimState m) q)
+newPutEnv off cap mem = do
+  offRef <- newMutVar off
   pure (PutEnv offRef cap mem)
 
-newtype PutEff s q a = PutEff {unPutEff :: ReaderT (PutEnv s q) (ST s) a}
-  deriving newtype (Functor, Applicative, Monad, MonadReader (PutEnv s q))
-
-runPutEff :: PutEff s q a -> PutEnv s q -> ST s a
-runPutEff act = runReaderT (unPutEff act)
-
-stPutEff :: ST s a -> PutEff s q a
-stPutEff = PutEff . lift
-
-newtype PutRun s q a = PutRun {unPutRun :: FreeT PutF (PutEff s q) a}
+newtype PutEff q m a = PutEff {unPutEff :: ReaderT (PutEnv (PrimState m) q) m a}
   deriving newtype (Functor, Applicative, Monad)
 
-writeBytes :: ByteCount -> (q s -> ByteCount -> ST s ()) -> PutEff s q ()
+deriving newtype instance (Monad m, s ~ PrimState m) => MonadReader (PutEnv s q) (PutEff q m)
+
+runPutEff :: PutEff q m a -> PutEnv (PrimState m) q -> m a
+runPutEff act = runReaderT (unPutEff act)
+
+stPutEff :: Monad m => m a -> PutEff q m a
+stPutEff = PutEff . lift
+
+newtype PutRun q m a = PutRun {unPutRun :: FreeT PutF (PutEff q m) a}
+  deriving newtype (Functor, Applicative, Monad)
+
+writeBytes :: PrimMonad m => ByteCount -> (q (PrimState m) -> ByteCount -> m ()) -> PutEff q m ()
 writeBytes bc f = do
   PutEnv offRef _ mem <- ask
   stPutEff $ do
-    off <- readSTRef offRef
+    off <- readMutVar offRef
     f mem off
     let newOff = off + bc
-    writeSTRef offRef newOff
+    writeMutVar offRef newOff
 
-writeStaticSeq :: WriteMem q => PutStaticSeqF (PutEff s q a) -> PutEff s q a
+writeStaticSeq :: WriteMem q m => PutStaticSeqF (PutEff q m a) -> PutEff q m a
 writeStaticSeq (PutStaticSeqF n mz p s k) = do
   for_ (take (coerce n) (toList s)) $ \a -> do
     mkPutEff (p a)
@@ -297,7 +302,7 @@ writeStaticSeq (PutStaticSeqF n mz p s k) = do
     replicateM_ (coerce n - e) q
   k
 
-writeStaticArray :: WriteMem q => PutStaticArrayF (PutEff s q a) -> PutEff s q a
+writeStaticArray :: WriteMem q m => PutStaticArrayF (PutEff q m a) -> PutEff q m a
 writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = do
   let elemSize = putStaticArrayElemSize psa
       haveElems = sizeofLiftedPrimArray a
@@ -312,7 +317,7 @@ writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = d
       Just z -> writeBytes extraBc (setMemInBytes extraBc z)
   k
 
-execPutRun :: WriteMem q => PutF (PutEff s q a) -> PutEff s q a
+execPutRun :: WriteMem q m => PutF (PutEff q m a) -> PutEff q m a
 execPutRun = \case
   PutFWord8 x k -> writeBytes 1 (writeMemInBytes x) *> k
   PutFInt8 x k -> writeBytes 1 (writeMemInBytes x) *> k
@@ -344,24 +349,25 @@ execPutRun = \case
     writeBytes bc (copyArrayMemInBytes barr 0 bc) *> k
   PutFStaticHint (PutStaticHintF _ p k) -> mkPutEff p *> k
 
-runPutRun :: WriteMem q => PutRun s q a -> PutEnv s q -> ST s a
+runPutRun :: WriteMem q m => PutRun q m a -> PutEnv (PrimState m) q -> m a
 runPutRun = runPutEff . iterPutRun
 
-iterPutRun :: WriteMem q => PutRun s q a -> PutEff s q a
+iterPutRun :: WriteMem q m => PutRun q m a -> PutEff q m a
 iterPutRun act = iterT execPutRun (unPutRun act)
 
-mkPutRun :: PutM a -> PutRun s q a
+mkPutRun :: Monad m => PutM a -> PutRun q m a
 mkPutRun (PutM (F w)) = PutRun (w pure wrap)
 
-mkPutEff :: WriteMem q => PutM a -> PutEff s q a
+mkPutEff :: WriteMem q m => PutM a -> PutEff q m a
 mkPutEff = iterPutRun . mkPutRun
 
-runPutUnsafe :: WriteMem q => Put -> ByteCount -> q s -> ST s ByteCount
-runPutUnsafe act len mem = do
+runPutUnsafe :: WriteMem q m => ByteCount -> Put -> ByteCount -> q (PrimState m) -> m ByteCount
+runPutUnsafe off act len mem = do
   let eff = mkPutRun act
-  st@(PutEnv offRef _ _) <- newPutEnv len mem
+      cap = off + len
+  st@(PutEnv offRef _ _) <- newPutEnv off cap mem
   runPutRun eff st
-  readSTRef offRef
+  readMutVar offRef
 
 -- Count:
 
@@ -428,9 +434,11 @@ runCount act =
 
 -- Put safe:
 
-runPutInternal :: WriteMem q => Put -> ByteCount -> (forall s. ByteCount -> ST s (q s)) -> (forall s. q s -> ByteCount -> ByteCount -> ST s z) -> z
-runPutInternal act cap mkMem useMem = runST $ do
-  mem <- mkMem cap
-  case releaseMem mem of
-    Nothing -> runPutUnsafe act cap mem >>= useMem mem cap
-    Just rel -> unsafeIOToST (onException (unsafeSTToIO (runPutUnsafe act cap mem >>= useMem mem cap)) rel)
+primOnExc :: PrimBase m => m a -> Maybe (IO ()) -> m a
+primOnExc prim = maybe prim $ \onExc ->
+  unsafeIOToPrim (onException (unsafePrimToIO prim) onExc)
+
+runPutInternal :: (PrimBase m, WriteMem q m) => ByteCount -> Put -> ByteCount -> (ByteCount -> ByteCount -> m (q (PrimState m), Maybe (IO ()))) -> (q (PrimState m) -> ByteCount -> ByteCount -> m z) -> m z
+runPutInternal off act len mkMem useMem = do
+  (mem, rel) <- mkMem off len
+  primOnExc (runPutUnsafe off act len mem >>= useMem mem off) rel
