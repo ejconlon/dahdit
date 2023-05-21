@@ -6,17 +6,21 @@ module Dahdit.Iface
   , mutPutTargetOffset
   , mutPutTarget
   , decode
+  , decodeEnd
   , decodeFile
+  , decodeFileEnd
   , encode
   , encodeFile
   , mutEncode
   )
 where
 
+import Control.Monad (unless)
 import Control.Monad.Primitive (PrimBase, PrimMonad (..))
 import Control.Monad.ST (runST)
 import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
+import Dahdit.Funs (getRemainingSize)
 import Dahdit.Mem (allocBAMem, allocPtrMem, freezeBAMem, freezeBSMem, freezeSBSMem, freezeVecMem, mutAllocBAMem, mutAllocVecMem, mutFreezeBAMem, mutFreezeVecMem, viewBSMem, viewSBSMem, viewVecMem)
 import Dahdit.Run (GetError, runCount, runGetInternal, runPutInternal)
 import Dahdit.Sizes (ByteCount (..))
@@ -80,13 +84,28 @@ instance (PrimBase m, s ~ PrimState m) => MutBinaryTarget m (MutableByteArray s)
 instance (PrimBase m, s ~ PrimState m) => MutBinaryTarget m (MVector s Word8) where
   mutPutTargetOffsetUnsafe = runMutPutVec
 
+getEnd :: Get a -> Get a
+getEnd getter = do
+  a <- getter
+  b <- getRemainingSize
+  unless (b == 0) (fail ("Expected end of input but had bytes remaining: " ++ show (unByteCount b)))
+  pure a
+
 -- | Decode a value from a source returning a result and consumed byte count.
 decode :: (Binary a, BinaryTarget z) => z -> (Either GetError a, ByteCount)
 decode = getTarget get
 
+-- | 'decode' but expect the end of input.
+decodeEnd :: (BinaryTarget z, Binary a) => z -> (Either GetError a, ByteCount)
+decodeEnd = getTarget (getEnd get)
+
 -- | Decode a value from a file.
 decodeFile :: Binary a => FilePath -> IO (Either GetError a, ByteCount)
 decodeFile = runGetFile get
+
+-- | 'decodeFile' but expect the end of file.
+decodeFileEnd :: Binary a => FilePath -> IO (Either GetError a, ByteCount)
+decodeFileEnd = runGetFile (getEnd get)
 
 -- | Encode a value to a sink.
 encode :: (Binary a, BinaryTarget z) => a -> z
