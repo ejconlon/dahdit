@@ -77,6 +77,7 @@ import Dahdit.Nums
   , Word64BE (..)
   , Word64LE (..)
   )
+import Dahdit.Run (runCount)
 import Dahdit.Sizes (ByteCount (..), ElemCount (..))
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Coerce (coerce)
@@ -97,8 +98,8 @@ import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
 
 class Binary a where
-  -- TODO add default impl for byteSize
   byteSize :: a -> ByteCount
+  byteSize = runCount . put
   get :: Get a
   put :: a -> Put
 
