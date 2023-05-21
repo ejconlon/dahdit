@@ -6,7 +6,6 @@ import Dahdit
   , BinaryTarget (..)
   , BoolByte (..)
   , ByteCount (..)
-  , ByteSized (..)
   , ByteString
   , DoubleBE (..)
   , DoubleLE (..)
@@ -158,15 +157,15 @@ instance (s ~ PrimState IO) => MutCaseTarget (MVector s Word8) where
 
 data DynFoo = DynFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
-  deriving (ByteSized, Binary) via (ViaGeneric DynFoo)
+  deriving (Binary) via (ViaGeneric DynFoo)
 
 data StaFoo = StaFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
-  deriving (ByteSized, StaticByteSized, Binary) via (ViaStaticGeneric StaFoo)
+  deriving (StaticByteSized, Binary) via (ViaStaticGeneric StaFoo)
 
 data TagFoo = TagFooOne !Word8 | TagFooTwo !Word16LE
   deriving stock (Eq, Show, Generic)
-  deriving (ByteSized, Binary) via (ViaGeneric TagFoo)
+  deriving (Binary) via (ViaGeneric TagFoo)
 
 type StaBytes = StaticBytes 2
 
@@ -255,7 +254,6 @@ testByteSize =
     , testCase "Int64BE" (byteSize @Int64BE 0 @?= 8)
     , testCase "FloatBE" (byteSize (FloatBE (castWord32ToFloat 0)) @?= 4)
     , testCase "DoubleBE" (byteSize (DoubleBE (castWord64ToDouble 0)) @?= 8)
-    , testCase "ShortByteString" (byteSize @ShortByteString (BSS.pack [0xEC, 0x5D]) @?= 2)
     , testCase "DynFoo" (byteSize (DynFoo 0xBB 0x5DEC) @?= 3)
     , testCase "StaFoo" (byteSize (StaFoo 0xBB 0x5DEC) @?= 3)
     , testCase "StaBytes" (byteSize (mkStaBytes "hi") @?= 2)

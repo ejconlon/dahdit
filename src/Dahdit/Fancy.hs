@@ -28,7 +28,7 @@ import Dahdit.Funs
 import Dahdit.LiftedPrim (LiftedPrim)
 import Dahdit.LiftedPrimArray (LiftedPrimArray, replicateLiftedPrimArray)
 import Dahdit.Proxy (proxyForNatF)
-import Dahdit.Sizes (ByteCount (..), ByteSized (..), StaticByteSized (..), ViaStaticByteSized (..))
+import Dahdit.Sizes (ByteCount (..), StaticByteSized (..), byteSizeViaStatic)
 import Data.ByteString.Internal (c2w)
 import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Short.Internal (ShortByteString (..))
@@ -64,12 +64,11 @@ newtype TermBytes = TermBytes {unTermBytes :: ShortByteString}
 instance Default TermBytes where
   def = TermBytes BSS.empty
 
-instance ByteSized TermBytes where
+instance Binary TermBytes where
   byteSize (TermBytes sbs) =
-    let bc = byteSize sbs + 1
+    let bc = ByteCount (BSS.length sbs + 1)
     in  if even bc then bc else bc + 1
 
-instance Binary TermBytes where
   get = do
     (i, acc) <- getUntilNull
     unless (odd i) $ do
@@ -87,8 +86,6 @@ instance Binary TermBytes where
 newtype StaticBytes (n :: Nat) = StaticBytes {unStaticBytes :: ShortByteString}
   deriving stock (Show)
   deriving newtype (IsString)
-
-deriving via (ViaStaticByteSized (StaticBytes n)) instance KnownNat n => ByteSized (StaticBytes n)
 
 mkStaticBytes :: KnownNat n => Proxy n -> ShortByteString -> StaticBytes n
 mkStaticBytes prox sbs =
@@ -125,13 +122,13 @@ instance KnownNat n => StaticByteSized (StaticBytes n) where
   staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n))
 
 instance KnownNat n => Binary (StaticBytes n) where
+  byteSize = byteSizeViaStatic
   get = fmap StaticBytes (getByteString (fromInteger (natVal (Proxy :: Proxy n))))
   put fb@(StaticBytes sbs) = putFixedString 0 (fromInteger (natVal fb)) sbs
 
 newtype StaticSeq (n :: Nat) a = StaticSeq {unStaticSeq :: Seq a}
   deriving stock (Show)
   deriving newtype (Eq, Functor, Foldable)
-  deriving (ByteSized) via (ViaStaticByteSized (StaticSeq n a))
 
 instance (KnownNat n, Default a) => Default (StaticSeq n a) where
   def = StaticSeq (Seq.replicate (fromInteger (natVal (Proxy :: Proxy n))) def)
@@ -140,14 +137,13 @@ instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticSeq n a) wher
   staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
 
 instance (KnownNat n, Binary a, StaticByteSized a, Default a) => Binary (StaticSeq n a) where
+  byteSize = byteSizeViaStatic
   get = fmap StaticSeq (getStaticSeq (fromInteger (natVal (Proxy :: Proxy n))) get)
   put = unsafePutStaticSeqN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
 
 newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray a}
   deriving stock (Show)
   deriving newtype (Eq)
-
-deriving via (ViaStaticByteSized (StaticArray n a)) instance (KnownNat n, StaticByteSized a) => ByteSized (StaticArray n a)
 
 instance (KnownNat n, LiftedPrim a, Default a) => Default (StaticArray n a) where
   def = StaticArray (replicateLiftedPrimArray (fromInteger (natVal (Proxy :: Proxy n))) def)
@@ -156,13 +152,13 @@ instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) wh
   staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
 
 instance (KnownNat n, LiftedPrim a, Default a) => Binary (StaticArray n a) where
+  byteSize = byteSizeViaStatic
   get = fmap StaticArray (getStaticArray (fromInteger (natVal (Proxy :: Proxy n))))
   put = unsafePutStaticArrayN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
 
 newtype BoolByte = BoolByte {unBoolByte :: Bool}
   deriving stock (Show)
   deriving newtype (Eq)
-  deriving (ByteSized) via (ViaStaticByteSized BoolByte)
 
 instance Default BoolByte where
   def = BoolByte False
@@ -171,13 +167,13 @@ instance StaticByteSized BoolByte where
   staticByteSize _ = 1
 
 instance Binary BoolByte where
+  byteSize = byteSizeViaStatic
   get = fmap (BoolByte . (/= 0)) getWord8
   put (BoolByte b) = putWord8 (if b then 1 else 0)
 
 newtype ExactBytes (s :: Symbol) = ExactBytes {unExactBytes :: ()}
   deriving stock (Show)
   deriving newtype (Eq)
-  deriving (ByteSized) via (ViaStaticByteSized (ExactBytes s))
 
 instance Default (ExactBytes s) where
   def = ExactBytes ()
@@ -186,6 +182,7 @@ instance KnownSymbol s => StaticByteSized (ExactBytes s) where
   staticByteSize _ = coerce (length (symbolVal (Proxy :: Proxy s)))
 
 instance KnownSymbol s => Binary (ExactBytes s) where
+  byteSize = byteSizeViaStatic
   get = do
     let s = symbolVal (Proxy :: Proxy s)
         bc = coerce (length s)

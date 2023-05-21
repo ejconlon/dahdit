@@ -19,7 +19,7 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Mem (allocBAMem, allocPtrMem, freezeBAMem, freezeBSMem, freezeSBSMem, freezeVecMem, mutAllocBAMem, mutAllocVecMem, mutFreezeBAMem, mutFreezeVecMem, viewBSMem, viewSBSMem, viewVecMem)
 import Dahdit.Run (GetError, runCount, runGetInternal, runPutInternal)
-import Dahdit.Sizes (ByteCount (..), ByteSized (..))
+import Dahdit.Sizes (ByteCount (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Short (ShortByteString)
@@ -89,15 +89,15 @@ decodeFile :: Binary a => FilePath -> IO (Either GetError a, ByteCount)
 decodeFile = runGetFile get
 
 -- | Encode a value to a sink.
-encode :: (Binary a, ByteSized a, BinaryTarget z) => a -> z
+encode :: (Binary a, BinaryTarget z) => a -> z
 encode a = putTargetUnsafe (put a) (byteSize a)
 
 -- | Encode a value to a file.
-encodeFile :: (Binary a, ByteSized a) => a -> FilePath -> IO ()
+encodeFile :: (Binary a) => a -> FilePath -> IO ()
 encodeFile a = runPutFile (put a) (byteSize a)
 
 -- | Encode a value to a mutable buffer, returning number of bytes filled.
-mutEncode :: (Binary a, ByteSized a, MutBinaryTarget m z) => a -> z -> m ByteCount
+mutEncode :: (Binary a, MutBinaryTarget m z) => a -> z -> m ByteCount
 mutEncode a = mutPutTargetOffsetUnsafe 0 (put a) (byteSize a)
 
 runGetBA :: ByteCount -> Get a -> ByteArray -> (Either GetError a, ByteCount)

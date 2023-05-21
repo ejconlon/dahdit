@@ -11,18 +11,32 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (putStaticHint)
 import Dahdit.Nums (Word16LE, Word32LE)
-import Dahdit.Sizes (ByteCount, ByteSized (..), StaticByteSized (..))
+import Dahdit.Proxy (proxyForRepF)
+import Dahdit.Sizes (ByteCount, StaticByteSized (..))
 import Data.Bits (Bits (..))
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
 import GHC.Generics (C1, Generic (..), K1 (..), M1 (..), U1 (..), (:*:) (..), (:+:) (..))
 
--- | Use: deriving (ByteSized, Binary) via (ViaGeneric Foo)
+-- | Use: deriving (Binary) via (ViaGeneric Foo)
 newtype ViaGeneric a = ViaGeneric {unViaGeneric :: a}
 
--- | Use: deriving (ByteSized, StaticByteSized, Binary) via (ViaStaticGeneric Foo)
+instance (Generic t, GByteSized (Rep t), GBinary (Rep t)) => Binary (ViaGeneric t) where
+  byteSize = gbyteSize . from . unViaGeneric
+  get = fmap (ViaGeneric . to) gget
+  put = gput . from . unViaGeneric
+
+-- | Use: deriving (StaticByteSized, Binary) via (ViaStaticGeneric Foo)
 newtype ViaStaticGeneric a = ViaStaticGeneric {unViaStaticGeneric :: a}
+
+instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaStaticGeneric t) where
+  byteSize sg = gstaticByteSize (proxyForRepF sg (from (unViaStaticGeneric sg)))
+  get = fmap (ViaStaticGeneric . to) gget
+  put = putStaticHint (gput . from . unViaStaticGeneric)
+
+instance GStaticByteSized (Rep t) => StaticByteSized (ViaStaticGeneric t) where
+  staticByteSize _ = gstaticByteSize (Proxy :: Proxy (Rep t))
 
 -- ByteSized:
 
@@ -49,18 +63,12 @@ instance (GByteSized a, GByteSized b, SumSize a, SumSize b) => GByteSized (a :+:
       R1 b -> gbyteSize b
 
 -- Field
-instance ByteSized a => GByteSized (K1 i a) where
+instance Binary a => GByteSized (K1 i a) where
   gbyteSize = byteSize . unK1
-
-instance (Generic t, GByteSized (Rep t)) => ByteSized (ViaGeneric t) where
-  byteSize = gbyteSize . from . unViaGeneric
-
-instance (Generic t, GByteSized (Rep t)) => ByteSized (ViaStaticGeneric t) where
-  byteSize = gbyteSize . from . unViaStaticGeneric
 
 -- StaticByteSized:
 
-class GByteSized f => GStaticByteSized (f :: Type -> Type) where
+class GStaticByteSized (f :: Type -> Type) where
   gstaticByteSize :: Proxy f -> ByteCount
 
 instance GStaticByteSized U1 where
@@ -74,9 +82,6 @@ instance GStaticByteSized a => GStaticByteSized (M1 i c a) where
 
 instance StaticByteSized a => GStaticByteSized (K1 i a) where
   gstaticByteSize _ = staticByteSize (Proxy :: Proxy a)
-
-instance (Generic t, GStaticByteSized (Rep t)) => StaticByteSized (ViaStaticGeneric t) where
-  staticByteSize _ = gstaticByteSize (Proxy :: Proxy (Rep t))
 
 -- Binary:
 
@@ -99,14 +104,6 @@ instance GBinary a => GBinary (M1 i c a) where
 instance Binary a => GBinary (K1 i a) where
   gget = fmap K1 get
   gput = put . unK1
-
-instance (Generic t, GBinary (Rep t)) => Binary (ViaGeneric t) where
-  get = fmap (ViaGeneric . to) gget
-  put = gput . from . unViaGeneric
-
-instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaStaticGeneric t) where
-  get = fmap (ViaStaticGeneric . to) gget
-  put = putStaticHint (gput . from . unViaStaticGeneric)
 
 -- Everything that follows is borrowed from the binary package, which
 -- borrows from the cereal package!

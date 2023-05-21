@@ -1,10 +1,11 @@
--- Experimental - bidirectional codecs
+-- | Experimental - bidirectional codecs
 -- See https://hackage.haskell.org/package/codec
 -- And https://blog.poisson.chat/posts/2016-10-12-bidirectional-serialization.html
 module Dahdit.Codec
   ( Codec
   , build
   , binary
+  , measure
   , parse
   , produce
   , bindPair
@@ -20,7 +21,7 @@ import Dahdit.Fancy (BoolByte, ExactBytes, StaticArray, StaticSeq, TermBytes)
 import Dahdit.Free (Get, Put)
 import Dahdit.LiftedPrim (LiftedPrim)
 import Dahdit.Nums (FloatBE, FloatLE, Int16BE, Int16LE, Int24BE, Int24LE, Int32BE, Int32LE, Word16BE, Word16LE, Word24BE, Word24LE, Word32BE, Word32LE)
-import Dahdit.Sizes (ByteSized (..), StaticByteSized)
+import Dahdit.Sizes (ByteCount, StaticByteSized)
 import Data.Coerce (coerce)
 import Data.Default (Default)
 import Data.Int (Int8)
@@ -28,7 +29,8 @@ import Data.Word (Word8)
 import GHC.TypeLits (KnownNat, KnownSymbol)
 
 data Codec' x a = Codec'
-  { parse' :: Get a
+  { measure' :: x -> ByteCount
+  , parse' :: Get a
   , produce' :: x -> Put
   }
 
@@ -36,21 +38,25 @@ instance Functor (Codec' x) where
   fmap f c = c {parse' = fmap f (parse' c)}
 
 instance Applicative (Codec' x) where
-  pure a = Codec' (pure a) (const (pure ()))
+  pure a = Codec' (const 0) (pure a) (const (pure ()))
 
   f <*> a =
     Codec'
-      { parse' = parse' f <*> parse' a
+      { measure' = \x -> measure' f x + measure' a x
+      , parse' = parse' f <*> parse' a
       , produce' = \x -> produce' f x *> produce' a x
       }
 
 type Codec a = Codec' a a
 
-build :: Get a -> (a -> Put) -> Codec a
+build :: (a -> ByteCount) -> Get a -> (a -> Put) -> Codec a
 build = Codec'
 
 binary :: Binary a => Codec a
-binary = build get put
+binary = build byteSize get put
+
+measure :: Codec a -> a -> ByteCount
+measure = measure'
 
 parse :: Codec a -> Get a
 parse = parse'
@@ -61,12 +67,14 @@ produce = produce'
 bindPair :: Codec a -> (a -> Codec b) -> Codec (a, b)
 bindPair c f =
   Codec'
+    (\(a, b) -> measure c a + measure (f a) b)
     (parse c >>= \a -> fmap (a,) (parse (f a)))
     (\(a, b) -> produce c a *> produce (f a) b)
 
 bindTag :: (b -> a) -> Codec a -> (a -> Codec b) -> Codec b
 bindTag t c f =
   Codec'
+    (\b -> let a = t b in measure c a + measure (f a) b)
     (parse c >>= parse . f)
     (\b -> let a = t b in produce c a *> produce (f a) b)
 
@@ -122,9 +130,7 @@ deriving via (ViaBinary (ExactBytes s)) instance KnownSymbol s => HasCodec (Exac
 
 newtype ViaCodec a = ViaCodec {unViaCodec :: a}
 
-instance ByteSized a => ByteSized (ViaCodec a) where
-  byteSize = byteSize . unViaCodec
-
 instance HasCodec a => Binary (ViaCodec a) where
+  byteSize = coerce (measure (codec @a))
   get = coerce (parse (codec @a))
   put = coerce (produce (codec @a))

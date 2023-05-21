@@ -9,7 +9,7 @@ module Dahdit.BinaryRep
 where
 
 import Dahdit.Binary (Binary (..))
-import Dahdit.Sizes (ByteSized (..), StaticByteSized (..))
+import Dahdit.Sizes (StaticByteSized (..))
 import Data.Proxy (Proxy (..))
 
 class Binary x => BinaryRep x a | a -> x where
@@ -34,12 +34,10 @@ instance (Binary x, Integral x, Integral a) => BinaryRep x (ViaIntegral x a) whe
 
 newtype ViaBinaryRep a = ViaBinaryRep {unViaBinaryRep :: a}
 
-instance (ByteSized x, BinaryRep x a) => ByteSized (ViaBinaryRep a) where
-  byteSize = byteSize . toBinaryRep . unViaBinaryRep
-
 instance (StaticByteSized x, BinaryRep x a) => StaticByteSized (ViaBinaryRep a) where
   staticByteSize _ = staticByteSize (Proxy :: Proxy x)
 
 instance BinaryRep x a => Binary (ViaBinaryRep a) where
+  byteSize = byteSize . toBinaryRep . unViaBinaryRep
   get = get >>= either fail (pure . ViaBinaryRep) . fromBinaryRep
   put = put . toBinaryRep . unViaBinaryRep

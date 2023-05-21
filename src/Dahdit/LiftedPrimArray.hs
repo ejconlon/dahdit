@@ -25,7 +25,7 @@ import Dahdit.LiftedPrim
   , writeArrayLiftedInElems
   )
 import Dahdit.Proxy (proxyFor, proxyForF)
-import Dahdit.Sizes (ByteCount (..), ByteSized (..), ElemCount (..), StaticByteSized (..))
+import Dahdit.Sizes (ByteCount (..), ElemCount (..), StaticByteSized (..))
 import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Foldable (for_)
@@ -51,9 +51,6 @@ newtype LiftedPrimArray a = LiftedPrimArray {unLiftedPrimArray :: ByteArray}
 
 instance Default (LiftedPrimArray a) where
   def = emptyLiftedPrimArray
-
-instance ByteSized (LiftedPrimArray a) where
-  byteSize = sizeofLiftedPrimArray
 
 newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray {unMutableLiftedPrimArray :: MutableByteArray m}
   deriving newtype (Eq)
