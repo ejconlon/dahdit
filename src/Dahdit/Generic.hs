@@ -31,14 +31,12 @@ instance (Generic t, GByteSized (Rep t), GBinary (Rep t)) => Binary (ViaGeneric 
 -- | Use: deriving (StaticByteSized, Binary) via (ViaStaticGeneric Foo)
 newtype ViaStaticGeneric a = ViaStaticGeneric {unViaStaticGeneric :: a}
 
--- GHC BUG: KnownNat not redundant
-instance (Generic t, KnownNat (GStaticSize (Rep t)), GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaStaticGeneric t) where
+instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaStaticGeneric t) where
   byteSize sg = gstaticByteSize (proxyForRepF sg (from (unViaStaticGeneric sg)))
   get = fmap (ViaStaticGeneric . to) gget
   put = putStaticHint (gput . from . unViaStaticGeneric)
 
--- GHC BUG: KnownNat not redundant
-instance (KnownNat (GStaticSize (Rep t)), GStaticByteSized (Rep t)) => StaticByteSized (ViaStaticGeneric t) where
+instance (GStaticByteSized (Rep t)) => StaticByteSized (ViaStaticGeneric t) where
   type StaticSize (ViaStaticGeneric t) = GStaticSize (Rep t)
   staticByteSize _ = gstaticByteSize (Proxy :: Proxy (Rep t))
 
