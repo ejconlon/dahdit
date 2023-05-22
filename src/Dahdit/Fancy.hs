@@ -1,5 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoStarIsType #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 module Dahdit.Fancy
   ( TermBytes (..)
@@ -136,10 +137,10 @@ newtype StaticSeq (n :: Nat) a = StaticSeq {unStaticSeq :: Seq a}
 instance (KnownNat n, Default a) => Default (StaticSeq n a) where
   def = StaticSeq (Seq.replicate (fromInteger (natVal (Proxy :: Proxy n))) def)
 
-instance (KnownNat n, StaticByteSized a, o ~ n * StaticSize a, KnownNat o) => StaticByteSized (StaticSeq n a) where
+instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticSeq n a) where
   type StaticSize (StaticSeq n a) = n * StaticSize a
 
-instance (KnownNat n, Binary a, StaticByteSized a, Default a, o ~ n * StaticSize a, KnownNat o) => Binary (StaticSeq n a) where
+instance (KnownNat n, Binary a, StaticByteSized a, Default a) => Binary (StaticSeq n a) where
   byteSize = byteSizeViaStatic
   get = fmap StaticSeq (getStaticSeq (fromInteger (natVal (Proxy :: Proxy n))) get)
   put = unsafePutStaticSeqN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
@@ -151,10 +152,10 @@ newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray
 instance (KnownNat n, LiftedPrim a, Default a) => Default (StaticArray n a) where
   def = StaticArray (replicateLiftedPrimArray (fromInteger (natVal (Proxy :: Proxy n))) def)
 
-instance (KnownNat n, StaticByteSized a, o ~ n * StaticSize a, KnownNat o) => StaticByteSized (StaticArray n a) where
+instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) where
   type StaticSize (StaticArray n a) = n * StaticSize a
 
-instance (KnownNat n, LiftedPrim a, Default a, o ~ n * StaticSize a, KnownNat o) => Binary (StaticArray n a) where
+instance (KnownNat n, LiftedPrim a, Default a) => Binary (StaticArray n a) where
   byteSize = byteSizeViaStatic
   get = fmap StaticArray (getStaticArray (fromInteger (natVal (Proxy :: Proxy n))))
   put = unsafePutStaticArrayN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
