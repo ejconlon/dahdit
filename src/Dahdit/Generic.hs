@@ -1,4 +1,5 @@
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 module Dahdit.Generic
   ( ViaGeneric (..)
@@ -36,7 +37,7 @@ instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaSt
   get = fmap (ViaStaticGeneric . to) gget
   put = putStaticHint (gput . from . unViaStaticGeneric)
 
-instance (GStaticByteSized (Rep t)) => StaticByteSized (ViaStaticGeneric t) where
+instance GStaticByteSized (Rep t) => StaticByteSized (ViaStaticGeneric t) where
   type StaticSize (ViaStaticGeneric t) = GStaticSize (Rep t)
   staticByteSize _ = gstaticByteSize (Proxy :: Proxy (Rep t))
 
@@ -50,7 +51,7 @@ instance GByteSized U1 where
   gbyteSize _ = 0
 
 -- Product
-instance (GByteSized a, GByteSized b) => GByteSized (a :*: b) where
+instance (GByteSized a, GByteSized b, o ~ n + m) => GByteSized (a :*: b) where
   gbyteSize (x :*: y) = gbyteSize x + gbyteSize y
 
 -- Metadata
@@ -81,7 +82,7 @@ gstaticByteProxy _ = Proxy
 instance GStaticByteSized U1 where
   type GStaticSize U1 = 0
 
-instance (GStaticByteSized a, GStaticByteSized b, o ~ GStaticSize a + GStaticSize b, KnownNat o) => GStaticByteSized (a :*: b) where
+instance (GStaticByteSized a, GStaticByteSized b) => GStaticByteSized (a :*: b) where
   type GStaticSize (a :*: b) = GStaticSize a + GStaticSize b
 
 instance GStaticByteSized a => GStaticByteSized (M1 i c a) where
