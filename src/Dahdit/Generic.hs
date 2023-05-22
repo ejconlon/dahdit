@@ -52,7 +52,7 @@ instance GByteSized U1 where
   gbyteSize _ = 0
 
 -- Product
-instance (GByteSized a, GByteSized b, o ~ n + m) => GByteSized (a :*: b) where
+instance (GByteSized a, GByteSized b) => GByteSized (a :*: b) where
   gbyteSize (x :*: y) = gbyteSize x + gbyteSize y
 
 -- Metadata
