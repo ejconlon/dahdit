@@ -5,15 +5,16 @@ import Data.Int (Int16, Int32, Int64, Int8)
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castDoubleToWord64, castFloatToWord32, castWord32ToFloat, castWord64ToDouble)
+import GHC.TypeLits (Nat)
 
-newtype ViaFromIntegral x y = ViaFromIntegral {unViaFromIntegral :: y}
+newtype ViaFromIntegral (n :: Nat) x y = ViaFromIntegral {unViaFromIntegral :: y}
   deriving newtype (Num)
 
 -- Types that can swap endianness - swapEndian is its own inverse
 class Num w => SwapEndian w where
   swapEndian :: w -> w
 
-instance (SwapEndian x, Integral x, Integral y) => SwapEndian (ViaFromIntegral x y) where
+instance (SwapEndian x, Integral x, Integral y) => SwapEndian (ViaFromIntegral n x y) where
   swapEndian = ViaFromIntegral . fromIntegral @x @y . swapEndian . fromIntegral @y @x . unViaFromIntegral
 
 instance SwapEndian Word8 where
@@ -27,28 +28,28 @@ instance SwapEndian Word16 where
     let (!b0, !b1) = unMkWord16LE w
     in  mkWord16LE b1 b0
 
-deriving via (ViaFromIntegral Word16 Int16) instance SwapEndian Int16
+deriving via (ViaFromIntegral n Word16 Int16) instance SwapEndian Int16
 
 instance SwapEndian Word24 where
   swapEndian w =
     let (!b0, !b1, !b2) = unMkWord24LE w
     in  mkWord24LE b2 b1 b0
 
-deriving via (ViaFromIntegral Word24 Int24) instance SwapEndian Int24
+deriving via (ViaFromIntegral n Word24 Int24) instance SwapEndian Int24
 
 instance SwapEndian Word32 where
   swapEndian w =
     let (!b0, !b1, !b2, !b3) = unMkWord32LE w
     in  mkWord32LE b3 b2 b1 b0
 
-deriving via (ViaFromIntegral Word32 Int32) instance SwapEndian Int32
+deriving via (ViaFromIntegral n Word32 Int32) instance SwapEndian Int32
 
 instance SwapEndian Word64 where
   swapEndian w =
     let (!b0, !b1, !b2, !b3, !b4, !b5, !b6, !b7) = unMkWord64LE w
     in  mkWord64LE b7 b6 b5 b4 b3 b2 b1 b0
 
-deriving via (ViaFromIntegral Word64 Int64) instance SwapEndian Int64
+deriving via (ViaFromIntegral n Word64 Int64) instance SwapEndian Int64
 
 instance SwapEndian Float where
   swapEndian w =
@@ -128,16 +129,16 @@ mkDoubleLE b0 b1 b2 b3 b4 b5 b6 b7 = castWord64ToDouble (mkWord64LE b0 b1 b2 b3 
 unMkDoubleLE :: Double -> (Word8, Word8, Word8, Word8, Word8, Word8, Word8, Word8)
 unMkDoubleLE f = unMkWord64LE (castDoubleToWord64 f)
 
-class (Num le, Num be) => EndianPair le be | le -> be, be -> le where
+class (Num le, Num be) => EndianPair (n :: Nat) le be | le -> n, be -> n, le -> be, be -> le where
   toLittleEndian :: be -> le
   toBigEndian :: le -> be
 
-newtype ViaEndianPair le be = ViaEndianPair {unViaEndianPair :: be}
+newtype ViaEndianPair (n :: Nat) le be = ViaEndianPair {unViaEndianPair :: be}
 
-instance EndianPair Word8 Word8 where
+instance EndianPair 1 Word8 Word8 where
   toLittleEndian = id
   toBigEndian = id
 
-instance EndianPair Int8 Int8 where
+instance EndianPair 1 Int8 Int8 where
   toLittleEndian = id
   toBigEndian = id

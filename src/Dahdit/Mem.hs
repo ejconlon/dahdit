@@ -48,7 +48,7 @@ newtype IxPtr s = IxPtr {unIxPtr :: Ptr Word8}
   deriving newtype (Eq, Ord)
 
 class ReadMem r where
-  indexMemInBytes :: LiftedPrim a => r -> ByteCount -> a
+  indexMemInBytes :: LiftedPrim n a => r -> ByteCount -> a
   cloneArrayMemInBytes :: r -> ByteCount -> ByteCount -> ByteArray
 
 instance ReadMem ByteArray where
@@ -88,9 +88,9 @@ mutViewVecMem mvec =
   in  unsafeForeignPtrToPtr fp
 
 class PrimMonad m => WriteMem q m where
-  writeMemInBytes :: LiftedPrim a => a -> q (PrimState m) -> ByteCount -> m ()
+  writeMemInBytes :: LiftedPrim n a => a -> q (PrimState m) -> ByteCount -> m ()
   copyArrayMemInBytes :: ByteArray -> ByteCount -> ByteCount -> q (PrimState m) -> ByteCount -> m ()
-  setMemInBytes :: LiftedPrim a => ByteCount -> a -> q (PrimState m) -> ByteCount -> m ()
+  setMemInBytes :: LiftedPrim n a => ByteCount -> a -> q (PrimState m) -> ByteCount -> m ()
 
 instance PrimMonad m => WriteMem MutableByteArray m where
   writeMemInBytes val mem off = writeArrayLiftedInBytes mem off val
@@ -102,7 +102,7 @@ copyPtr arr arrOff arrLen ptr off =
   let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
   in  copyByteArrayToPtr wptr arr (coerce arrOff) (coerce arrLen)
 
-setPtr :: (PrimMonad m, LiftedPrim a) => ByteCount -> a -> Ptr Word8 -> ByteCount -> m ()
+setPtr :: (PrimMonad m, LiftedPrim n a) => ByteCount -> a -> Ptr Word8 -> ByteCount -> m ()
 setPtr len val ptr off = do
   let elemSize = staticByteSize (proxyFor val)
       elemLen = div (coerce len) elemSize

@@ -18,6 +18,7 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
 import GHC.Generics (C1, Generic (..), K1 (..), M1 (..), U1 (..), (:*:) (..), (:+:) (..))
+import GHC.TypeLits (Nat, natVal, type (+), KnownNat)
 
 -- | Use: deriving (Binary) via (ViaGeneric Foo)
 newtype ViaGeneric a = ViaGeneric {unViaGeneric :: a}
@@ -30,12 +31,13 @@ instance (Generic t, GByteSized (Rep t), GBinary (Rep t)) => Binary (ViaGeneric 
 -- | Use: deriving (StaticByteSized, Binary) via (ViaStaticGeneric Foo)
 newtype ViaStaticGeneric a = ViaStaticGeneric {unViaStaticGeneric :: a}
 
-instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaStaticGeneric t) where
+instance (Generic t, GStaticByteSized n (Rep t), GBinary (Rep t)) => Binary (ViaStaticGeneric t) where
   byteSize sg = gstaticByteSize (proxyForRepF sg (from (unViaStaticGeneric sg)))
   get = fmap (ViaStaticGeneric . to) gget
   put = putStaticHint (gput . from . unViaStaticGeneric)
 
-instance GStaticByteSized (Rep t) => StaticByteSized (ViaStaticGeneric t) where
+-- GHC BUG: KnownNat is not actually redundant
+instance (KnownNat n, GStaticByteSized n (Rep t)) => StaticByteSized n (ViaStaticGeneric t) where
   staticByteSize _ = gstaticByteSize (Proxy :: Proxy (Rep t))
 
 -- ByteSized:
@@ -48,7 +50,7 @@ instance GByteSized U1 where
   gbyteSize _ = 0
 
 -- Product
-instance (GByteSized a, GByteSized b) => GByteSized (a :*: b) where
+instance (GByteSized a, GByteSized b, o ~ n + m) => GByteSized (a :*: b) where
   gbyteSize (x :*: y) = gbyteSize x + gbyteSize y
 
 -- Metadata
@@ -68,20 +70,25 @@ instance Binary a => GByteSized (K1 i a) where
 
 -- StaticByteSized:
 
-class GStaticByteSized (f :: Type -> Type) where
+class KnownNat n => GStaticByteSized (n :: Nat) (f :: Type -> Type) | f -> n where
   gstaticByteSize :: Proxy f -> ByteCount
+  gstaticByteSize = fromInteger . natVal . gstaticByteProxy
 
-instance GStaticByteSized U1 where
-  gstaticByteSize _ = 0
+-- NOTE Class is there to allow correct type inference via fun deps
+gstaticByteProxy :: GStaticByteSized n f => Proxy f -> Proxy n
+gstaticByteProxy _ = Proxy
 
-instance (GStaticByteSized a, GStaticByteSized b) => GStaticByteSized (a :*: b) where
-  gstaticByteSize _ = gstaticByteSize (Proxy :: Proxy a) + gstaticByteSize (Proxy :: Proxy b)
+instance GStaticByteSized 0 U1
 
-instance GStaticByteSized a => GStaticByteSized (M1 i c a) where
-  gstaticByteSize _ = gstaticByteSize (Proxy :: Proxy a)
+instance (GStaticByteSized n a, GStaticByteSized m b, o ~ n + m, KnownNat o) => GStaticByteSized o (a :*: b)
 
-instance StaticByteSized a => GStaticByteSized (K1 i a) where
-  gstaticByteSize _ = staticByteSize (Proxy :: Proxy a)
+instance GStaticByteSized n a => GStaticByteSized n (M1 i c a)
+
+-- GHC BUG: KnownNat is not actually redundant
+instance (KnownNat n, StaticByteSized n a) => GStaticByteSized n (K1 i a)
+
+-- This one line is the reason all the nat constraints are threaded through this codebase
+instance (GStaticByteSized n a, GStaticByteSized n b) => GStaticByteSized n (a :+: b)
 
 -- Binary:
 

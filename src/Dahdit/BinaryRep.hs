@@ -34,7 +34,7 @@ instance (Binary x, Integral x, Integral a) => BinaryRep x (ViaIntegral x a) whe
 
 newtype ViaBinaryRep a = ViaBinaryRep {unViaBinaryRep :: a}
 
-instance (StaticByteSized x, BinaryRep x a) => StaticByteSized (ViaBinaryRep a) where
+instance (StaticByteSized n x, BinaryRep x a) => StaticByteSized n (ViaBinaryRep a) where
   staticByteSize _ = staticByteSize (Proxy :: Proxy x)
 
 instance BinaryRep x a => Binary (ViaBinaryRep a) where

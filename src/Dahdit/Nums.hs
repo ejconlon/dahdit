@@ -126,42 +126,42 @@ newtype DoubleBE = DoubleBE {unDoubleBE :: Double}
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Real, Fractional, Floating, RealFrac, Default)
 
-instance EndianPair Word16LE Word16BE where
+instance EndianPair 2 Word16LE Word16BE where
   toLittleEndian = Word16LE . swapEndian . unWord16BE
   toBigEndian = Word16BE . swapEndian . unWord16LE
 
-instance EndianPair Int16LE Int16BE where
+instance EndianPair 2 Int16LE Int16BE where
   toLittleEndian = Int16LE . swapEndian . unInt16BE
   toBigEndian = Int16BE . swapEndian . unInt16LE
 
-instance EndianPair Word24LE Word24BE where
+instance EndianPair 3 Word24LE Word24BE where
   toLittleEndian = Word24LE . swapEndian . unWord24BE
   toBigEndian = Word24BE . swapEndian . unWord24LE
 
-instance EndianPair Int24LE Int24BE where
+instance EndianPair 3 Int24LE Int24BE where
   toLittleEndian = Int24LE . swapEndian . unInt24BE
   toBigEndian = Int24BE . swapEndian . unInt24LE
 
-instance EndianPair Word32LE Word32BE where
+instance EndianPair 4 Word32LE Word32BE where
   toLittleEndian = Word32LE . swapEndian . unWord32BE
   toBigEndian = Word32BE . swapEndian . unWord32LE
 
-instance EndianPair Int32LE Int32BE where
+instance EndianPair 4 Int32LE Int32BE where
   toLittleEndian = Int32LE . swapEndian . unInt32BE
   toBigEndian = Int32BE . swapEndian . unInt32LE
 
-instance EndianPair Word64LE Word64BE where
+instance EndianPair 8 Word64LE Word64BE where
   toLittleEndian = Word64LE . swapEndian . unWord64BE
   toBigEndian = Word64BE . swapEndian . unWord64LE
 
-instance EndianPair Int64LE Int64BE where
+instance EndianPair 8 Int64LE Int64BE where
   toLittleEndian = Int64LE . swapEndian . unInt64BE
   toBigEndian = Int64BE . swapEndian . unInt64LE
 
-instance EndianPair FloatLE FloatBE where
+instance EndianPair 4 FloatLE FloatBE where
   toLittleEndian = FloatLE . swapEndian . unFloatBE
   toBigEndian = FloatBE . swapEndian . unFloatLE
 
-instance EndianPair DoubleLE DoubleBE where
+instance EndianPair 8 DoubleLE DoubleBE where
   toLittleEndian = DoubleLE . swapEndian . unDoubleBE
   toBigEndian = DoubleBE . swapEndian . unDoubleLE

@@ -49,51 +49,52 @@ import Data.Primitive.Ptr (indexOffPtr, writeOffPtr)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
+import GHC.TypeLits (Nat)
 
 -- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
 -- It's all about reading and writing structures from lifted byte arrays and pointers.
-class StaticByteSized a => LiftedPrim a where
+class StaticByteSized n a => LiftedPrim (n :: Nat) a | a -> n where
   indexArrayLiftedInBytes :: ByteArray -> ByteCount -> a
   writeArrayLiftedInBytes :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> a -> m ()
   indexPtrLiftedInBytes :: Ptr Word8 -> ByteCount -> a
   writePtrLiftedInBytes :: PrimMonad m => Ptr Word8 -> ByteCount -> a -> m ()
 
-indexArrayLiftedInElems :: LiftedPrim a => Proxy a -> ByteArray -> ElemCount -> a
+indexArrayLiftedInElems :: LiftedPrim n a => Proxy a -> ByteArray -> ElemCount -> a
 indexArrayLiftedInElems prox arr pos =
   indexArrayLiftedInBytes arr (coerce pos * staticByteSize prox)
 
-writeArrayLiftedInElems :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> ElemCount -> a -> m ()
+writeArrayLiftedInElems :: (PrimMonad m, LiftedPrim n a) => MutableByteArray (PrimState m) -> ElemCount -> a -> m ()
 writeArrayLiftedInElems arr pos val =
   writeArrayLiftedInBytes arr (coerce pos * staticByteSize (proxyFor val)) val
 
-indexPtrLiftedInElems :: LiftedPrim a => Proxy a -> Ptr Word8 -> ElemCount -> a
+indexPtrLiftedInElems :: LiftedPrim n a => Proxy a -> Ptr Word8 -> ElemCount -> a
 indexPtrLiftedInElems prox ptr pos =
   indexPtrLiftedInBytes ptr (coerce pos * staticByteSize prox)
 
-writePtrLiftedInElems :: (PrimMonad m, LiftedPrim a) => Ptr Word8 -> ElemCount -> a -> m ()
+writePtrLiftedInElems :: (PrimMonad m, LiftedPrim n a) => Ptr Word8 -> ElemCount -> a -> m ()
 writePtrLiftedInElems ptr pos val =
   writePtrLiftedInBytes ptr (coerce pos * staticByteSize (proxyFor val)) val
 
-instance LiftedPrim Word8 where
+instance LiftedPrim 1 Word8 where
   indexArrayLiftedInBytes arr = indexByteArray arr . coerce
   writeArrayLiftedInBytes marr = writeByteArray marr . coerce
   indexPtrLiftedInBytes ptr = indexOffPtr ptr . coerce
   writePtrLiftedInBytes ptr = writeOffPtr ptr . coerce
 
-instance LiftedPrim Int8 where
+instance LiftedPrim 1 Int8 where
   indexArrayLiftedInBytes arr = indexByteArray arr . coerce
   writeArrayLiftedInBytes marr = writeByteArray marr . coerce
   indexPtrLiftedInBytes ptr = indexOffPtr (coerce ptr) . coerce
   writePtrLiftedInBytes ptr = writeOffPtr (coerce ptr) . coerce
 
 -- | NOTE: Relies on same byte width of both types!
-instance (Integral x, LiftedPrim x, Integral y) => LiftedPrim (ViaFromIntegral x y) where
+instance (Integral x, LiftedPrim n x, Integral y) => LiftedPrim n (ViaFromIntegral n x y) where
   indexArrayLiftedInBytes arr off = ViaFromIntegral (fromIntegral (indexArrayLiftedInBytes arr off :: x))
   writeArrayLiftedInBytes arr off val = let x = fromIntegral (unViaFromIntegral val) :: x in writeArrayLiftedInBytes arr off x
   indexPtrLiftedInBytes ptr = ViaFromIntegral . fromIntegral @x @y . indexPtrLiftedInBytes ptr
   writePtrLiftedInBytes ptr off (ViaFromIntegral y) = writePtrLiftedInBytes ptr off (fromIntegral y :: x)
 
-instance LiftedPrim Word16LE where
+instance LiftedPrim 2 Word16LE where
   indexArrayLiftedInBytes arr off =
     let !b0 = indexByteArray arr (coerce off)
         !b1 = indexByteArray arr (coerce off + 1)
@@ -114,7 +115,7 @@ instance LiftedPrim Word16LE where
     in  writeOffPtr ptr (coerce off) b0
           *> writeOffPtr ptr (coerce off + 1) b1
 
-instance LiftedPrim Word24LE where
+instance LiftedPrim 3 Word24LE where
   indexArrayLiftedInBytes arr off =
     let !b0 = indexByteArray arr (coerce off)
         !b1 = indexByteArray arr (coerce off + 1)
@@ -139,7 +140,7 @@ instance LiftedPrim Word24LE where
           *> writeOffPtr ptr (coerce off + 1) b1
           *> writeOffPtr ptr (coerce off + 2) b2
 
-instance LiftedPrim Word32LE where
+instance LiftedPrim 4 Word32LE where
   indexArrayLiftedInBytes arr off =
     let !b0 = indexByteArray arr (coerce off)
         !b1 = indexByteArray arr (coerce off + 1)
@@ -168,7 +169,7 @@ instance LiftedPrim Word32LE where
           *> writeOffPtr ptr (coerce off + 2) b2
           *> writeOffPtr ptr (coerce off + 3) b3
 
-instance LiftedPrim Word64LE where
+instance LiftedPrim 8 Word64LE where
   indexArrayLiftedInBytes arr off =
     let !b0 = indexArrayLiftedInBytes arr (coerce off)
         !b1 = indexArrayLiftedInBytes arr (coerce off + 1)
@@ -213,7 +214,7 @@ instance LiftedPrim Word64LE where
           *> writeOffPtr ptr (coerce off + 6) b6
           *> writeOffPtr ptr (coerce off + 7) b7
 
-instance LiftedPrim FloatLE where
+instance LiftedPrim 4 FloatLE where
   indexArrayLiftedInBytes arr off =
     let !b0 = indexByteArray arr (coerce off)
         !b1 = indexByteArray arr (coerce off + 1)
@@ -242,7 +243,7 @@ instance LiftedPrim FloatLE where
           *> writeOffPtr ptr (coerce off + 2) b2
           *> writeOffPtr ptr (coerce off + 3) b3
 
-instance LiftedPrim DoubleLE where
+instance LiftedPrim 8 DoubleLE where
   indexArrayLiftedInBytes arr off =
     let !b0 = indexArrayLiftedInBytes arr (coerce off)
         !b1 = indexArrayLiftedInBytes arr (coerce off + 1)
@@ -287,42 +288,42 @@ instance LiftedPrim DoubleLE where
           *> writeOffPtr ptr (coerce off + 6) b6
           *> writeOffPtr ptr (coerce off + 7) b7
 
-instance (LiftedPrim le, EndianPair le be) => LiftedPrim (ViaEndianPair le be) where
+instance (LiftedPrim n le, EndianPair n le be) => LiftedPrim n (ViaEndianPair n le be) where
   indexArrayLiftedInBytes arr off = ViaEndianPair (toBigEndian (indexArrayLiftedInBytes arr off))
   writeArrayLiftedInBytes arr off = writeArrayLiftedInBytes arr off . toLittleEndian . unViaEndianPair
   indexPtrLiftedInBytes ptr off = ViaEndianPair (toBigEndian (indexPtrLiftedInBytes ptr off))
   writePtrLiftedInBytes ptr off = writePtrLiftedInBytes ptr off . toLittleEndian . unViaEndianPair
 
-deriving via (ViaFromIntegral Word16LE Int16LE) instance LiftedPrim Int16LE
+deriving via (ViaFromIntegral 2 Word16LE Int16LE) instance LiftedPrim 2 Int16LE
 
-deriving via (ViaFromIntegral Word24LE Int24LE) instance LiftedPrim Int24LE
+deriving via (ViaFromIntegral 3 Word24LE Int24LE) instance LiftedPrim 3 Int24LE
 
-deriving via (ViaFromIntegral Word32LE Int32LE) instance LiftedPrim Int32LE
+deriving via (ViaFromIntegral 4 Word32LE Int32LE) instance LiftedPrim 4 Int32LE
 
-deriving via (ViaFromIntegral Word64LE Int64LE) instance LiftedPrim Int64LE
+deriving via (ViaFromIntegral 8 Word64LE Int64LE) instance LiftedPrim 8 Int64LE
 
-deriving via (ViaEndianPair Word16LE Word16BE) instance LiftedPrim Word16BE
+deriving via (ViaEndianPair 2 Word16LE Word16BE) instance LiftedPrim 2 Word16BE
 
-deriving via (ViaEndianPair Int16LE Int16BE) instance LiftedPrim Int16BE
+deriving via (ViaEndianPair 2 Int16LE Int16BE) instance LiftedPrim 2 Int16BE
 
-deriving via (ViaEndianPair Word24LE Word24BE) instance LiftedPrim Word24BE
+deriving via (ViaEndianPair 3 Word24LE Word24BE) instance LiftedPrim 3 Word24BE
 
-deriving via (ViaEndianPair Int24LE Int24BE) instance LiftedPrim Int24BE
+deriving via (ViaEndianPair 3 Int24LE Int24BE) instance LiftedPrim 3 Int24BE
 
-deriving via (ViaEndianPair Word32LE Word32BE) instance LiftedPrim Word32BE
+deriving via (ViaEndianPair 4 Word32LE Word32BE) instance LiftedPrim 4 Word32BE
 
-deriving via (ViaEndianPair Int32LE Int32BE) instance LiftedPrim Int32BE
+deriving via (ViaEndianPair 4 Int32LE Int32BE) instance LiftedPrim 4 Int32BE
 
-deriving via (ViaEndianPair Word64LE Word64BE) instance LiftedPrim Word64BE
+deriving via (ViaEndianPair 8 Word64LE Word64BE) instance LiftedPrim 8 Word64BE
 
-deriving via (ViaEndianPair Int64LE Int64BE) instance LiftedPrim Int64BE
+deriving via (ViaEndianPair 8 Int64LE Int64BE) instance LiftedPrim 8 Int64BE
 
-deriving via (ViaEndianPair FloatLE FloatBE) instance LiftedPrim FloatBE
+deriving via (ViaEndianPair 4 FloatLE FloatBE) instance LiftedPrim 4 FloatBE
 
-deriving via (ViaEndianPair DoubleLE DoubleBE) instance LiftedPrim DoubleBE
+deriving via (ViaEndianPair 8 DoubleLE DoubleBE) instance LiftedPrim 8 DoubleBE
 
 -- | Fill a byte array with the given value
-setByteArrayLifted :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> a -> m ()
+setByteArrayLifted :: (PrimMonad m, LiftedPrim n a) => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> a -> m ()
 setByteArrayLifted arr off len val = do
   let elemSize = staticByteSize (proxyFor val)
       elemLen = div (coerce len) elemSize

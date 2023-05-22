@@ -49,13 +49,13 @@ import Data.Sequence (Seq)
 import Data.Word (Word8)
 
 data GetStaticSeqF a where
-  GetStaticSeqF :: StaticByteSized z => !ElemCount -> Get z -> (Seq z -> a) -> GetStaticSeqF a
+  GetStaticSeqF :: StaticByteSized n z => !ElemCount -> Get z -> (Seq z -> a) -> GetStaticSeqF a
 
 instance Functor GetStaticSeqF where
   fmap f (GetStaticSeqF n g k) = GetStaticSeqF n g (f . k)
 
 data GetStaticArrayF a where
-  GetStaticArrayF :: LiftedPrim z => !ElemCount -> Proxy z -> (LiftedPrimArray z -> a) -> GetStaticArrayF a
+  GetStaticArrayF :: LiftedPrim n z => !ElemCount -> Proxy z -> (LiftedPrimArray z -> a) -> GetStaticArrayF a
 
 instance Functor GetStaticArrayF where
   fmap f (GetStaticArrayF n p k) = GetStaticArrayF n p (f . k)
@@ -118,13 +118,13 @@ instance MonadFail Get where
   fail msg = Get (F (\_ y -> y (GetFFail msg)))
 
 data PutStaticSeqF a where
-  PutStaticSeqF :: StaticByteSized z => !ElemCount -> !(Maybe z) -> (z -> Put) -> !(Seq z) -> a -> PutStaticSeqF a
+  PutStaticSeqF :: StaticByteSized n z => !ElemCount -> !(Maybe z) -> (z -> Put) -> !(Seq z) -> a -> PutStaticSeqF a
 
 instance Functor PutStaticSeqF where
   fmap f (PutStaticSeqF n z p s k) = PutStaticSeqF n z p s (f k)
 
 data PutStaticArrayF a where
-  PutStaticArrayF :: LiftedPrim z => !ElemCount -> !(Maybe z) -> !(LiftedPrimArray z) -> a -> PutStaticArrayF a
+  PutStaticArrayF :: LiftedPrim n z => !ElemCount -> !(Maybe z) -> !(LiftedPrimArray z) -> a -> PutStaticArrayF a
 
 instance Functor PutStaticArrayF where
   fmap f (PutStaticArrayF n z a k) = PutStaticArrayF n z a (f k)
