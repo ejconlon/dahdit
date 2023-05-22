@@ -184,7 +184,7 @@ instance Default (ExactBytes n s) where
 
 class SymLen (n :: Nat) (s :: Symbol) | s -> n
 
-instance SymLen 0 ""
+instance {-# OVERLAPPING #-} SymLen 0 ""
 
 instance (SymLen n s, m ~ n + 1, t ~ ConsSymbol c s) => SymLen m t
 
