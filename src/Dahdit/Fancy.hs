@@ -1,5 +1,5 @@
-{-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoStarIsType #-}
 
 module Dahdit.Fancy
   ( TermBytes (..)
@@ -43,7 +43,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.String (IsString)
 import Data.Word (Word8)
-import GHC.TypeLits (KnownNat, KnownSymbol, Nat, Symbol, natVal, symbolVal, type (*), type (+), ConsSymbol)
+import GHC.TypeLits (ConsSymbol, KnownNat, KnownSymbol, Nat, Symbol, natVal, symbolVal, type (*), type (+))
 
 getUntilNull :: Get (ByteCount, [Word8])
 getUntilNull = go 0 []
@@ -121,8 +121,8 @@ instance KnownNat n => Ord (StaticBytes n) where
 instance Default (StaticBytes n) where
   def = StaticBytes BSS.empty
 
-instance KnownNat n => StaticByteSized n (StaticBytes n) where
-  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n))
+instance KnownNat n => StaticByteSized (StaticBytes n) where
+  type StaticSize (StaticBytes n) = n
 
 instance KnownNat n => Binary (StaticBytes n) where
   byteSize = byteSizeViaStatic
@@ -136,10 +136,10 @@ newtype StaticSeq (n :: Nat) a = StaticSeq {unStaticSeq :: Seq a}
 instance (KnownNat n, Default a) => Default (StaticSeq n a) where
   def = StaticSeq (Seq.replicate (fromInteger (natVal (Proxy :: Proxy n))) def)
 
-instance (KnownNat n, StaticByteSized m a, o ~ n * m, KnownNat o) => StaticByteSized o (StaticSeq n a) where
-  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
+instance (KnownNat n, StaticByteSized a, o ~ n * StaticSize a, KnownNat o) => StaticByteSized (StaticSeq n a) where
+  type StaticSize (StaticSeq n a) = n * StaticSize a
 
-instance (KnownNat n, Binary a, StaticByteSized m a, Default a, o ~ n * m, KnownNat o) => Binary (StaticSeq n a) where
+instance (KnownNat n, Binary a, StaticByteSized a, Default a, o ~ n * StaticSize a, KnownNat o) => Binary (StaticSeq n a) where
   byteSize = byteSizeViaStatic
   get = fmap StaticSeq (getStaticSeq (fromInteger (natVal (Proxy :: Proxy n))) get)
   put = unsafePutStaticSeqN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) put . unStaticSeq
@@ -148,13 +148,13 @@ newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray
   deriving stock (Show)
   deriving newtype (Eq)
 
-instance (KnownNat n, LiftedPrim m a, Default a) => Default (StaticArray n a) where
+instance (KnownNat n, LiftedPrim a, Default a) => Default (StaticArray n a) where
   def = StaticArray (replicateLiftedPrimArray (fromInteger (natVal (Proxy :: Proxy n))) def)
 
-instance (KnownNat n, StaticByteSized m a, o ~ n * m, KnownNat o) => StaticByteSized o (StaticArray n a) where
-  staticByteSize _ = fromInteger (natVal (Proxy :: Proxy n)) * staticByteSize (Proxy :: Proxy a)
+instance (KnownNat n, StaticByteSized a, o ~ n * StaticSize a, KnownNat o) => StaticByteSized (StaticArray n a) where
+  type StaticSize (StaticArray n a) = n * StaticSize a
 
-instance (KnownNat n, LiftedPrim m a, Default a, o ~ n * m, KnownNat o) => Binary (StaticArray n a) where
+instance (KnownNat n, LiftedPrim a, Default a, o ~ n * StaticSize a, KnownNat o) => Binary (StaticArray n a) where
   byteSize = byteSizeViaStatic
   get = fmap StaticArray (getStaticArray (fromInteger (natVal (Proxy :: Proxy n))))
   put = unsafePutStaticArrayN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray
@@ -166,7 +166,8 @@ newtype BoolByte = BoolByte {unBoolByte :: Bool}
 instance Default BoolByte where
   def = BoolByte False
 
-instance StaticByteSized 1 BoolByte where
+instance StaticByteSized BoolByte where
+  type StaticSize BoolByte = 1
   staticByteSize _ = 1
 
 instance Binary BoolByte where
@@ -182,10 +183,13 @@ instance Default (ExactBytes n s) where
   def = ExactBytes ()
 
 class SymLen (n :: Nat) (s :: Symbol) | s -> n
+
 instance SymLen 0 ""
+
 instance (SymLen n s, m ~ n + 1, t ~ ConsSymbol c s) => SymLen m t
 
-instance (SymLen n s, KnownSymbol s, KnownNat n) => StaticByteSized n (ExactBytes n s)
+instance (SymLen n s, KnownSymbol s, KnownNat n) => StaticByteSized (ExactBytes n s) where
+  type StaticSize (ExactBytes n s) = n
 
 instance (SymLen n s, KnownSymbol s, KnownNat n) => Binary (ExactBytes n s) where
   byteSize = byteSizeViaStatic

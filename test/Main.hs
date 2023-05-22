@@ -1,3 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-}
+
 module Main (main) where
 
 import Control.Monad.Primitive (PrimState)
@@ -161,7 +163,7 @@ data DynFoo = DynFoo !Word8 !Word16LE
 
 data StaFoo = StaFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
-  deriving (StaticByteSized 3, Binary) via (ViaStaticGeneric StaFoo)
+  deriving (StaticByteSized, Binary) via (ViaStaticGeneric StaFoo)
 
 data TagFoo = TagFooOne !Word8 | TagFooTwo !Word16LE
   deriving stock (Eq, Show, Generic)
@@ -267,45 +269,45 @@ testStaticByteSize :: TestTree
 testStaticByteSize =
   testGroup
     "staticByteSize"
-    [ testCase "Word8" (staticByteSize @_ @Word8 Proxy @?= 1)
-    , testCase "Int8" (staticByteSize @_ @Int8 Proxy @?= 1)
-    , testCase "Word16" (staticByteSize @_ @Word16 Proxy @?= 2)
-    , testCase "Int16" (staticByteSize @_ @Int16 Proxy @?= 2)
-    , testCase "Word24" (staticByteSize @_ @Word24 Proxy @?= 3)
-    , testCase "Int24" (staticByteSize @_ @Int24 Proxy @?= 3)
-    , testCase "Word32" (staticByteSize @_ @Word32 Proxy @?= 4)
-    , testCase "Int32" (staticByteSize @_ @Int32 Proxy @?= 4)
-    , testCase "Word64" (staticByteSize @_ @Word64 Proxy @?= 8)
-    , testCase "Int64" (staticByteSize @_ @Int64 Proxy @?= 8)
-    , testCase "Float" (staticByteSize @_ @Float Proxy @?= 4)
-    , testCase "Double" (staticByteSize @_ @Double Proxy @?= 8)
-    , testCase "()" (staticByteSize @_ @() Proxy @?= 0)
-    , testCase "Bool" (staticByteSize @_ @Bool Proxy @?= 1)
-    , testCase "Char" (staticByteSize @_ @Char Proxy @?= 1)
-    , testCase "Int" (staticByteSize @_ @Int Proxy @?= 8)
-    , testCase "Word16LE" (staticByteSize @_ @Word16LE Proxy @?= 2)
-    , testCase "Int16LE" (staticByteSize @_ @Int16LE Proxy @?= 2)
-    , testCase "Word24LE" (staticByteSize @_ @Word24LE Proxy @?= 3)
-    , testCase "Int24LE" (staticByteSize @_ @Int24LE Proxy @?= 3)
-    , testCase "Word32LE" (staticByteSize @_ @Word32LE Proxy @?= 4)
-    , testCase "Int32LE" (staticByteSize @_ @Int32LE Proxy @?= 4)
-    , testCase "Word64LE" (staticByteSize @_ @Word64LE Proxy @?= 8)
-    , testCase "Int64LE" (staticByteSize @_ @Int64LE Proxy @?= 8)
-    , testCase "FloatLE" (staticByteSize @_ @FloatLE Proxy @?= 4)
-    , testCase "DoubleLE" (staticByteSize @_ @DoubleLE Proxy @?= 8)
-    , testCase "Word16BE" (staticByteSize @_ @Word16BE Proxy @?= 2)
-    , testCase "Int16BE" (staticByteSize @_ @Int16BE Proxy @?= 2)
-    , testCase "Word24BE" (staticByteSize @_ @Word24BE Proxy @?= 3)
-    , testCase "Int24BE" (staticByteSize @_ @Int24BE Proxy @?= 3)
-    , testCase "Word32BE" (staticByteSize @_ @Word32BE Proxy @?= 4)
-    , testCase "Int32BE" (staticByteSize @_ @Int32BE Proxy @?= 4)
-    , testCase "Word64BE" (staticByteSize @_ @Word64BE Proxy @?= 8)
-    , testCase "Int64BE" (staticByteSize @_ @Int64BE Proxy @?= 8)
-    , testCase "FloatBE" (staticByteSize @_ @FloatBE Proxy @?= 4)
-    , testCase "DoubleBE" (staticByteSize @_ @DoubleBE Proxy @?= 8)
-    , testCase "StaFoo" (staticByteSize @_ @StaFoo Proxy @?= 3)
-    , testCase "BoolByte" (staticByteSize @_ @BoolByte Proxy @?= 1)
-    , testCase "StaBytes" (staticByteSize @_ @StaBytes Proxy @?= 2)
+    [ testCase "Word8" (staticByteSize @Word8 Proxy @?= 1)
+    , testCase "Int8" (staticByteSize @Int8 Proxy @?= 1)
+    , testCase "Word16" (staticByteSize @Word16 Proxy @?= 2)
+    , testCase "Int16" (staticByteSize @Int16 Proxy @?= 2)
+    , testCase "Word24" (staticByteSize @Word24 Proxy @?= 3)
+    , testCase "Int24" (staticByteSize @Int24 Proxy @?= 3)
+    , testCase "Word32" (staticByteSize @Word32 Proxy @?= 4)
+    , testCase "Int32" (staticByteSize @Int32 Proxy @?= 4)
+    , testCase "Word64" (staticByteSize @Word64 Proxy @?= 8)
+    , testCase "Int64" (staticByteSize @Int64 Proxy @?= 8)
+    , testCase "Float" (staticByteSize @Float Proxy @?= 4)
+    , testCase "Double" (staticByteSize @Double Proxy @?= 8)
+    , testCase "()" (staticByteSize @() Proxy @?= 0)
+    , testCase "Bool" (staticByteSize @Bool Proxy @?= 1)
+    , testCase "Char" (staticByteSize @Char Proxy @?= 1)
+    , testCase "Int" (staticByteSize @Int Proxy @?= 8)
+    , testCase "Word16LE" (staticByteSize @Word16LE Proxy @?= 2)
+    , testCase "Int16LE" (staticByteSize @Int16LE Proxy @?= 2)
+    , testCase "Word24LE" (staticByteSize @Word24LE Proxy @?= 3)
+    , testCase "Int24LE" (staticByteSize @Int24LE Proxy @?= 3)
+    , testCase "Word32LE" (staticByteSize @Word32LE Proxy @?= 4)
+    , testCase "Int32LE" (staticByteSize @Int32LE Proxy @?= 4)
+    , testCase "Word64LE" (staticByteSize @Word64LE Proxy @?= 8)
+    , testCase "Int64LE" (staticByteSize @Int64LE Proxy @?= 8)
+    , testCase "FloatLE" (staticByteSize @FloatLE Proxy @?= 4)
+    , testCase "DoubleLE" (staticByteSize @DoubleLE Proxy @?= 8)
+    , testCase "Word16BE" (staticByteSize @Word16BE Proxy @?= 2)
+    , testCase "Int16BE" (staticByteSize @Int16BE Proxy @?= 2)
+    , testCase "Word24BE" (staticByteSize @Word24BE Proxy @?= 3)
+    , testCase "Int24BE" (staticByteSize @Int24BE Proxy @?= 3)
+    , testCase "Word32BE" (staticByteSize @Word32BE Proxy @?= 4)
+    , testCase "Int32BE" (staticByteSize @Int32BE Proxy @?= 4)
+    , testCase "Word64BE" (staticByteSize @Word64BE Proxy @?= 8)
+    , testCase "Int64BE" (staticByteSize @Int64BE Proxy @?= 8)
+    , testCase "FloatBE" (staticByteSize @FloatBE Proxy @?= 4)
+    , testCase "DoubleBE" (staticByteSize @DoubleBE Proxy @?= 8)
+    , testCase "StaFoo" (staticByteSize @StaFoo Proxy @?= 3)
+    , testCase "BoolByte" (staticByteSize @BoolByte Proxy @?= 1)
+    , testCase "StaBytes" (staticByteSize @StaBytes Proxy @?= 2)
     ]
 
 getCases :: [GetCase]
@@ -342,7 +344,7 @@ getCases =
   , GetCase "Two Word16LE" ((,) <$> getWord16LE <*> getWord16LE) (Just (4, 0, (0x5DEC, 0x4020))) [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "Seq" (getSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "StaticSeq" (getStaticSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
-  , GetCase "StaticArray" (getStaticArray @_ @Word16LE 2) (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , GetCase "StaticArray" (getStaticArray @Word16LE 2) (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "DynFoo" (get @DynFoo) (Just (3, 0, DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , GetCase "StaFoo" (get @StaFoo) (Just (3, 0, StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , GetCase "getRemainingSize" getRemainingSize (Just (0, 3, 3)) [0xBB, 0xEC, 0x5D]
@@ -357,7 +359,7 @@ getCases =
   , GetCase "BoolByte True" (get @BoolByte) (Just (1, 0, BoolByte True)) [0x01]
   , GetCase "BoolByte False" (get @BoolByte) (Just (1, 0, BoolByte False)) [0x00]
   , GetCase "getByteArray" (getByteArray 3) (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC, 0x5D]
-  , GetCase "getLiftedPrimArray" (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @_ @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D]
+  , GetCase "getLiftedPrimArray" (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D]
   , GetCase "StaBytes" (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21]
   , GetCase "TagFoo (one)" (get @TagFoo) (Just (2, 0, TagFooOne 7)) [0x00, 0x07]
   , GetCase "TagFoo (two)" (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00]
@@ -395,13 +397,13 @@ putCases =
   , PutCase "Two Word16LE" (putWord16LE 0x5DEC *> putWord16LE 0x4020) [0xEC, 0x5D, 0x20, 0x40]
   , PutCase "Seq" (putSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , PutCase "StaticSeq" (putStaticSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
-  , PutCase "StaticArray" (putStaticArray @_ @Word16LE (liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , PutCase "StaticArray" (putStaticArray @Word16LE (liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , PutCase "DynFoo" (put (DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , PutCase "StaFoo" (put (StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , PutCase "BoolByte True" (put (BoolByte True)) [0x01]
   , PutCase "BoolByte False" (put (BoolByte False)) [0x00]
   , PutCase "putByteArray" (putByteArray (byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC]
-  , PutCase "putLiftedPrimArray" (putLiftedPrimArray (liftedPrimArrayFromList @_ @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]
+  , PutCase "putLiftedPrimArray" (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]
   , PutCase "StaBytes" (put (mkStaBytes "hi")) [0x68, 0x69]
   , PutCase "StaBytes (less)" (put (mkStaBytes "h")) [0x68, 0x00]
   , PutCase "StaBytes (more)" (put (mkStaBytes "hi!")) [0x68, 0x69]

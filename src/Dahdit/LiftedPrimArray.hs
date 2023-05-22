@@ -58,10 +58,10 @@ newtype MutableLiftedPrimArray m a = MutableLiftedPrimArray {unMutableLiftedPrim
 emptyLiftedPrimArray :: LiftedPrimArray a
 emptyLiftedPrimArray = LiftedPrimArray emptyByteArray
 
-indexLiftedPrimArray :: LiftedPrim n a => LiftedPrimArray a -> ElemCount -> a
+indexLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> ElemCount -> a
 indexLiftedPrimArray (LiftedPrimArray arr) = indexArrayLiftedInElems Proxy arr
 
-writeLiftedPrimArray :: (LiftedPrim n a, PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> a -> m ()
+writeLiftedPrimArray :: (LiftedPrim a, PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> a -> m ()
 writeLiftedPrimArray (MutableLiftedPrimArray arr) = writeArrayLiftedInElems arr
 
 freezeLiftedPrimArray :: PrimMonad m => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> ElemCount -> m (LiftedPrimArray a)
@@ -76,7 +76,7 @@ thawLiftedPrimArray (LiftedPrimArray arr) off len = fmap MutableLiftedPrimArray 
 unsafeThawLiftedPrimArray :: PrimMonad m => LiftedPrimArray a -> m (MutableLiftedPrimArray (PrimState m) a)
 unsafeThawLiftedPrimArray (LiftedPrimArray arr) = fmap MutableLiftedPrimArray (unsafeThawByteArray arr)
 
-liftedPrimArrayFromListN :: LiftedPrim n a => ElemCount -> [a] -> LiftedPrimArray a
+liftedPrimArrayFromListN :: LiftedPrim a => ElemCount -> [a] -> LiftedPrimArray a
 liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
   let elemSize = staticByteSize (proxyForF xs)
       len = coerce n * coerce elemSize
@@ -88,22 +88,22 @@ liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
     modifySTRef' offRef (elemSize +)
   pure arr
 
-liftedPrimArrayFromList :: LiftedPrim n a => [a] -> LiftedPrimArray a
+liftedPrimArrayFromList :: LiftedPrim a => [a] -> LiftedPrimArray a
 liftedPrimArrayFromList xs = liftedPrimArrayFromListN (coerce (length xs)) xs
 
-generateLiftedPrimArray :: LiftedPrim n a => ElemCount -> (ElemCount -> a) -> LiftedPrimArray a
+generateLiftedPrimArray :: LiftedPrim a => ElemCount -> (ElemCount -> a) -> LiftedPrimArray a
 generateLiftedPrimArray n f = liftedPrimArrayFromListN n (fmap f [0 .. n - 1])
 
 sizeofLiftedPrimArray :: LiftedPrimArray a -> ByteCount
 sizeofLiftedPrimArray (LiftedPrimArray arr) = coerce (sizeofByteArray arr)
 
-lengthLiftedPrimArray :: LiftedPrim n a => LiftedPrimArray a -> ElemCount
+lengthLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> ElemCount
 lengthLiftedPrimArray pa@(LiftedPrimArray arr) =
   let elemSize = coerce (staticByteSize (proxyForF pa))
       arrSize = sizeofByteArray arr
   in  coerce (div arrSize elemSize)
 
-cloneLiftedPrimArray :: LiftedPrim n a => LiftedPrimArray a -> ElemCount -> ElemCount -> LiftedPrimArray a
+cloneLiftedPrimArray :: LiftedPrim a => LiftedPrimArray a -> ElemCount -> ElemCount -> LiftedPrimArray a
 cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
   let elemSize = staticByteSize (proxyForF pa)
       byteOff = coerce off * elemSize
@@ -111,7 +111,7 @@ cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
       arr' = cloneByteArray arr (coerce byteOff) (coerce byteLen)
   in  LiftedPrimArray arr'
 
-replicateLiftedPrimArray :: LiftedPrim n a => ElemCount -> a -> LiftedPrimArray a
+replicateLiftedPrimArray :: LiftedPrim a => ElemCount -> a -> LiftedPrimArray a
 replicateLiftedPrimArray len val = LiftedPrimArray $ runByteArray $ do
   let elemSize = staticByteSize (proxyFor val)
       byteLen = coerce len * elemSize

@@ -32,12 +32,13 @@ instance (Binary x, Integral x, Integral a) => BinaryRep x (ViaIntegral x a) whe
   fromBinaryRep = Right . ViaIntegral . fromIntegral
   toBinaryRep = fromIntegral . unViaIntegral
 
-newtype ViaBinaryRep a = ViaBinaryRep {unViaBinaryRep :: a}
+newtype ViaBinaryRep x a = ViaBinaryRep {unViaBinaryRep :: a}
 
-instance (StaticByteSized n x, BinaryRep x a) => StaticByteSized n (ViaBinaryRep a) where
+instance (StaticByteSized x, BinaryRep x a) => StaticByteSized (ViaBinaryRep x a) where
+  type StaticSize (ViaBinaryRep x a) = StaticSize x
   staticByteSize _ = staticByteSize (Proxy :: Proxy x)
 
-instance BinaryRep x a => Binary (ViaBinaryRep a) where
+instance BinaryRep x a => Binary (ViaBinaryRep x a) where
   byteSize = byteSize . toBinaryRep . unViaBinaryRep
   get = get >>= either fail (pure . ViaBinaryRep) . fromBinaryRep
   put = put . toBinaryRep . unViaBinaryRep
