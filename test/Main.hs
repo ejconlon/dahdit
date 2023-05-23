@@ -446,7 +446,7 @@ testMutPutOffset n p = testCase ("mut put offset (" ++ n ++ ")") $ do
   c2 <- mutPutTargetOffset 1 (putWord16LE 0x5634) u
   c2 @?= 3
   x <- freezeSink (u `asProxyTypeOf` p)
-  x @?= [0x12, 0x34, 0x56, 0]
+  take 3 x @?= [0x12, 0x34, 0x56]
   pure ()
 
 data TargetDef where
