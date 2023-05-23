@@ -31,6 +31,8 @@ import Dahdit
   , ShortByteString
   , StaticByteSized (..)
   , StaticBytes (..)
+  , TermBytes16 (..)
+  , TermBytes8 (..)
   , ViaGeneric (..)
   , ViaStaticGeneric (..)
   , Word16BE
@@ -363,6 +365,14 @@ getCases =
   , GetCase "StaBytes" (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21]
   , GetCase "TagFoo (one)" (get @TagFoo) (Just (2, 0, TagFooOne 7)) [0x00, 0x07]
   , GetCase "TagFoo (two)" (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00]
+  , GetCase "TB8 0" (get @TermBytes8) (Just (1, 0, TermBytes8 BSS.empty)) [0]
+  , GetCase "TB8 1" (get @TermBytes8) (Just (2, 0, TermBytes8 (BSS.pack [1]))) [1, 0]
+  , GetCase "TB8 2" (get @TermBytes8) (Just (3, 0, TermBytes8 (BSS.pack [1, 2]))) [1, 2, 0]
+  , GetCase "TB8 3" (get @TermBytes8) (Just (4, 0, TermBytes8 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
+  , GetCase "TB16 0" (get @TermBytes16) (Just (2, 0, TermBytes16 BSS.empty)) [0, 0]
+  , GetCase "TB16 1" (get @TermBytes16) (Just (2, 0, TermBytes16 (BSS.pack [1]))) [1, 0]
+  , GetCase "TB16 2" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2]))) [1, 2, 0, 0]
+  , GetCase "TB16 3" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
   ]
 
 testGet :: CaseTarget z => String -> Proxy z -> TestTree
@@ -409,6 +419,14 @@ putCases =
   , PutCase "StaBytes (more)" (put (mkStaBytes "hi!")) [0x68, 0x69]
   , PutCase "TagFoo (one)" (put (TagFooOne 7)) [0x00, 0x07]
   , PutCase "TagFoo (two)" (put (TagFooTwo 7)) [0x01, 0x07, 0x00]
+  , PutCase "TB8 0" (put (TermBytes8 BSS.empty)) [0]
+  , PutCase "TB8 1" (put (TermBytes8 (BSS.pack [1]))) [1, 0]
+  , PutCase "TB8 2" (put (TermBytes8 (BSS.pack [1, 2]))) [1, 2, 0]
+  , PutCase "TB8 3" (put (TermBytes8 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
+  , PutCase "TB16 0" (put (TermBytes16 BSS.empty)) [0, 0]
+  , PutCase "TB16 1" (put (TermBytes16 (BSS.pack [1]))) [1, 0]
+  , PutCase "TB16 2" (put (TermBytes16 (BSS.pack [1, 2]))) [1, 2, 0, 0]
+  , PutCase "TB16 3" (put (TermBytes16 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
   ]
 
 testPut :: CaseTarget z => String -> Proxy z -> TestTree

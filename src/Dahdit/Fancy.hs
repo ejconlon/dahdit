@@ -3,7 +3,8 @@
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 module Dahdit.Fancy
-  ( TermBytes (..)
+  ( TermBytes8 (..)
+  , TermBytes16 (..)
   , StaticBytes (..)
   , mkStaticBytes
   , normStaticBytes
@@ -59,17 +60,37 @@ mkSBS :: ByteCount -> [Word8] -> ShortByteString
 mkSBS n bs = let !(ByteArray ba) = byteArrayFromListN (coerce n) bs in SBS ba
 
 -- | Bytes terminated with null byte.
--- NOTE: Terminated with TWO null bytes if the string is even length
--- to align to Word16 boundaries, as required for RIFF format, for example.
-newtype TermBytes = TermBytes {unTermBytes :: ShortByteString}
+newtype TermBytes8 = TermBytes8 {unTermBytes8 :: ShortByteString}
   deriving stock (Show)
   deriving newtype (Eq, Ord, IsString)
 
-instance Default TermBytes where
-  def = TermBytes BSS.empty
+instance Default TermBytes8 where
+  def = TermBytes8 BSS.empty
 
-instance Binary TermBytes where
-  byteSize (TermBytes sbs) =
+instance Binary TermBytes8 where
+  byteSize (TermBytes8 sbs) = ByteCount (BSS.length sbs + 1)
+
+  get = do
+    (i, acc) <- getUntilNull
+    let sbs = mkSBS i acc
+    pure (TermBytes8 sbs)
+
+  put (TermBytes8 sbs) = do
+    putByteString sbs
+    putWord8 0
+
+-- | Bytes terminated with null byte.
+-- NOTE: Terminated with TWO null bytes if the string is even length
+-- to align to Word16 boundaries, as required for RIFF format, for example.
+newtype TermBytes16 = TermBytes16 {unTermBytes16 :: ShortByteString}
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, IsString)
+
+instance Default TermBytes16 where
+  def = TermBytes16 BSS.empty
+
+instance Binary TermBytes16 where
+  byteSize (TermBytes16 sbs) =
     let bc = ByteCount (BSS.length sbs + 1)
     in  if even bc then bc else bc + 1
 
@@ -79,9 +100,9 @@ instance Binary TermBytes where
       w <- getWord8
       unless (w == 0) (fail "TermBytes missing word pad")
     let sbs = mkSBS i acc
-    pure (TermBytes sbs)
+    pure (TermBytes16 sbs)
 
-  put (TermBytes sbs) = do
+  put (TermBytes16 sbs) = do
     putByteString sbs
     putWord8 0
     unless (odd (BSS.length sbs)) (putWord8 0)
