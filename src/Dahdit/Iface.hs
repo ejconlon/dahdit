@@ -30,6 +30,10 @@ import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (ByteArray, MutableByteArray, sizeofByteArray)
+import Data.Text (Text)
+import Data.Text.Short (ShortText)
+import qualified Data.Text.Short as TS
+import qualified Data.Text.Short.Unsafe as TSU
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
 import Data.Vector.Storable.Mutable (MVector)
@@ -61,6 +65,18 @@ mutPutTargetOffset off p = mutPutTargetOffsetUnsafe off p (runCount p)
 
 mutPutTarget :: MutBinaryTarget m z => Put -> z -> m ByteCount
 mutPutTarget = mutPutTargetOffset 0
+
+instance BinaryTarget String where
+  getTargetOffset = runGetString
+  putTargetUnsafe = runPutString
+
+instance BinaryTarget Text where
+  getTargetOffset = runGetText
+  putTargetUnsafe = runPutText
+
+instance BinaryTarget ShortText where
+  getTargetOffset = runGetST
+  putTargetUnsafe = runPutST
 
 instance BinaryTarget ShortByteString where
   getTargetOffset = runGetSBS
@@ -119,6 +135,15 @@ encodeFile a = runPutFile (put a) (byteSize a)
 mutEncode :: (Binary a, MutBinaryTarget m z) => a -> z -> m ByteCount
 mutEncode a = mutPutTargetOffsetUnsafe 0 (put a) (byteSize a)
 
+runGetString :: ByteCount -> Get a -> String -> (Either GetError a, ByteCount)
+runGetString off act = runGetST off act . TS.pack
+
+runGetText :: ByteCount -> Get a -> Text -> (Either GetError a, ByteCount)
+runGetText off act = runGetST off act . TS.fromText
+
+runGetST :: ByteCount -> Get a -> ShortText -> (Either GetError a, ByteCount)
+runGetST off act = runGetSBS off act . TS.toShortByteString
+
 runGetBA :: ByteCount -> Get a -> ByteArray -> (Either GetError a, ByteCount)
 runGetBA off act ba = runGetInternal off act (coerce (sizeofByteArray ba)) ba
 
@@ -135,6 +160,15 @@ runGetFile :: Get a -> FilePath -> IO (Either GetError a, ByteCount)
 runGetFile act fp = do
   bs <- BS.readFile fp
   pure (runGetBS 0 act bs)
+
+runPutString :: Put -> ByteCount -> String
+runPutString act len = TS.unpack (runPutST act len)
+
+runPutText :: Put -> ByteCount -> Text
+runPutText act len = TS.toText (runPutST act len)
+
+runPutST :: Put -> ByteCount -> ShortText
+runPutST act len = TSU.fromShortByteStringUnsafe (runPutSBS act len)
 
 runPutBA :: Put -> ByteCount -> ByteArray
 runPutBA act len = runST (runPutInternal 0 act len allocBAMem freezeBAMem)
