@@ -21,6 +21,7 @@ module Dahdit.Funs
   , getInt64BE
   , getFloatBE
   , getDoubleBE
+  , getText
   , getByteString
   , getSkip
   , getExact
@@ -63,6 +64,7 @@ module Dahdit.Funs
   , putInt64BE
   , putFloatBE
   , putDoubleBE
+  , putText
   , putByteString
   , putFixedString
   , putList
@@ -130,6 +132,9 @@ import Data.Primitive.ByteArray (ByteArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
+import Data.Text.Short (ShortText)
+import qualified Data.Text.Short as TS
+import qualified Data.Text.Short.Unsafe as TSU
 import Data.Word (Word8)
 
 getWord8 :: Get Word8
@@ -197,6 +202,9 @@ getFloatBE = Get (F (\x y -> y (GetFFloatBE x)))
 
 getDoubleBE :: Get DoubleBE
 getDoubleBE = Get (F (\x y -> y (GetFDoubleBE x)))
+
+getText :: ByteCount -> Get ShortText
+getText = fmap TSU.fromShortByteStringUnsafe . getByteString
 
 getByteString :: ByteCount -> Get ShortByteString
 getByteString bc = Get (F (\x y -> y (GetFShortByteString bc x)))
@@ -379,6 +387,9 @@ putFloatBE d = PutM (F (\x y -> y (PutFFloatBE d (x ()))))
 
 putDoubleBE :: DoubleBE -> Put
 putDoubleBE d = PutM (F (\x y -> y (PutFDoubleBE d (x ()))))
+
+putText :: ShortText -> Put
+putText = putByteString . TS.toShortByteString
 
 putByteString :: ShortByteString -> Put
 putByteString sbs =
