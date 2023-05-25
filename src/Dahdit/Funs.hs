@@ -79,7 +79,7 @@ module Dahdit.Funs
   )
 where
 
-import Control.Monad (replicateM_, unless)
+import Control.Monad (replicateM_, unless, (>=>))
 import Control.Monad.Free.Church (F (..))
 import Dahdit.Free
   ( Get (..)
@@ -134,7 +134,6 @@ import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Text.Short (ShortText)
 import qualified Data.Text.Short as TS
-import qualified Data.Text.Short.Unsafe as TSU
 import Data.Word (Word8)
 
 getWord8 :: Get Word8
@@ -204,7 +203,7 @@ getDoubleBE :: Get DoubleBE
 getDoubleBE = Get (F (\x y -> y (GetFDoubleBE x)))
 
 getText :: ByteCount -> Get ShortText
-getText = fmap TSU.fromShortByteStringUnsafe . getByteString
+getText = getByteString >=> maybe (fail "Invalid unicode") pure . TS.fromShortByteString
 
 getByteString :: ByteCount -> Get ShortByteString
 getByteString bc = Get (F (\x y -> y (GetFShortByteString bc x)))
