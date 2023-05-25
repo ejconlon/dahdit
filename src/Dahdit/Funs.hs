@@ -132,8 +132,8 @@ import Data.Primitive.ByteArray (ByteArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
-import Data.Text.Short (ShortText)
-import qualified Data.Text.Short as TS
+import Data.Text (Text)
+import qualified Data.Text.Encoding as TE
 import Data.Word (Word8)
 
 getWord8 :: Get Word8
@@ -202,8 +202,8 @@ getFloatBE = Get (F (\x y -> y (GetFFloatBE x)))
 getDoubleBE :: Get DoubleBE
 getDoubleBE = Get (F (\x y -> y (GetFDoubleBE x)))
 
-getText :: ByteCount -> Get ShortText
-getText = getByteString >=> maybe (fail "Invalid unicode") pure . TS.fromShortByteString
+getText :: ByteCount -> Get Text
+getText = getByteString >=> either (fail . ("Invalid UTF-8: " ++) . show) pure . TE.decodeUtf8' . BSS.fromShort
 
 getByteString :: ByteCount -> Get ShortByteString
 getByteString bc = Get (F (\x y -> y (GetFShortByteString bc x)))
@@ -387,8 +387,8 @@ putFloatBE d = PutM (F (\x y -> y (PutFFloatBE d (x ()))))
 putDoubleBE :: DoubleBE -> Put
 putDoubleBE d = PutM (F (\x y -> y (PutFDoubleBE d (x ()))))
 
-putText :: ShortText -> Put
-putText = putByteString . TS.toShortByteString
+putText :: Text -> Put
+putText = putByteString . BSS.toShort . TE.encodeUtf8
 
 putByteString :: ShortByteString -> Put
 putByteString sbs =
