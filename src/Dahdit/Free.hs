@@ -46,6 +46,8 @@ import Data.Int (Int8)
 import Data.Primitive (ByteArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq)
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Word (Word8)
 
 data GetStaticSeqF a where
@@ -108,14 +110,14 @@ data GetF a
   | GetFSkip !ByteCount a
   | GetFLookAhead !(GetLookAheadF a)
   | GetFRemainingSize (ByteCount -> a)
-  | GetFFail !String
+  | GetFFail !Text
   deriving stock (Functor)
 
 newtype Get a = Get {unGet :: F GetF a}
   deriving newtype (Functor, Applicative, Monad)
 
 instance MonadFail Get where
-  fail msg = Get (F (\_ y -> y (GetFFail msg)))
+  fail msg = Get (F (\_ y -> y (GetFFail (T.pack msg))))
 
 data PutStaticSeqF a where
   PutStaticSeqF :: StaticByteSized z => !ElemCount -> !(Maybe z) -> (z -> Put) -> !(Seq z) -> a -> PutStaticSeqF a

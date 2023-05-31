@@ -455,7 +455,7 @@ testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
   ez2 @?= Right 0x5634
   c2 @?= 3
   let (ez3, c3) = getTargetOffset 3 getWord16LE src
-  ez3 @?= Left (GetErrorParseNeed "Word16LE" 1 2)
+  ez3 @?= Left (GetErrorGlobalCap "Word16LE" 4 5)
   c3 @?= 3
 
 testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
