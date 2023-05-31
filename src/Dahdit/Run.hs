@@ -113,145 +113,6 @@ prettyGetError = \case
   GetErrorGlobalCap nm ac bc -> "Hit limit parsing " <> nm <> " (allowed " <> T.pack (show (unByteCount ac)) <> " bytes, need " <> T.pack (show (unByteCount bc)) <> ")"
   GetErrorRemaining ac -> "Cannot read remaining length in stream context (read " <> T.pack (show (unByteCount ac)) <> ")"
 
--- data GetEnv s r = GetEnv
---   { geOff :: !(STRef s ByteCount)
---   -- ^ Offset from buffer start (in bytes)
---   , geCap :: !ByteCount
---   -- ^ Capacity of buffer segment
---   , geArray :: !r
---   -- ^ Source buffer
---   }
-
--- newGetEnv :: ByteCount -> ByteCount -> r -> ST s (GetEnv s r)
--- newGetEnv off cap mem = do
---   offRef <- newSTRef off
---   pure (GetEnv offRef cap mem)
-
--- newtype GetEff s r a = GetEff {unGetEff :: ReaderT (GetEnv s r) (ExceptT GetError (ST s)) a}
---   deriving newtype (Functor, Applicative, Monad, MonadReader (GetEnv s r), MonadError GetError)
-
--- runGetEff :: GetEff s r a -> GetEnv s r -> ST s (Either GetError a)
--- runGetEff act env = runExceptT (runReaderT (unGetEff act) env)
-
--- instance MonadFail (GetEff s r) where
---   fail = GetEff . throwError . GetErrorFail . T.pack
-
--- stGetEff :: ST s a -> GetEff s r a
--- stGetEff = GetEff . lift . lift
-
--- newtype GetRun s r a = GetRun {unGetRun :: FT GetF (GetEff s r) a}
---   deriving newtype (Functor, Applicative, Monad)
-
--- guardReadBytes :: Text -> ByteCount -> GetEff s r ByteCount
--- guardReadBytes nm bc = do
---   GetEnv offRef cap _ <- ask
---   off <- stGetEff (readSTRef offRef)
---   let ac = cap - off
---   if bc > ac
---     then throwError (GetErrorParseNeed nm ac bc)
---     else pure off
-
--- readBytes :: Text -> ByteCount -> (r -> ByteCount -> a) -> GetEff s r a
--- readBytes nm bc f = do
---   off <- guardReadBytes nm bc
---   GetEnv offRef _ mem <- ask
---   stGetEff $ do
---     let a = f mem off
---         newOff = off + bc
---     writeSTRef offRef newOff
---     pure a
-
--- readScope :: ReadMem r => GetScopeF (GetEff s r a) -> GetEff s r a
--- readScope (GetScopeF sm bc g k) = do
---   GetEnv offRef oldCap _ <- ask
---   oldOff <- stGetEff (readSTRef offRef)
---   let oldAvail = oldCap - oldOff
---   if bc > oldAvail
---     then throwError (GetErrorParseNeed "scope" oldAvail bc)
---     else do
---       let newCap = oldOff + bc
---       a <- local (\ge -> ge {geCap = newCap}) (mkGetEff g)
---       case sm of
---         ScopeModeWithin -> k a
---         ScopeModeExact -> do
---           newOff <- stGetEff (readSTRef offRef)
---           let actualBc = newOff - oldOff
---           if actualBc == bc
---             then k a
---             else throwError (GetErrorScopedMismatch actualBc bc)
-
--- readStaticSeq :: ReadMem r => GetStaticSeqF (GetEff s r a) -> GetEff s r a
--- readStaticSeq gss@(GetStaticSeqF ec g k) = do
---   let bc = getStaticSeqSize gss
---   _ <- guardReadBytes "static sequence" bc
---   ss <- Seq.replicateA (coerce ec) (mkGetEff g)
---   k ss
-
--- readStaticArray :: ReadMem r => GetStaticArrayF (GetEff s r a) -> GetEff s r a
--- readStaticArray gsa@(GetStaticArrayF _ _ k) = do
---   let bc = getStaticArraySize gsa
---   sa <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
---   k (LiftedPrimArray sa)
-
--- readLookAhead :: ReadMem r => GetLookAheadF (GetEff s r a) -> GetEff s r a
--- readLookAhead (GetLookAheadF g k) = do
---   offRef <- asks geOff
---   startOff <- stGetEff (readSTRef offRef)
---   a <- mkGetEff g
---   stGetEff (writeSTRef offRef startOff)
---   k a
-
--- execGetRun :: ReadMem r => GetF (GetEff s r a) -> GetEff s r a
--- execGetRun = \case
---   GetFWord8 k -> readBytes "Word8" 1 (indexMemInBytes @_ @Word8) >>= k
---   GetFInt8 k -> readBytes "Int8" 1 (indexMemInBytes @_ @Int8) >>= k
---   GetFWord16LE k -> readBytes "Word16LE" 2 (indexMemInBytes @_ @Word16LE) >>= k
---   GetFInt16LE k -> readBytes "Int16LE" 2 (indexMemInBytes @_ @Int16LE) >>= k
---   GetFWord24LE k -> readBytes "Word24LE" 3 (indexMemInBytes @_ @Word24LE) >>= k
---   GetFInt24LE k -> readBytes "Int24LE" 3 (indexMemInBytes @_ @Int24LE) >>= k
---   GetFWord32LE k -> readBytes "Word32LE" 4 (indexMemInBytes @_ @Word32LE) >>= k
---   GetFInt32LE k -> readBytes "Int32LE" 4 (indexMemInBytes @_ @Int32LE) >>= k
---   GetFWord64LE k -> readBytes "Word64LE" 8 (indexMemInBytes @_ @Word64LE) >>= k
---   GetFInt64LE k -> readBytes "Int64LE" 8 (indexMemInBytes @_ @Int64LE) >>= k
---   GetFFloatLE k -> readBytes "FloatLE" 4 (indexMemInBytes @_ @FloatLE) >>= k
---   GetFDoubleLE k -> readBytes "DoubleLE" 8 (indexMemInBytes @_ @DoubleLE) >>= k
---   GetFWord16BE k -> readBytes "Word16BE" 2 (indexMemInBytes @_ @Word16BE) >>= k
---   GetFInt16BE k -> readBytes "Int16BE" 2 (indexMemInBytes @_ @Int16BE) >>= k
---   GetFWord24BE k -> readBytes "Word24BE" 3 (indexMemInBytes @_ @Word24BE) >>= k
---   GetFInt24BE k -> readBytes "Int24BE" 3 (indexMemInBytes @_ @Int24BE) >>= k
---   GetFWord32BE k -> readBytes "Word32BE" 4 (indexMemInBytes @_ @Word32BE) >>= k
---   GetFInt32BE k -> readBytes "Int32BE" 4 (indexMemInBytes @_ @Int32BE) >>= k
---   GetFWord64BE k -> readBytes "Word64BE" 8 (indexMemInBytes @_ @Word64BE) >>= k
---   GetFInt64BE k -> readBytes "Int64BE" 8 (indexMemInBytes @_ @Int64BE) >>= k
---   GetFFloatBE k -> readBytes "FloatBE" 4 (indexMemInBytes @_ @FloatBE) >>= k
---   GetFDoubleBE k -> readBytes "DoubleBE" 8 (indexMemInBytes @_ @DoubleBE) >>= k
---   GetFShortByteString bc k ->
---     readBytes "ShortByteString" bc (\mem off -> readSBSMem mem off bc) >>= k
---   GetFStaticSeq gss -> readStaticSeq gss
---   GetFStaticArray gsa -> readStaticArray gsa
---   GetFByteArray bc k ->
---     readBytes "ByteArray" bc (\mem off -> cloneArrayMemInBytes mem off bc) >>= k
---   GetFScope gs -> readScope gs
---   GetFSkip bc k -> readBytes "skip" bc (\_ _ -> ()) >> k
---   GetFLookAhead gla -> readLookAhead gla
---   GetFRemainingSize k -> do
---     GetEnv offRef cap _ <- ask
---     off <- stGetEff (readSTRef offRef)
---     k (cap - off)
---   GetFFail msg -> fail (T.unpack msg)
-
--- runGetRun :: ReadMem r => GetRun s r a -> GetEnv s r -> ST s (Either GetError a)
--- runGetRun = runGetEff . iterGetRun
-
--- iterGetRun :: ReadMem r => GetRun s r a -> GetEff s r a
--- iterGetRun act = iterT execGetRun (unGetRun act)
-
--- mkGetRun :: Get a -> GetRun s r a
--- mkGetRun (Get (F w)) = GetRun (w pure wrap)
-
--- mkGetEff :: ReadMem r => Get a -> GetEff s r a
--- mkGetEff = iterGetRun . mkGetRun
-
 runGetInternal :: ReadMem r => ByteCount -> Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
 runGetInternal off act cap mem = runST $ do
   chunk <- newGetIncChunk off cap mem
@@ -358,37 +219,35 @@ readBytes nm bc f = do
   lift (writeMutVar gloOffRef gloOffEnd)
   pure a
 
--- readScope :: ReadMem r => GetScopeF (GetEff s r a) -> GetEff s r a
--- readScope (GetScopeF sm bc g k) = do
---   GetEnv offRef oldCap _ <- ask
---   oldOff <- stGetEff (readSTRef offRef)
---   let oldAvail = oldCap - oldOff
---   if bc > oldAvail
---     then throwError (GetErrorParseNeed "scope" oldAvail bc)
---     else do
---       let newCap = oldOff + bc
---       a <- local (\ge -> ge {geCap = newCap}) (mkGetEff g)
---       case sm of
---         ScopeModeWithin -> k a
---         ScopeModeExact -> do
---           newOff <- stGetEff (readSTRef offRef)
---           let actualBc = newOff - oldOff
---           if actualBc == bc
---             then k a
---             else throwError (GetErrorScopedMismatch actualBc bc)
+readScope :: (MonadPrim s m, ReadMem r) => GetScopeF (GetIncM s r m a) -> GetIncM s r m a
+readScope (GetScopeF sm bc g k) = do
+  GetIncEnv gloOffRef mayGloCap _ <- ask
+  gloOffStart <- lift (readMutVar gloOffRef)
+  let gloOffMax = gloOffStart + bc
+  case mayGloCap of
+    Just gloCap | gloOffMax > gloCap -> throwError (GetErrorGlobalCap "scope" gloCap gloOffMax)
+    _ -> pure ()
+  a <- case mayGloCap of
+    Nothing -> interpGetInc g
+    Just gloCap -> local (\env -> env {gieGlobalCap = Just (gloCap + bc)}) (interpGetInc g)
+  gloOffEnd <- lift (readMutVar gloOffRef)
+  let actualBc = gloOffEnd - gloOffStart
+  if (sm == ScopeModeExact && actualBc == bc) || (sm == ScopeModeWithin && actualBc <= bc)
+    then k a
+    else throwError (GetErrorScopedMismatch actualBc bc)
 
--- readStaticSeq :: ReadMem r => GetStaticSeqF (GetEff s r a) -> GetEff s r a
--- readStaticSeq gss@(GetStaticSeqF ec g k) = do
---   let bc = getStaticSeqSize gss
---   _ <- guardReadBytes "static sequence" bc
---   ss <- Seq.replicateA (coerce ec) (mkGetEff g)
---   k ss
+readStaticSeq :: (MonadPrim s m, ReadMem r) => GetStaticSeqF (GetIncM s r m a) -> GetIncM s r m a
+readStaticSeq gss@(GetStaticSeqF ec g k) = do
+  let bc = getStaticSeqSize gss
+  _ <- guardReadBytes "static sequence" bc
+  ss <- Seq.replicateA (coerce ec) (interpGetInc g)
+  k ss
 
--- readStaticArray :: ReadMem r => GetStaticArrayF (GetEff s r a) -> GetEff s r a
--- readStaticArray gsa@(GetStaticArrayF _ _ k) = do
---   let bc = getStaticArraySize gsa
---   sa <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
---   k (LiftedPrimArray sa)
+readStaticArray :: (MonadPrim s m, ReadMem r) => GetStaticArrayF (GetIncM s r m a) -> GetIncM s r m a
+readStaticArray gsa@(GetStaticArrayF _ _ k) = do
+  let bc = getStaticArraySize gsa
+  sa <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
+  k (LiftedPrimArray sa)
 
 -- readLookAhead :: ReadMem r => GetLookAheadF (GetEff s r a) -> GetEff s r a
 -- readLookAhead (GetLookAheadF g k) = do
@@ -424,11 +283,11 @@ interpGetInc (Get g) = flip iterM g $ \case
   GetFDoubleBE k -> readBytes "DoubleBE" 8 (indexMemInBytes @_ @DoubleBE) >>= k
   GetFShortByteString bc k ->
     readBytes "ShortByteString" bc (\mem off -> readSBSMem mem off bc) >>= k
-  -- GetFStaticSeq gss -> readStaticSeq gss
-  -- GetFStaticArray gsa -> readStaticArray gsa
+  GetFStaticSeq gss -> readStaticSeq gss
+  GetFStaticArray gsa -> readStaticArray gsa
   GetFByteArray bc k ->
     readBytes "ByteArray" bc (\mem off -> cloneArrayMemInBytes mem off bc) >>= k
-  -- GetFScope gs -> readScope gs
+  GetFScope gs -> readScope gs
   GetFSkip bc k -> readBytes "skip" bc (\_ _ -> ()) >> k
   -- GetFLookAhead gla -> readLookAhead gla
   GetFRemainingSize k -> do
