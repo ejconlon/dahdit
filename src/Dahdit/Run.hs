@@ -70,6 +70,7 @@ import Data.Foldable (for_, toList)
 import Data.Int (Int8)
 import Data.Maybe (fromJust)
 import Data.Primitive.MutVar (MutVar, newMutVar, readMutVar, writeMutVar)
+import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -96,7 +97,7 @@ putStaticArraySize (PutStaticArrayF n _ a _) = staticByteSize (proxyForF a) * co
 
 data GetError
   = GetErrorLocalCap !Text !ByteCount !ByteCount
-  | GetErrorScopedMismatch !ByteCount !ByteCount
+  | GetErrorScopedMismatch !ScopeMode !ByteCount !ByteCount
   | GetErrorFail !Text
   | GetErrorGlobalCap !Text !ByteCount !ByteCount
   | GetErrorRemaining !ByteCount
@@ -105,53 +106,64 @@ data GetError
 instance Exception GetError where
   displayException = T.unpack . prettyGetError
 
+-- TODO better error message for scoped mismatch
 prettyGetError :: GetError -> Text
 prettyGetError = \case
   GetErrorLocalCap nm ac bc -> "End of chunk parsing " <> nm <> " (have " <> T.pack (show (unByteCount ac)) <> " bytes, need " <> T.pack (show (unByteCount bc)) <> ")"
-  GetErrorScopedMismatch ac bc -> "Did not parse enough scoped input (read " <> T.pack (show (unByteCount ac)) <> " bytes, expected " <> T.pack (show (unByteCount bc)) <> ")"
+  GetErrorScopedMismatch _ ac bc -> "Did not parse enough scoped input (read " <> T.pack (show (unByteCount ac)) <> " bytes, expected " <> T.pack (show (unByteCount bc)) <> ")"
   GetErrorFail msg -> "User error: " <> msg
   GetErrorGlobalCap nm ac bc -> "Hit limit parsing " <> nm <> " (allowed " <> T.pack (show (unByteCount ac)) <> " bytes, need " <> T.pack (show (unByteCount bc)) <> ")"
   GetErrorRemaining ac -> "Cannot read remaining length in stream context (read " <> T.pack (show (unByteCount ac)) <> ")"
 
+-- | Get from a single buffer
 runGetInternal :: ReadMem r => ByteCount -> Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
 runGetInternal off act cap mem = runST $ do
-  chunk <- newGetIncChunk off cap mem
-  env <- newGetIncEnv off (Just cap) chunk
-  (ea, off', _) <- runGetIncInternal act env (\_ _ -> pure Nothing)
+  let chunk = GetIncChunk off cap mem
+  env <- newGetIncEnv (Just (cap - off)) chunk
+  (ea, _, off') <- runGetIncInternal act env (const (pure Nothing))
   pure (ea, off')
 
 -- Get inc
 
-data GetIncChunk s r = GetIncChunk
-  { gicLocalOff :: !(MutVar s ByteCount)
-  -- ^ Offset from start of local buffer (in bytes)
+data GetIncChunk r = GetIncChunk
+  { gicLocalOff :: !ByteCount
+  -- ^ Offset from start of local buffer to data
   , gicLocalCap :: !ByteCount
   -- ^ Capacity of local buffer
   , gicArray :: !r
   -- ^ Source buffer
   }
 
-newGetIncChunk :: MonadPrim s m => ByteCount -> ByteCount -> r -> m (GetIncChunk s r)
-newGetIncChunk off cap arr = do
-  offVar <- newMutVar off
-  pure (GetIncChunk offVar cap arr)
-
 data GetIncEnv s r = GetIncEnv
-  { gieGlobalOff :: !(MutVar s ByteCount)
-  -- ^ Offset from start of parsing (in bytes)
+  { gieGlobalAbs :: !(MutVar s ByteCount)
+  -- ^ Offset from start of parsing (0) to current position
+  , gieGlobalRel :: !(MutVar s ByteCount)
+  -- ^ Offset from start of parsing (0) to start of buffer
+  -- It will always be the case that gloRel <= gloAbs
   , gieGlobalCap :: !(Maybe ByteCount)
   -- ^ Maximum capacity across all chunks
-  , gieCurChunk :: !(MutVar s (GetIncChunk s r))
+  , gieCurChunk :: !(MutVar s (GetIncChunk r))
   -- ^ Current chunk
+  , gieLookAhead :: !(Seq ByteCount)
+  -- ^ Stack of look ahead points (in absolute position)
+  -- Top of stack is end of sequence
   }
 
-newGetIncEnv :: MonadPrim s m => ByteCount -> Maybe ByteCount -> GetIncChunk s r -> m (GetIncEnv s r)
-newGetIncEnv off mayCap chunk = do
-  offVar <- newMutVar off
+newGetIncEnv :: MonadPrim s m => Maybe ByteCount -> GetIncChunk r -> m (GetIncEnv s r)
+newGetIncEnv mayCap chunk = do
+  gloAbsVar <- newMutVar 0
+  gloRelVar <- newMutVar 0
   chunkVar <- newMutVar chunk
-  pure (GetIncEnv offVar mayCap chunkVar)
+  pure (GetIncEnv gloAbsVar gloRelVar mayCap chunkVar Empty)
 
-data GetIncDemand s r x = GetIncDemand !ByteCount !(Maybe (GetIncChunk s r) -> x)
+data GetIncState r = GetIncState
+  { gisBaseOff :: !ByteCount
+  , gisNeedLength :: !ByteCount
+  , gisCurChunk :: !(GetIncChunk r)
+  }
+
+-- | See 'GetIncCb' - this is the functor-ized version so we can suspend execution.
+data GetIncDemand s r x = GetIncDemand !(GetIncState r) !(Maybe (GetIncChunk r) -> x)
   deriving stock (Functor)
 
 newtype GetIncM s r m a = GetIncM {unGetIncM :: ReaderT (GetIncEnv s r) (ExceptT GetError (FT (GetIncDemand s r) m)) a}
@@ -167,74 +179,90 @@ newtype GetIncM s r m a = GetIncM {unGetIncM :: ReaderT (GetIncEnv s r) (ExceptT
 instance MonadTrans (GetIncM s r) where
   lift = GetIncM . lift . lift . lift
 
-type GetIncCb s r m = GetIncChunk s r -> ByteCount -> m (Maybe (GetIncChunk s r))
+-- | Return new chunk containing enough data (or nothing).
+type GetIncCb r m = GetIncState r -> m (Maybe (GetIncChunk r))
 
-runGetIncM :: MonadPrim s m => GetIncM s r m a -> GetIncEnv s r -> GetIncCb s r m -> m (Either GetError a)
+runGetIncM :: MonadPrim s m => GetIncM s r m a -> GetIncEnv s r -> GetIncCb r m -> m (Either GetError a)
 runGetIncM m env cb =
   runFT
     (runExceptT (runReaderT (unGetIncM m) env))
     pure
-    (\k2 (GetIncDemand bc k1) -> readMutVar (gieCurChunk env) >>= \c -> cb c bc >>= k2 . k1)
+    (\k2 (GetIncDemand st k1) -> cb st >>= k2 . k1)
 
-guardReadBytes :: MonadPrim s m => Text -> ByteCount -> GetIncM s r m (ByteCount, GetIncChunk s r, ByteCount, ByteCount)
+guardReadBytes :: MonadPrim s m => Text -> ByteCount -> GetIncM s r m (ByteCount, GetIncChunk r, ByteCount)
 guardReadBytes nm bc = do
-  GetIncEnv gloOffRef mayGloCap chunkRef <- ask
+  GetIncEnv gloAbsRef gloRelRef mayGloCap chunkRef looks <- ask
   -- First check if we're in cap
-  gloOffStart <- lift (readMutVar gloOffRef)
-  let gloOffEnd = gloOffStart + bc
+  gloAbsStart <- lift (readMutVar gloAbsRef)
+  let gloAbsEnd = gloAbsStart + bc
   case mayGloCap of
-    Just gloCap | gloOffEnd > gloCap -> do
-      throwError (GetErrorGlobalCap nm gloCap gloOffEnd)
+    Just gloCap
+      | gloAbsEnd > gloCap ->
+          throwError (GetErrorGlobalCap nm gloCap gloAbsEnd)
     _ -> pure ()
   -- Now check that we have enough in the local buf
-  oldChunk <- lift (readMutVar chunkRef)
-  oldLocOffStart <- lift (readMutVar (gicLocalOff oldChunk))
-  let oldLocCap = gicLocalCap oldChunk
-      oldLocOffEnd = oldLocOffStart + bc
-  -- If we do, use the current buf, otherwise refresh the buffer
-  (newChunk, newLocOffStart, newLocOffEnd) <-
-    if oldLocOffEnd <= oldLocCap
-      then pure (oldChunk, oldLocOffStart, oldLocOffEnd)
-      else wrap $ GetIncDemand bc $ \case
-        Nothing -> throwError (GetErrorLocalCap nm oldLocCap oldLocOffEnd)
-        Just newChunk -> do
-          lift (writeMutVar chunkRef newChunk)
-          -- Check that the new one has enough
-          newLocOffStart <- lift (readMutVar (gicLocalOff newChunk))
-          let newLocCap = gicLocalCap newChunk
-              newLocOffEnd = newLocOffStart + bc
-          unless
-            (newLocOffEnd <= newLocCap)
-            (throwError (GetErrorLocalCap nm newLocCap newLocOffEnd))
-          pure (newChunk, newLocOffStart, newLocOffEnd)
-  pure (gloOffEnd, newChunk, newLocOffStart, newLocOffEnd)
+  gloRel <- lift (readMutVar gloRelRef)
+  oldChunk@(GetIncChunk oldOff oldCap _) <- lift (readMutVar chunkRef)
+  let gloBaseStart = case looks of Empty -> gloAbsStart; x :<| _ -> x
+      gloBaseOffStart = gloBaseStart - gloRel + oldOff
+      gloBaseOffEnd = gloAbsStart - gloRel + oldOff + bc
+  (newChunk, newLocOffStart) <-
+    if gloBaseOffEnd <= oldCap
+      then pure (oldChunk, gloBaseOffStart)
+      else do
+        -- TODO actually get more
+        throwError (GetErrorLocalCap nm oldCap gloBaseOffEnd)
+  pure (gloAbsEnd, newChunk, newLocOffStart)
 
+-- let needLength = gloAbsEnd -
+-- oldLocOffStart <- lift (readMutVar (gicLocalOff oldChunk))
+-- let oldLocCap = gicLocalCap oldChunk
+--     oldLocOffEnd = oldLocOffStart + bc
+-- -- If we do, use the current buf, otherwise refresh the buffer
+-- (newChunk, newLocOffStart, newLocOffEnd) <-
+--   if oldLocOffEnd <= oldLocCap
+--     then pure (oldChunk, oldLocOffStart, oldLocOffEnd)
+--     else wrap $ GetIncDemand bc $ \case
+--       Nothing -> throwError (GetErrorLocalCap nm oldLocCap oldLocOffEnd)
+--       Just newChunk -> do
+--         lift (writeMutVar chunkRef newChunk)
+--         -- Check that the new one has enough
+--         newLocOffStart <- lift (readMutVar (gicLocalOff newChunk))
+--         let newLocCap = gicLocalCap newChunk
+--             newLocOffEnd = newLocOffStart + bc
+--         unless
+--           (newLocOffEnd <= newLocCap)
+--           (throwError (GetErrorLocalCap nm newLocCap newLocOffEnd))
+--         pure (newChunk, newLocOffStart, newLocOffEnd)
+
+-- Memory read function takes local start offset
 readBytes :: MonadPrim s m => Text -> ByteCount -> (r -> ByteCount -> a) -> GetIncM s r m a
 readBytes nm bc f = do
-  (gloOffEnd, newChunk, newLocOffStart, newLocOffEnd) <- guardReadBytes nm bc
+  (gloAbsEnd, newChunk, newLocOffStart) <- guardReadBytes nm bc
   let mem = gicArray newChunk
       a = f mem newLocOffStart
-  lift (writeMutVar (gicLocalOff newChunk) newLocOffEnd)
-  gloOffRef <- asks gieGlobalOff
-  lift (writeMutVar gloOffRef gloOffEnd)
+  gloAbsRef <- asks gieGlobalAbs
+  lift (writeMutVar gloAbsRef gloAbsEnd)
   pure a
 
 readScope :: (MonadPrim s m, ReadMem r) => GetScopeF (GetIncM s r m a) -> GetIncM s r m a
 readScope (GetScopeF sm bc g k) = do
-  GetIncEnv gloOffRef mayGloCap _ <- ask
-  gloOffStart <- lift (readMutVar gloOffRef)
-  let gloOffMax = gloOffStart + bc
+  GetIncEnv gloAbsRef _ mayGloCap _ _ <- ask
+  gloAbsStart <- lift (readMutVar gloAbsRef)
+  let gloAbsMax = gloAbsStart + bc
   case mayGloCap of
-    Just gloCap | gloOffMax > gloCap -> throwError (GetErrorGlobalCap "scope" gloCap gloOffMax)
+    Just gloCap
+      | sm == ScopeModeExact && gloAbsMax > gloCap ->
+          throwError (GetErrorGlobalCap "scope" gloCap gloAbsMax)
     _ -> pure ()
   a <- case mayGloCap of
     Nothing -> interpGetInc g
     Just gloCap -> local (\env -> env {gieGlobalCap = Just (gloCap + bc)}) (interpGetInc g)
-  gloOffEnd <- lift (readMutVar gloOffRef)
-  let actualBc = gloOffEnd - gloOffStart
+  gloAbsEnd <- lift (readMutVar gloAbsRef)
+  let actualBc = gloAbsEnd - gloAbsStart
   if (sm == ScopeModeExact && actualBc == bc) || (sm == ScopeModeWithin && actualBc <= bc)
     then k a
-    else throwError (GetErrorScopedMismatch actualBc bc)
+    else throwError (GetErrorScopedMismatch sm actualBc bc)
 
 readStaticSeq :: (MonadPrim s m, ReadMem r) => GetStaticSeqF (GetIncM s r m a) -> GetIncM s r m a
 readStaticSeq gss@(GetStaticSeqF ec g k) = do
@@ -249,13 +277,15 @@ readStaticArray gsa@(GetStaticArrayF _ _ k) = do
   sa <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
   k (LiftedPrimArray sa)
 
--- readLookAhead :: ReadMem r => GetLookAheadF (GetEff s r a) -> GetEff s r a
--- readLookAhead (GetLookAheadF g k) = do
---   offRef <- asks geOff
---   startOff <- stGetEff (readSTRef offRef)
---   a <- mkGetEff g
---   stGetEff (writeSTRef offRef startOff)
---   k a
+readLookAhead :: (MonadPrim s m, ReadMem r) => GetLookAheadF (GetIncM s r m a) -> GetIncM s r m a
+readLookAhead (GetLookAheadF g k) = do
+  error "TODO"
+
+-- offRef <- asks geOff
+-- startOff <- stGetEff (readSTRef offRef)
+-- a <- mkGetEff g
+-- stGetEff (writeSTRef offRef startOff)
+-- k a
 
 interpGetInc :: (MonadPrim s m, ReadMem r) => Get a -> GetIncM s r m a
 interpGetInc (Get g) = flip iterM g $ \case
@@ -289,24 +319,24 @@ interpGetInc (Get g) = flip iterM g $ \case
     readBytes "ByteArray" bc (\mem off -> cloneArrayMemInBytes mem off bc) >>= k
   GetFScope gs -> readScope gs
   GetFSkip bc k -> readBytes "skip" bc (\_ _ -> ()) >> k
-  -- GetFLookAhead gla -> readLookAhead gla
+  GetFLookAhead gla -> readLookAhead gla
   GetFRemainingSize k -> do
-    GetIncEnv gloOffRef mayGloCap _ <- ask
-    gloOff <- lift (readMutVar gloOffRef)
+    GetIncEnv gloAbsRef _ mayGloCap _ _ <- ask
+    gloAbs <- lift (readMutVar gloAbsRef)
     case mayGloCap of
-      Nothing -> throwError (GetErrorRemaining gloOff)
-      Just gloCap -> k (gloCap - gloOff)
+      Nothing -> throwError (GetErrorRemaining gloAbs)
+      Just gloCap -> k (gloCap - gloAbs)
   GetFFail msg -> throwError (GetErrorFail msg)
-  _ -> error "TODO"
 
-runGetIncInternal :: (ReadMem r, s ~ PrimState m, PrimMonad m) => Get a -> GetIncEnv s r -> GetIncCb s r m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncInternal :: (ReadMem r, s ~ PrimState m, PrimMonad m) => Get a -> GetIncEnv s r -> GetIncCb r m -> m (Either GetError a, ByteCount, ByteCount)
 runGetIncInternal getter env cb = do
   let m = interpGetInc getter
   res <- runGetIncM m env cb
-  gloOff <- readMutVar (gieGlobalOff env)
+  gloAbs <- readMutVar (gieGlobalAbs env)
+  gloRel <- readMutVar (gieGlobalRel env)
   curChunk <- readMutVar (gieCurChunk env)
-  locOff <- readMutVar (gicLocalOff curChunk)
-  pure (res, gloOff, locOff)
+  let baseOff = gloAbs - gloRel + gicLocalOff curChunk
+  pure (res, gloAbs, baseOff)
 
 -- Put unsafe:
 
