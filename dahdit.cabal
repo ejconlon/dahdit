@@ -131,6 +131,7 @@ test-suite dahdit-test
     , dahdit
     , data-default ==0.7.*
     , data-sword ==0.2.*
+    , falsify
     , free ==5.1.*
     , ghc-typelits-knownnat ==0.7.*
     , mtl ==2.2.*

@@ -132,6 +132,7 @@ import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
 import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty.Falsify (testProperty)
 import Test.Tasty.HUnit (testCase, (@?=))
 
 class BinaryTarget z => CaseTarget z where
@@ -458,6 +459,10 @@ testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
   ez3 @?= Left (GetErrorGlobalCap "Word16LE" 1 2)
   c3 @?= 3
 
+testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
+testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
+  pure ()
+
 testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
 testMutPut n p = testGroup ("mut put (" ++ n ++ ")") (fmap (mutRunPutCase p) putCases)
 
@@ -501,6 +506,7 @@ testDahdit = testGroup "Dahdit" trees
       [ testGet name prox
       , testPut name prox
       , testGetOffset name prox
+      , testGetInc name prox
       ]
   mutTargetTrees =
     mutTargets >>= \(MutTargetDef name prox) ->
