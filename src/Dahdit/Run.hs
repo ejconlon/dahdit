@@ -17,7 +17,6 @@ module Dahdit.Run
   )
 where
 
--- import Debug.Trace
 import Control.Applicative (Alternative (..))
 import Control.Exception (Exception (..))
 import Control.Monad (replicateM_, unless)
@@ -238,49 +237,15 @@ guardReadBytes nm bc = do
       else do
         let needLength = baseOffEnd - baseOffStart
             req = GetIncRequest gloAbsStart baseOffStart needLength
-        -- traceM "*** PRE REQ"
-        -- traceShowM baseOffStart
-        -- traceShowM baseOffEnd
-        -- traceShowM oldCap
-        -- traceShowM req
         wrap $ GetIncSuspend req $ \case
-          Nothing -> do
-            -- error "*** THROWING"
-            throwError (GetErrorLocalCap nm oldCap baseOffEnd)
-          Just newChunk -> do
-            -- TODO assert that new buffer length is sufficient
-            -- traceM "*** GOT NEW CHUNK"
-            -- traceM "Local offset"
-            -- traceShowM (gicLocalOff newChunk)
-            -- traceM "Local cap"
-            -- traceShowM (gicLocalCap newChunk)
-            -- traceM "New rel"
-            -- traceShowM gloBaseStart
+          Nothing -> throwError (GetErrorLocalCap nm oldCap baseOffEnd)
+          Just newChunk@(GetIncChunk newOff newCap _) -> do
+            let newEnd = newOff + needLength
+            unless (newEnd <= newCap) (throwError (GetErrorLocalCap nm newCap newOff))
             lift (writeMutVar chunkRef newChunk)
             lift (writeMutVar gloRelRef gloBaseStart)
             pure (newChunk, gicLocalOff newChunk)
   pure (gloAbsEnd, newChunk, newLocOffStart)
-
--- let needLength = gloAbsEnd -
--- oldLocOffStart <- lift (readMutVar (gicLocalOff oldChunk))
--- let oldLocCap = gicLocalCap oldChunk
---     oldLocOffEnd = oldLocOffStart + bc
--- -- If we do, use the current buf, otherwise refresh the buffer
--- (newChunk, newLocOffStart, newLocOffEnd) <-
---   if oldLocOffEnd <= oldLocCap
---     then pure (oldChunk, oldLocOffStart, oldLocOffEnd)
---     else wrap $ GetIncDemand bc $ \case
---       Nothing -> throwError (GetErrorLocalCap nm oldLocCap oldLocOffEnd)
---       Just newChunk -> do
---         lift (writeMutVar chunkRef newChunk)
---         -- Check that the new one has enough
---         newLocOffStart <- lift (readMutVar (gicLocalOff newChunk))
---         let newLocCap = gicLocalCap newChunk
---             newLocOffEnd = newLocOffStart + bc
---         unless
---           (newLocOffEnd <= newLocCap)
---           (throwError (GetErrorLocalCap nm newLocCap newLocOffEnd))
---         pure (newChunk, newLocOffStart, newLocOffEnd)
 
 -- Memory read function takes local start offset
 readBytes :: MonadPrim s m => Text -> ByteCount -> (r -> ByteCount -> m a) -> GetIncM s r m a

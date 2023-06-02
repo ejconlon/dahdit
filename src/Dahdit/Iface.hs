@@ -18,18 +18,17 @@ module Dahdit.Iface
 where
 
 import Control.Monad (unless)
-import Control.Monad.Primitive (MonadPrim, PrimMonad (..))
+import Control.Monad.Primitive (MonadPrim, PrimMonad (..), RealWorld)
 import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (getRemainingSize)
-import Dahdit.Mem (mutViewVecMem, viewBSMem, viewSBSMem, viewVecMem, withBAMem, withBSMem, withSBSMem, withVecMem)
+import Dahdit.Mem (MemPtr (..), emptyMemPtr, mutViewVecMem, viewBSMem, viewSBSMem, viewVecMem, withBAMem, withBSMem, withSBSMem, withVecMem)
 import Dahdit.Run (GetError, GetIncCb, GetIncChunk (..), newGetIncEnv, runCount, runGetIncInternal, runGetInternal, runPutInternal)
 import Dahdit.Sizes (ByteCount (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (ByteArray, MutableByteArray, emptyByteArray, sizeofByteArray)
 import Data.Text (Text)
@@ -156,7 +155,7 @@ runGetBA :: PrimMonad m => ByteCount -> Get a -> ByteArray -> m (Either GetError
 runGetBA off act ba = runGetInternal off act (coerce (sizeofByteArray ba)) ba
 
 runGetSBS :: PrimMonad m => ByteCount -> Get a -> ShortByteString -> m (Either GetError a, ByteCount)
-runGetSBS off act sbs = runGetInternal off act (coerce (BSS.length sbs)) (viewSBSMem sbs)
+runGetSBS off act = runGetBA off act . viewSBSMem
 
 runGetBS :: ByteCount -> Get a -> ByteString -> IO (Either GetError a, ByteCount)
 runGetBS off act bs = runGetInternal off act (coerce (BS.length bs)) (viewBSMem bs)
@@ -176,20 +175,28 @@ runGetIncText :: Get a -> GetIncCb Text IO -> IO (Either GetError a, ByteCount, 
 runGetIncText g cb = runGetIncBS g (fmap (fmap TE.encodeUtf8) . cb)
 
 runGetIncBA :: PrimMonad m => Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
-runGetIncBA = error "TODO"
+runGetIncBA act cb = do
+  env <- newGetIncEnv Nothing (GetIncChunk 0 0 emptyByteArray)
+  let view s = GetIncChunk 0 (coerce (sizeofByteArray s)) s
+  let cb' = fmap (fmap view) . cb
+  runGetIncInternal act env cb'
 
 runGetIncSBS :: PrimMonad m => Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
-runGetIncSBS act cb = do
-  env <- newGetIncEnv Nothing (GetIncChunk 0 0 emptyByteArray)
-  let view s = GetIncChunk 0 (coerce (BSS.length s)) (viewSBSMem s)
+runGetIncSBS act cb = runGetIncBA act (fmap (fmap viewSBSMem) . cb)
+
+runGetIncMemPtr :: Get a -> GetIncCb (MemPtr RealWorld) IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncMemPtr act cb = do
+  mem <- emptyMemPtr
+  env <- newGetIncEnv Nothing (GetIncChunk 0 0 mem)
+  let view mem'@(MemPtr _ off len) = GetIncChunk 0 (len - off) mem'
   let cb' = fmap (fmap view) . cb
   runGetIncInternal act env cb'
 
 runGetIncBS :: Get a -> GetIncCb ByteString IO -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncBS = error "TODO"
+runGetIncBS act cb = runGetIncMemPtr act (fmap (fmap viewBSMem) . cb)
 
 runGetIncVec :: Get a -> GetIncCb (Vector Word8) IO -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncVec = error "TODO"
+runGetIncVec act cb = runGetIncMemPtr act (fmap (fmap viewVecMem) . cb)
 
 runPutString :: Put -> ByteCount -> IO String
 runPutString act len = fmap BSC.unpack (runPutBS act len)

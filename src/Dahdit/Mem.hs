@@ -1,5 +1,6 @@
 module Dahdit.Mem
   ( MemPtr (..)
+  , emptyMemPtr
   , ReadMem (..)
   , readSBSMem
   , viewSBSMem
@@ -40,6 +41,9 @@ data MemPtr s = MemPtr
   , mpLength :: !ByteCount
   }
   deriving stock (Eq, Ord, Show)
+
+emptyMemPtr :: IO (MemPtr RealWorld)
+emptyMemPtr = allocPtrMem 0
 
 withMemPtr :: MemPtr RealWorld -> (Ptr Word8 -> IO a) -> IO a
 withMemPtr (MemPtr fp off _) f = withForeignPtr fp (\ptr -> f (plusPtr ptr (coerce off)))

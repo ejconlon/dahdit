@@ -126,7 +126,7 @@ import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString (..))
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
-import Data.IORef (newIORef, modifyIORef', atomicModifyIORef', readIORef)
+import Data.IORef (atomicModifyIORef', modifyIORef', newIORef, readIORef)
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, byteArrayFromList, freezeByteArray, newByteArray, sizeofMutableByteArray)
 import Data.Proxy (asProxyTypeOf)
@@ -553,9 +553,10 @@ wordXGen = Gen.choice [gen8, gen16, gen32]
   gen32 = fmap (WordX32 . Word32LE) (Gen.integral (Range.constant 0 maxBound))
 
 takeDiff :: CaseTarget z => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> ([ByteCount], (ByteCount, z))
-takeDiff z pos had diff = go 0 where
+takeDiff z pos had diff = go 0
+ where
   go !acc = \case
-    y:ys | acc < diff -> go (acc + y) ys
+    y : ys | acc < diff -> go (acc + y) ys
     ys -> (ys, (acc, sliceBuffer z pos (had + acc)))
 
 testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
@@ -574,7 +575,7 @@ testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ property $ do
       totLen === byteSize xs
   sliceBuffer wholeBuf 0 totLen === wholeBuf
   -- Shuffle list to come up with splits and test incremental
-  ys <- forAll (Gen.shuffle (8:fmap byteSize xs))
+  ys <- forAll (Gen.shuffle (8 : fmap byteSize xs))
   ysRef <- liftIO (newIORef ys)
   sentRef <- liftIO (newIORef 0)
   -- liftIO (putStrLn "=== WHOLE")
@@ -592,9 +593,10 @@ testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ property $ do
         modifyIORef' sentRef (+ bufLen)
         -- readIORef ysRef >>= print
         -- readIORef sentRef >>= print
-        pure $ if bufLen == 0
-          then Nothing
-          else Just (buf `asProxyTypeOf` p)
+        pure $
+          if bufLen == 0
+            then Nothing
+            else Just (buf `asProxyTypeOf` p)
   (ezs, totLen', _) <- liftIO (decodeInc cb)
   case ezs of
     Left err -> fail (show err)
@@ -622,8 +624,8 @@ data TargetDef where
 targets :: [TargetDef]
 targets =
   [ TargetDef "ShortByteString" (Proxy :: Proxy ShortByteString)
-  -- , TargetDef "ByteString" (Proxy :: Proxy ByteString)
-  -- , TargetDef "Vector" (Proxy :: Proxy (Vector Word8))
+  , TargetDef "ByteString" (Proxy :: Proxy ByteString)
+  , TargetDef "Vector" (Proxy :: Proxy (Vector Word8))
   -- TODO re-enable
   ]
 

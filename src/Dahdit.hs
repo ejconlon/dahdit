@@ -39,7 +39,7 @@ import Dahdit.LiftedPrim
 import Dahdit.LiftedPrimArray
 import Dahdit.Nums
 import Dahdit.Proxy
-import Dahdit.Run (GetError (..), GetIncCb, GetIncRequest (..), GetIncChunk (..), prettyGetError, runCount)
+import Dahdit.Run (GetError (..), GetIncCb, GetIncRequest (..), prettyGetError, runCount)
 import Dahdit.Sizes
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
