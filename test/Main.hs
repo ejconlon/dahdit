@@ -146,7 +146,7 @@ import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Falsify (testProperty)
 import Test.Tasty.HUnit (testCase, (@?=))
 
-class BinaryTarget z => CaseTarget z where
+class BinaryTarget z IO => CaseTarget z where
   initSource :: [Word8] -> z
   consumeSink :: z -> [Word8]
 
@@ -198,7 +198,7 @@ runGetCase :: CaseTarget z => Proxy z -> GetCase -> TestTree
 runGetCase p (GetCase name getter mayRes buf) = testCase name $ do
   let src = initSource buf `asProxyTypeOf` p
       totLen = coerce (length buf)
-      (result, actOff) = getTarget getter src
+  (result, actOff) <- getTarget getter src
   case (result, mayRes) of
     (Left _, Nothing) -> pure ()
     (Left err, Just (_, _, expecVal)) -> fail ("Got error <" ++ show err ++ ">, expected value <" ++ show expecVal ++ ">")
@@ -216,8 +216,8 @@ runPutCase p (PutCase name putter expecBs) = testCase name $ do
   let expecBc = coerce (length expecBs)
       estBc = runCount putter
   estBc @?= expecBc
-  let actSink = putTargetUnsafe putter expecBc `asProxyTypeOf` p
-      actBs = consumeSink actSink
+  actSink <- putTargetUnsafe putter expecBc
+  let actBs = consumeSink (actSink `asProxyTypeOf` p)
       actBc = coerce (length actBs)
   actBs @?= expecBs
   actBc @?= expecBc
@@ -462,13 +462,13 @@ testGetOffset :: CaseTarget z => String -> Proxy z -> TestTree
 testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
   let buf = [0x12, 0x34, 0x56, 0x78]
       src = initSource buf `asProxyTypeOf` p
-      (ez1, c1) = getTargetOffset 0 getWord8 src
+  (ez1, c1) <- getTargetOffset 0 getWord8 src
   ez1 @?= Right 0x12
   c1 @?= 1
-  let (ez2, c2) = getTargetOffset 1 getWord16LE src
+  (ez2, c2) <- getTargetOffset 1 getWord16LE src
   ez2 @?= Right 0x5634
   c2 @?= 3
-  let (ez3, c3) = getTargetOffset 3 getWord16LE src
+  (ez3, c3) <- getTargetOffset 3 getWord16LE src
   ez3 @?= Left (GetErrorGlobalCap "Word16LE" 1 2)
   c3 @?= 3
 
@@ -502,22 +502,22 @@ wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
   gen16 = fmap (WordX16 . Word16LE) (FG.integral (FR.between (0, maxBound)))
   gen32 = fmap (WordX32 . Word32LE) (FG.integral (FR.between (0, maxBound)))
 
-assertEq :: (Eq a, Show a) => a -> a -> Property ()
-assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
+-- assertEq :: (Eq a, Show a) => a -> a -> Property ()
+-- assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
 
-testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
-testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
-  numElems <- FP.gen @Int (FG.integral (FR.between (0, 20)))
-  xs <- FP.gen (fmap Seq.fromList (replicateM numElems wordXGen))
-  assertEq (Seq.length xs) numElems
-  let vec = encode @(Seq WordX) @ShortByteString xs
-  traceShowM xs
-  traceShowM vec
-  --     (exs, _) = decodeEnd @_ @(Seq WordX) vec
-  -- case exs of
-  --   Left err -> fail (show err)
-  --   Right xs' -> assertEq xs' xs
-  pure ()
+-- testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
+-- testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
+--   numElems <- FP.gen @Int (FG.integral (FR.between (0, 20)))
+--   xs <- FP.gen (fmap Seq.fromList (replicateM numElems wordXGen))
+--   assertEq (Seq.length xs) numElems
+--   vec <- encode @(Seq WordX) @ShortByteString xs
+--   traceShowM xs
+--   traceShowM vec
+--   --     (exs, _) = decodeEnd @_ @(Seq WordX) vec
+--   -- case exs of
+--   --   Left err -> fail (show err)
+--   --   Right xs' -> assertEq xs' xs
+--   pure ()
 
 testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
 testMutPut n p = testGroup ("mut put (" ++ n ++ ")") (fmap (mutRunPutCase p) putCases)
