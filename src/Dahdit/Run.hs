@@ -112,11 +112,12 @@ data GetError
 instance Exception GetError where
   displayException = T.unpack . prettyGetError
 
--- TODO better error message for scoped mismatch
 prettyGetError :: GetError -> Text
 prettyGetError = \case
   GetErrorLocalCap nm ac bc -> "End of chunk parsing " <> nm <> " (have " <> T.pack (show (unByteCount ac)) <> " bytes, need " <> T.pack (show (unByteCount bc)) <> ")"
-  GetErrorScopedMismatch _ ac bc -> "Did not parse enough scoped input (read " <> T.pack (show (unByteCount ac)) <> " bytes, expected " <> T.pack (show (unByteCount bc)) <> ")"
+  GetErrorScopedMismatch sm ac bc ->
+    let ty = case sm of ScopeModeExact -> "exact"; ScopeModeWithin -> "within"
+    in  "Did not parse " <> ty <> " scoped input (read " <> T.pack (show (unByteCount ac)) <> " bytes, expected " <> T.pack (show (unByteCount bc)) <> ")"
   GetErrorFail msg -> "User error: " <> msg
   GetErrorGlobalCap nm ac bc -> "Hit limit parsing " <> nm <> " (allowed " <> T.pack (show (unByteCount ac)) <> " bytes, need " <> T.pack (show (unByteCount bc)) <> ")"
   GetErrorRemaining ac -> "Cannot read remaining length in stream context (read " <> T.pack (show (unByteCount ac)) <> ")"

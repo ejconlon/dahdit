@@ -597,7 +597,7 @@ testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ property $ do
           if bufLen == 0
             then Nothing
             else Just (buf `asProxyTypeOf` p)
-  (ezs, totLen', _) <- liftIO (decodeInc cb)
+  (ezs, totLen', _) <- liftIO (decodeInc (Just totLen) cb)
   case ezs of
     Left err -> fail (show err)
     Right zs -> do
@@ -626,7 +626,6 @@ targets =
   [ TargetDef "ShortByteString" (Proxy :: Proxy ShortByteString)
   , TargetDef "ByteString" (Proxy :: Proxy ByteString)
   , TargetDef "Vector" (Proxy :: Proxy (Vector Word8))
-  -- TODO re-enable
   ]
 
 data MutTargetDef where

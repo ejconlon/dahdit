@@ -37,6 +37,7 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
 import Data.Vector.Storable.Mutable (IOVector)
 import Data.Word (Word8)
+import System.IO (Handle)
 
 -- | Abstracts over the sources we can read from / sinks we can render to.
 class PrimMonad m => BinaryTarget z m where
@@ -50,7 +51,8 @@ class PrimMonad m => BinaryTarget z m where
 
   -- | Get a value incrementally from sources yielded by the given callback, returning a
   -- result, final offset in the whole stream, and final offset in the current chunk.
-  getTargetInc :: Get a -> GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
+  -- Takes an optional maximum capacity.
+  getTargetInc :: Maybe ByteCount -> Get a -> GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
 
 -- | Get a value from the source, returning a result and final offset.
 getTarget :: BinaryTarget z m => Get a -> z -> m (Either GetError a, ByteCount)
@@ -99,6 +101,11 @@ instance BinaryTarget (Vector Word8) IO where
   putTargetUnsafe = runPutVec
   getTargetInc = runGetIncVec
 
+instance BinaryTarget Handle IO where
+  getTargetOffset = error "TODO" -- runGetHandle
+  putTargetUnsafe = error "TODO" -- runPutHandle
+  getTargetInc = error "TODO" -- runGetIncHandle
+
 instance MonadPrim s m => MutBinaryTarget (MutableByteArray s) m where
   mutPutTargetOffsetUnsafe = runMutPutBA
 
@@ -118,8 +125,8 @@ decode :: (Binary a, BinaryTarget z m) => z -> m (Either GetError a, ByteCount)
 decode = getTarget get
 
 -- | Decode a value incrementally from sources yielded by a callback.
-decodeInc :: (Binary a, BinaryTarget z m) => GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
-decodeInc = getTargetInc get
+decodeInc :: (Binary a, BinaryTarget z m) => Maybe ByteCount -> GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
+decodeInc mayCap = getTargetInc mayCap get
 
 -- | 'decode' but expect the end of input.
 decodeEnd :: (Binary a, BinaryTarget z m) => z -> m (Either GetError a, ByteCount)
@@ -168,35 +175,35 @@ runGetFile act fp = do
   bs <- BS.readFile fp
   runGetBS 0 act bs
 
-runGetIncString :: Get a -> GetIncCb String IO -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncString g cb = runGetIncBS g (fmap (fmap BSC.pack) . cb)
+runGetIncString :: Maybe ByteCount -> Get a -> GetIncCb String IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncString mayCap g cb = runGetIncBS mayCap g (fmap (fmap BSC.pack) . cb)
 
-runGetIncText :: Get a -> GetIncCb Text IO -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncText g cb = runGetIncBS g (fmap (fmap TE.encodeUtf8) . cb)
+runGetIncText :: Maybe ByteCount -> Get a -> GetIncCb Text IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncText mayCap g cb = runGetIncBS mayCap g (fmap (fmap TE.encodeUtf8) . cb)
 
-runGetIncBA :: PrimMonad m => Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
-runGetIncBA act cb = do
-  env <- newGetIncEnv Nothing (GetIncChunk 0 0 emptyByteArray)
+runGetIncBA :: PrimMonad m => Maybe ByteCount -> Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncBA mayCap act cb = do
+  env <- newGetIncEnv mayCap (GetIncChunk 0 0 emptyByteArray)
   let view s = GetIncChunk 0 (coerce (sizeofByteArray s)) s
   let cb' = fmap (fmap view) . cb
   runGetIncInternal act env cb'
 
-runGetIncSBS :: PrimMonad m => Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
-runGetIncSBS act cb = runGetIncBA act (fmap (fmap viewSBSMem) . cb)
+runGetIncSBS :: PrimMonad m => Maybe ByteCount -> Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncSBS mayCap act cb = runGetIncBA mayCap act (fmap (fmap viewSBSMem) . cb)
 
-runGetIncMemPtr :: Get a -> GetIncCb (MemPtr RealWorld) IO -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncMemPtr act cb = do
+runGetIncMemPtr :: Maybe ByteCount -> Get a -> GetIncCb (MemPtr RealWorld) IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncMemPtr mayCap act cb = do
   mem <- emptyMemPtr
-  env <- newGetIncEnv Nothing (GetIncChunk 0 0 mem)
+  env <- newGetIncEnv mayCap (GetIncChunk 0 0 mem)
   let view mem'@(MemPtr _ off len) = GetIncChunk 0 (len - off) mem'
   let cb' = fmap (fmap view) . cb
   runGetIncInternal act env cb'
 
-runGetIncBS :: Get a -> GetIncCb ByteString IO -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncBS act cb = runGetIncMemPtr act (fmap (fmap viewBSMem) . cb)
+runGetIncBS :: Maybe ByteCount -> Get a -> GetIncCb ByteString IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncBS mayCap act cb = runGetIncMemPtr mayCap act (fmap (fmap viewBSMem) . cb)
 
-runGetIncVec :: Get a -> GetIncCb (Vector Word8) IO -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncVec act cb = runGetIncMemPtr act (fmap (fmap viewVecMem) . cb)
+runGetIncVec :: Maybe ByteCount -> Get a -> GetIncCb (Vector Word8) IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncVec mayCap act cb = runGetIncMemPtr mayCap act (fmap (fmap viewVecMem) . cb)
 
 runPutString :: Put -> ByteCount -> IO String
 runPutString act len = fmap BSC.unpack (runPutBS act len)
