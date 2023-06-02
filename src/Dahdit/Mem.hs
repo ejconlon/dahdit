@@ -1,91 +1,85 @@
 module Dahdit.Mem
-  ( IxPtr (..)
+  ( MemPtr (..)
   , ReadMem (..)
   , readSBSMem
   , viewSBSMem
   , viewBSMem
   , viewVecMem
+  , mutViewVecMem
   , WriteMem (..)
   , writeSBSMem
-  , allocBAMem
-  , allocPtrMem
-  , freezeBAMem
-  , freezeSBSMem
-  , freezeBSMem
-  , freezeVecMem
-  , mutAllocBAMem
-  , mutFreezeBAMem
-  , mutAllocVecMem
-  , mutFreezeVecMem
+  , withBAMem
+  , withSBSMem
+  , withVecMem
+  , withBSMem
   )
 where
 
-import Control.Monad.Primitive (PrimMonad (..), unsafeIOToPrim)
-import Control.Monad.ST (runST)
+import Control.Monad.Primitive (MonadPrim, PrimMonad (..), RealWorld)
 import Dahdit.LiftedPrim (LiftedPrim (..), setByteArrayLifted)
 import Dahdit.Proxy (proxyFor)
 import Dahdit.Sizes (ByteCount (..), staticByteSize)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BSI
 import Data.ByteString.Short.Internal (ShortByteString (..))
-import qualified Data.ByteString.Unsafe as BSU
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, sizeofMutableByteArray, unsafeFreezeByteArray)
+import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, unsafeFreezeByteArray)
 import Data.Primitive.Ptr (copyPtrToMutableByteArray)
-import Data.Vector.Storable (MVector, Vector)
+import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
+import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word8)
-import Foreign.ForeignPtr (newForeignPtr)
-import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
-import Foreign.Marshal.Alloc (callocBytes, finalizerFree, free)
+import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
 import Foreign.Ptr (Ptr, plusPtr)
 
--- | A wrapper over 'Ptr' with an additional phantom type index to align with 'ST' state.
-newtype IxPtr s = IxPtr {unIxPtr :: Ptr Word8}
-  deriving stock (Show)
-  deriving newtype (Eq, Ord)
+data MemPtr s = MemPtr
+  { mpForeign :: !(ForeignPtr Word8)
+  , mpOffset :: !ByteCount
+  , mpLength :: !ByteCount
+  }
+  deriving stock (Eq, Ord, Show)
 
-class ReadMem r where
-  indexMemInBytes :: LiftedPrim a => r -> ByteCount -> a
-  cloneArrayMemInBytes :: r -> ByteCount -> ByteCount -> ByteArray
+withMemPtr :: MemPtr RealWorld -> (Ptr Word8 -> IO a) -> IO a
+withMemPtr (MemPtr fp off _) f = withForeignPtr fp (\ptr -> f (plusPtr ptr (coerce off)))
 
-instance ReadMem ByteArray where
-  indexMemInBytes = indexArrayLiftedInBytes
-  cloneArrayMemInBytes arr off len = cloneByteArray arr (coerce off) (coerce len)
+class PrimMonad m => ReadMem r m where
+  indexMemInBytes :: LiftedPrim a => r -> ByteCount -> m a
+  cloneArrayMemInBytes :: r -> ByteCount -> ByteCount -> m ByteArray
 
-clonePtr :: Ptr Word8 -> ByteCount -> ByteCount -> ByteArray
-clonePtr ptr off len = runST $ do
-  let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
+instance PrimMonad m => ReadMem ByteArray m where
+  indexMemInBytes arr off = pure (indexArrayLiftedInBytes arr off)
+  cloneArrayMemInBytes arr off len = pure (cloneByteArray arr (coerce off) (coerce len))
+
+cloneMemPtr :: MemPtr RealWorld -> ByteCount -> ByteCount -> IO ByteArray
+cloneMemPtr mem off len = do
   marr <- newByteArray (coerce len)
-  copyPtrToMutableByteArray marr 0 wptr (coerce len)
+  withMemPtr mem $ \ptr -> do
+    let wptr = plusPtr ptr (coerce off) :: Ptr Word8
+    copyPtrToMutableByteArray marr 0 wptr (coerce len)
   unsafeFreezeByteArray marr
 
-instance ReadMem (Ptr Word8) where
-  indexMemInBytes = indexPtrLiftedInBytes
-  cloneArrayMemInBytes = clonePtr
+instance ReadMem (MemPtr RealWorld) IO where
+  indexMemInBytes mem off = withMemPtr mem (\ptr -> pure (indexPtrLiftedInBytes ptr off))
+  cloneArrayMemInBytes = cloneMemPtr
 
-readSBSMem :: ReadMem r => r -> ByteCount -> ByteCount -> ShortByteString
-readSBSMem mem off len = let !(ByteArray frozArr) = cloneArrayMemInBytes mem off len in SBS frozArr
+readSBSMem :: ReadMem r m => r -> ByteCount -> ByteCount -> m ShortByteString
+readSBSMem mem off len = do
+  ByteArray frozArr <- cloneArrayMemInBytes mem off len
+  pure (SBS frozArr)
 
 viewSBSMem :: ShortByteString -> ByteArray
 viewSBSMem (SBS harr) = ByteArray harr
 
-viewBSMem :: ByteString -> Ptr Word8
-viewBSMem bs =
-  let (fp, _) = BSI.toForeignPtr0 bs
-  in  unsafeForeignPtrToPtr fp
+viewBSMem :: ByteString -> MemPtr RealWorld
+viewBSMem bs = let (fp, off, len) = BSI.toForeignPtr bs in MemPtr fp (coerce off) (coerce len)
 
-viewVecMem :: Vector Word8 -> Ptr Word8
-viewVecMem vec =
-  let (fp, _) = VS.unsafeToForeignPtr0 vec
-  in  unsafeForeignPtrToPtr fp
+viewVecMem :: Vector Word8 -> MemPtr RealWorld
+viewVecMem vec = let (fp, off, len) = VS.unsafeToForeignPtr vec in MemPtr fp (coerce off) (coerce len)
 
-mutViewVecMem :: MVector s Word8 -> Ptr Word8
-mutViewVecMem mvec =
-  let (fp, _) = VSM.unsafeToForeignPtr0 mvec
-  in  unsafeForeignPtrToPtr fp
+mutViewVecMem :: IOVector Word8 -> MemPtr RealWorld
+mutViewVecMem mvec = let (fp, off, len) = VSM.unsafeToForeignPtr mvec in MemPtr fp (coerce off) (coerce len)
 
 class PrimMonad m => WriteMem q m where
   writeMemInBytes :: LiftedPrim a => a -> q (PrimState m) -> ByteCount -> m ()
@@ -109,54 +103,46 @@ setPtr len val ptr off = do
   for_ [0 .. elemLen - 1] $ \pos ->
     writePtrLiftedInBytes ptr (off + pos * elemSize) val
 
-instance PrimMonad m => WriteMem IxPtr m where
-  writeMemInBytes val mem off = writePtrLiftedInBytes (unIxPtr mem) off val
-  copyArrayMemInBytes arr arrOff arrLen = copyPtr arr arrOff arrLen . unIxPtr
-  setMemInBytes len val = setPtr len val . unIxPtr
+instance WriteMem MemPtr IO where
+  writeMemInBytes val mem off = withMemPtr mem (\ptr -> writePtrLiftedInBytes ptr off val)
+  copyArrayMemInBytes arr arrOff arrLen mem off = withMemPtr mem (\ptr -> copyPtr arr arrOff arrLen ptr off)
+  setMemInBytes len val mem off = withMemPtr mem (\ptr -> setPtr len val ptr off)
 
 writeSBSMem :: WriteMem q m => ShortByteString -> ByteCount -> q (PrimState m) -> ByteCount -> m ()
 writeSBSMem (SBS harr) = copyArrayMemInBytes (ByteArray harr) 0
 
-freezeBAMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m ByteArray
-freezeBAMem marr (ByteCount startOff) (ByteCount endOff) =
-  if startOff == 0 && endOff == sizeofMutableByteArray marr
+withBAMem :: MonadPrim s m => ByteCount -> (MutableByteArray s -> m ByteCount) -> m ByteArray
+withBAMem len use = do
+  marr <- newByteArray (coerce len)
+  len' <- use marr
+  if len' == len
     then unsafeFreezeByteArray marr
-    else freezeByteArray marr startOff (endOff - startOff)
+    else freezeByteArray marr 0 (coerce len')
 
-freezeSBSMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m ShortByteString
-freezeSBSMem marr startOff endOff = fmap (\(ByteArray harr) -> SBS harr) (freezeBAMem marr startOff endOff)
+withSBSMem :: MonadPrim s m => ByteCount -> (MutableByteArray s -> m ByteCount) -> m ShortByteString
+withSBSMem len use = fmap (\(ByteArray arr) -> SBS arr) (withBAMem len use)
 
-freezeBSMem :: PrimMonad m => IxPtr (PrimState m) -> ByteCount -> ByteCount -> m ByteString
-freezeBSMem (IxPtr ptr) startOff endOff =
-  unsafeIOToPrim $
-    BSU.unsafePackCStringFinalizer
-      (plusPtr ptr (unByteCount startOff))
-      (unByteCount (endOff - startOff))
-      (free ptr)
+allocPtrMem :: ByteCount -> IO (MemPtr RealWorld)
+allocPtrMem len = do
+  fp <- mallocForeignPtrBytes (coerce len)
+  pure (MemPtr fp 0 len)
 
-freezeVecMem :: PrimMonad m => IxPtr (PrimState m) -> ByteCount -> ByteCount -> m (Vector Word8)
-freezeVecMem (IxPtr ptr) _ len = unsafeIOToPrim (fmap (\fp -> VS.unsafeFromForeignPtr0 fp (coerce len)) (newForeignPtr finalizerFree ptr))
+freezeVecMem :: MemPtr RealWorld -> ByteCount -> Vector Word8
+freezeVecMem (MemPtr fp off _) len =
+  VS.unsafeFromForeignPtr fp (coerce off) (coerce (off + len))
 
-allocPtrMem :: PrimMonad m => ByteCount -> ByteCount -> m (IxPtr (PrimState m), Maybe (IO ()))
-allocPtrMem off len = do
-  let cap = off + len
-  ptr <- unsafeIOToPrim (callocBytes (unByteCount cap))
-  pure (IxPtr ptr, Just (free ptr))
+freezeBSMem :: MemPtr RealWorld -> ByteCount -> ByteString
+freezeBSMem (MemPtr fp off _) len =
+  BSI.fromForeignPtr fp (coerce off) (coerce (off + len))
 
-allocBAMem :: PrimMonad m => ByteCount -> ByteCount -> m (MutableByteArray (PrimState m), Maybe (IO ()))
-allocBAMem off len = do
-  let cap = off + len
-  arr <- newByteArray (unByteCount cap)
-  pure (arr, Nothing)
+withVecMem :: ByteCount -> (MemPtr RealWorld -> IO ByteCount) -> IO (Vector Word8)
+withVecMem len use = do
+  mem <- allocPtrMem len
+  len' <- use mem
+  pure (freezeVecMem mem len')
 
-mutAllocBAMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m (MutableByteArray (PrimState m), Maybe (IO ()))
-mutAllocBAMem u _ _ = pure (u, Nothing)
-
-mutFreezeBAMem :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> m ByteCount
-mutFreezeBAMem _ _ = pure
-
-mutAllocVecMem :: PrimMonad m => MVector (PrimState m) Word8 -> ByteCount -> ByteCount -> m (IxPtr (PrimState m), Maybe (IO ()))
-mutAllocVecMem u _ _ = pure (IxPtr (mutViewVecMem u), Nothing)
-
-mutFreezeVecMem :: PrimMonad m => IxPtr (PrimState m) -> ByteCount -> ByteCount -> m ByteCount
-mutFreezeVecMem _ _ = pure
+withBSMem :: ByteCount -> (MemPtr RealWorld -> IO ByteCount) -> IO ByteString
+withBSMem len use = do
+  mem <- allocPtrMem len
+  len' <- use mem
+  pure (freezeBSMem mem len')

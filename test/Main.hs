@@ -3,7 +3,8 @@
 
 module Main (main) where
 
-import Control.Monad.Primitive (PrimState)
+import Control.Monad (replicateM)
+import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
   , BinaryTarget (..)
@@ -37,13 +38,15 @@ import Dahdit
   , ViaGeneric (..)
   , ViaStaticGeneric (..)
   , Word16BE
-  , Word16LE
+  , Word16LE (..)
   , Word24BE
   , Word24LE
   , Word32BE
-  , Word32LE
+  , Word32LE (..)
   , Word64BE
   , Word64LE
+  , decodeEnd
+  , encode
   , getByteArray
   , getByteString
   , getDoubleBE
@@ -123,14 +126,22 @@ import Data.Coerce (coerce)
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, byteArrayFromList, freezeByteArray, newByteArray, sizeofMutableByteArray)
 import Data.Proxy (asProxyTypeOf)
+import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.ShortWord (Int24, Word24)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
-import Data.Vector.Storable.Mutable (MVector)
+import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
+import Debug.Trace
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
+import Test.Falsify.Generator (Gen)
+import qualified Test.Falsify.Generator as FG
+import qualified Test.Falsify.Predicate as FC
+import Test.Falsify.Property (Property)
+import qualified Test.Falsify.Property as FP
+import qualified Test.Falsify.Range as FR
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Falsify (testProperty)
 import Test.Tasty.HUnit (testCase, (@?=))
@@ -151,15 +162,15 @@ instance CaseTarget (Vector Word8) where
   initSource = VS.fromList
   consumeSink = VS.toList
 
-class MutBinaryTarget IO u => MutCaseTarget u where
+class MutBinaryTarget u IO => MutCaseTarget u where
   newSink :: ByteCount -> IO u
   freezeSink :: u -> IO [Word8]
 
-instance (s ~ PrimState IO) => MutCaseTarget (MutableByteArray s) where
+instance MutCaseTarget (MutableByteArray RealWorld) where
   newSink = newByteArray . unByteCount
   freezeSink u = fmap (\(ByteArray arr) -> BSS.unpack (SBS arr)) (freezeByteArray u 0 (sizeofMutableByteArray u))
 
-instance (s ~ PrimState IO) => MutCaseTarget (MVector s Word8) where
+instance MutCaseTarget (IOVector Word8) where
   newSink = VSM.new . unByteCount
   freezeSink = fmap consumeSink . VS.freeze
 
@@ -378,6 +389,7 @@ getCases =
   , GetCase "TB16 1" (get @TermBytes16) (Just (2, 0, TermBytes16 (BSS.pack [1]))) [1, 0]
   , GetCase "TB16 2" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2]))) [1, 2, 0, 0]
   , GetCase "TB16 3" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
+  , GetCase "Seq Word16LE" (get @(Seq Word16LE)) (Just (12, 0, Seq.fromList [0xEC, 0x5D])) [2, 0, 0, 0, 0, 0, 0, 0, 0xEC, 0, 0x5D, 0]
   ]
 
 testGet :: CaseTarget z => String -> Proxy z -> TestTree
@@ -433,6 +445,7 @@ putCases =
   , PutCase "TB16 1" (put (TermBytes16 (BSS.pack [1]))) [1, 0]
   , PutCase "TB16 2" (put (TermBytes16 (BSS.pack [1, 2]))) [1, 2, 0, 0]
   , PutCase "TB16 3" (put (TermBytes16 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
+  , PutCase "Seq Word16LE" (put @(Seq Word16LE) (Seq.fromList [0xEC, 0x5D])) [2, 0, 0, 0, 0, 0, 0, 0, 0xEC, 0, 0x5D, 0]
   ]
 
 testPut :: CaseTarget z => String -> Proxy z -> TestTree
@@ -459,8 +472,51 @@ testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
   ez3 @?= Left (GetErrorGlobalCap "Word16LE" 1 2)
   c3 @?= 3
 
+data WordX
+  = WordX8 !Word8
+  | WordX16 !Word16LE
+  | WordX32 !Word32LE
+  deriving stock (Eq, Ord, Show)
+
+instance Binary WordX where
+  byteSize = \case
+    WordX8 _ -> 1
+    WordX16 _ -> 2
+    WordX32 _ -> 4
+  get = do
+    w <- get @Word8
+    case w of
+      1 -> fmap WordX8 get
+      2 -> fmap WordX16 get
+      4 -> fmap WordX32 get
+      _ -> fail ("Bad size for WordX: " ++ show w)
+  put = \case
+    WordX8 w -> put @Word8 1 >> put w
+    WordX16 w -> put @Word8 2 >> put w
+    WordX32 w -> put @Word8 4 >> put w
+
+wordXGen :: Gen WordX
+wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
+ where
+  gen8 = fmap WordX8 (FG.integral (FR.between (0, maxBound)))
+  gen16 = fmap (WordX16 . Word16LE) (FG.integral (FR.between (0, maxBound)))
+  gen32 = fmap (WordX32 . Word32LE) (FG.integral (FR.between (0, maxBound)))
+
+assertEq :: (Eq a, Show a) => a -> a -> Property ()
+assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
+
 testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
 testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
+  numElems <- FP.gen @Int (FG.integral (FR.between (0, 20)))
+  xs <- FP.gen (fmap Seq.fromList (replicateM numElems wordXGen))
+  assertEq (Seq.length xs) numElems
+  let vec = encode @(Seq WordX) @ShortByteString xs
+  traceShowM xs
+  traceShowM vec
+  --     (exs, _) = decodeEnd @_ @(Seq WordX) vec
+  -- case exs of
+  --   Left err -> fail (show err)
+  --   Right xs' -> assertEq xs' xs
   pure ()
 
 testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
@@ -492,8 +548,8 @@ data MutTargetDef where
 
 mutTargets :: [MutTargetDef]
 mutTargets =
-  [ MutTargetDef "MutableByteArray" (Proxy :: Proxy (MutableByteArray (PrimState IO)))
-  , MutTargetDef "MVector" (Proxy :: Proxy (MVector (PrimState IO) Word8))
+  [ MutTargetDef "MutableByteArray" (Proxy :: Proxy (MutableByteArray RealWorld))
+  , MutTargetDef "IOVector" (Proxy :: Proxy (IOVector Word8))
   ]
 
 testDahdit :: TestTree
@@ -506,7 +562,7 @@ testDahdit = testGroup "Dahdit" trees
       [ testGet name prox
       , testPut name prox
       , testGetOffset name prox
-      , testGetInc name prox
+      -- , testGetInc name prox
       ]
   mutTargetTrees =
     mutTargets >>= \(MutTargetDef name prox) ->

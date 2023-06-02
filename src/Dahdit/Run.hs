@@ -11,14 +11,13 @@ module Dahdit.Run
 where
 
 import Control.Applicative (Alternative (..))
-import Control.Exception (Exception (..), onException)
+import Control.Exception (Exception (..))
 import Control.Monad (replicateM_, unless)
 import Control.Monad.Except (ExceptT, MonadError, runExceptT, throwError)
 import Control.Monad.Free.Church (F (..), iterM)
 import Control.Monad.Free.Class (MonadFree (..))
-import Control.Monad.Primitive (MonadPrim, PrimBase, PrimMonad (..), unsafeIOToPrim, unsafePrimToIO)
+import Control.Monad.Primitive (MonadPrim, PrimMonad (..))
 import Control.Monad.Reader (MonadReader (..), ReaderT (..), asks)
-import Control.Monad.ST.Strict (runST)
 import Control.Monad.State.Strict (MonadState, State, runState)
 import qualified Control.Monad.State.Strict as State
 import Control.Monad.Trans (MonadTrans (..))
@@ -116,8 +115,8 @@ prettyGetError = \case
   GetErrorRemaining ac -> "Cannot read remaining length in stream context (read " <> T.pack (show (unByteCount ac)) <> ")"
 
 -- | Get from a single buffer
-runGetInternal :: ReadMem r => ByteCount -> Get a -> ByteCount -> r -> (Either GetError a, ByteCount)
-runGetInternal off act cap mem = runST $ do
+runGetInternal :: ReadMem r m => ByteCount -> Get a -> ByteCount -> r -> m (Either GetError a, ByteCount)
+runGetInternal off act cap mem = do
   let chunk = GetIncChunk off cap mem
   env <- newGetIncEnv (Just (cap - off)) chunk
   (ea, _, off') <- runGetIncInternal act env (const (pure Nothing))
@@ -249,16 +248,16 @@ guardReadBytes nm bc = do
 --         pure (newChunk, newLocOffStart, newLocOffEnd)
 
 -- Memory read function takes local start offset
-readBytes :: MonadPrim s m => Text -> ByteCount -> (r -> ByteCount -> a) -> GetIncM s r m a
+readBytes :: MonadPrim s m => Text -> ByteCount -> (r -> ByteCount -> m a) -> GetIncM s r m a
 readBytes nm bc f = do
   (gloAbsEnd, newChunk, newLocOffStart) <- guardReadBytes nm bc
   let mem = gicArray newChunk
-      a = f mem newLocOffStart
+  a <- lift (f mem newLocOffStart)
   gloAbsRef <- GetIncM (asks gieGlobalAbs)
   lift (writeMutVar gloAbsRef gloAbsEnd)
   pure a
 
-readScope :: (MonadPrim s m, ReadMem r) => GetScopeF (GetIncM s r m a) -> GetIncM s r m a
+readScope :: (MonadPrim s m, ReadMem r m) => GetScopeF (GetIncM s r m a) -> GetIncM s r m a
 readScope (GetScopeF sm bc g k) = do
   GetIncEnv gloAbsRef _ capStackRef _ _ <- GetIncM ask
   gloAbsStart <- lift (readMutVar gloAbsRef)
@@ -278,20 +277,20 @@ readScope (GetScopeF sm bc g k) = do
     then k a
     else throwError (GetErrorScopedMismatch sm actualBc bc)
 
-readStaticSeq :: (MonadPrim s m, ReadMem r) => GetStaticSeqF (GetIncM s r m a) -> GetIncM s r m a
+readStaticSeq :: (MonadPrim s m, ReadMem r m) => GetStaticSeqF (GetIncM s r m a) -> GetIncM s r m a
 readStaticSeq gss@(GetStaticSeqF ec g k) = do
   let bc = getStaticSeqSize gss
   _ <- guardReadBytes "static sequence" bc
   ss <- Seq.replicateA (coerce ec) (interpGetInc g)
   k ss
 
-readStaticArray :: (MonadPrim s m, ReadMem r) => GetStaticArrayF (GetIncM s r m a) -> GetIncM s r m a
+readStaticArray :: (MonadPrim s m, ReadMem r m) => GetStaticArrayF (GetIncM s r m a) -> GetIncM s r m a
 readStaticArray gsa@(GetStaticArrayF _ _ k) = do
   let bc = getStaticArraySize gsa
   sa <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
   k (LiftedPrimArray sa)
 
-readLookAhead :: (MonadPrim s m, ReadMem r) => GetLookAheadF (GetIncM s r m a) -> GetIncM s r m a
+readLookAhead :: (MonadPrim s m, ReadMem r m) => GetLookAheadF (GetIncM s r m a) -> GetIncM s r m a
 readLookAhead (GetLookAheadF g k) = do
   GetIncEnv gloAbsRef _ _ _ lookStackRef <- GetIncM ask
   gloAbs <- lift (readMutVar gloAbsRef)
@@ -301,30 +300,30 @@ readLookAhead (GetLookAheadF g k) = do
   lift (writeMutVar gloAbsRef gloAbs)
   k a
 
-interpGetInc :: (MonadPrim s m, ReadMem r) => Get a -> GetIncM s r m a
+interpGetInc :: (MonadPrim s m, ReadMem r m) => Get a -> GetIncM s r m a
 interpGetInc (Get g) = flip iterM g $ \case
-  GetFWord8 k -> readBytes "Word8" 1 (indexMemInBytes @_ @Word8) >>= k
-  GetFInt8 k -> readBytes "Int8" 1 (indexMemInBytes @_ @Int8) >>= k
-  GetFWord16LE k -> readBytes "Word16LE" 2 (indexMemInBytes @_ @Word16LE) >>= k
-  GetFInt16LE k -> readBytes "Int16LE" 2 (indexMemInBytes @_ @Int16LE) >>= k
-  GetFWord24LE k -> readBytes "Word24LE" 3 (indexMemInBytes @_ @Word24LE) >>= k
-  GetFInt24LE k -> readBytes "Int24LE" 3 (indexMemInBytes @_ @Int24LE) >>= k
-  GetFWord32LE k -> readBytes "Word32LE" 4 (indexMemInBytes @_ @Word32LE) >>= k
-  GetFInt32LE k -> readBytes "Int32LE" 4 (indexMemInBytes @_ @Int32LE) >>= k
-  GetFWord64LE k -> readBytes "Word64LE" 8 (indexMemInBytes @_ @Word64LE) >>= k
-  GetFInt64LE k -> readBytes "Int64LE" 8 (indexMemInBytes @_ @Int64LE) >>= k
-  GetFFloatLE k -> readBytes "FloatLE" 4 (indexMemInBytes @_ @FloatLE) >>= k
-  GetFDoubleLE k -> readBytes "DoubleLE" 8 (indexMemInBytes @_ @DoubleLE) >>= k
-  GetFWord16BE k -> readBytes "Word16BE" 2 (indexMemInBytes @_ @Word16BE) >>= k
-  GetFInt16BE k -> readBytes "Int16BE" 2 (indexMemInBytes @_ @Int16BE) >>= k
-  GetFWord24BE k -> readBytes "Word24BE" 3 (indexMemInBytes @_ @Word24BE) >>= k
-  GetFInt24BE k -> readBytes "Int24BE" 3 (indexMemInBytes @_ @Int24BE) >>= k
-  GetFWord32BE k -> readBytes "Word32BE" 4 (indexMemInBytes @_ @Word32BE) >>= k
-  GetFInt32BE k -> readBytes "Int32BE" 4 (indexMemInBytes @_ @Int32BE) >>= k
-  GetFWord64BE k -> readBytes "Word64BE" 8 (indexMemInBytes @_ @Word64BE) >>= k
-  GetFInt64BE k -> readBytes "Int64BE" 8 (indexMemInBytes @_ @Int64BE) >>= k
-  GetFFloatBE k -> readBytes "FloatBE" 4 (indexMemInBytes @_ @FloatBE) >>= k
-  GetFDoubleBE k -> readBytes "DoubleBE" 8 (indexMemInBytes @_ @DoubleBE) >>= k
+  GetFWord8 k -> readBytes "Word8" 1 (indexMemInBytes @_ @_ @Word8) >>= k
+  GetFInt8 k -> readBytes "Int8" 1 (indexMemInBytes @_ @_ @Int8) >>= k
+  GetFWord16LE k -> readBytes "Word16LE" 2 (indexMemInBytes @_ @_ @Word16LE) >>= k
+  GetFInt16LE k -> readBytes "Int16LE" 2 (indexMemInBytes @_ @_ @Int16LE) >>= k
+  GetFWord24LE k -> readBytes "Word24LE" 3 (indexMemInBytes @_ @_ @Word24LE) >>= k
+  GetFInt24LE k -> readBytes "Int24LE" 3 (indexMemInBytes @_ @_ @Int24LE) >>= k
+  GetFWord32LE k -> readBytes "Word32LE" 4 (indexMemInBytes @_ @_ @Word32LE) >>= k
+  GetFInt32LE k -> readBytes "Int32LE" 4 (indexMemInBytes @_ @_ @Int32LE) >>= k
+  GetFWord64LE k -> readBytes "Word64LE" 8 (indexMemInBytes @_ @_ @Word64LE) >>= k
+  GetFInt64LE k -> readBytes "Int64LE" 8 (indexMemInBytes @_ @_ @Int64LE) >>= k
+  GetFFloatLE k -> readBytes "FloatLE" 4 (indexMemInBytes @_ @_ @FloatLE) >>= k
+  GetFDoubleLE k -> readBytes "DoubleLE" 8 (indexMemInBytes @_ @_ @DoubleLE) >>= k
+  GetFWord16BE k -> readBytes "Word16BE" 2 (indexMemInBytes @_ @_ @Word16BE) >>= k
+  GetFInt16BE k -> readBytes "Int16BE" 2 (indexMemInBytes @_ @_ @Int16BE) >>= k
+  GetFWord24BE k -> readBytes "Word24BE" 3 (indexMemInBytes @_ @_ @Word24BE) >>= k
+  GetFInt24BE k -> readBytes "Int24BE" 3 (indexMemInBytes @_ @_ @Int24BE) >>= k
+  GetFWord32BE k -> readBytes "Word32BE" 4 (indexMemInBytes @_ @_ @Word32BE) >>= k
+  GetFInt32BE k -> readBytes "Int32BE" 4 (indexMemInBytes @_ @_ @Int32BE) >>= k
+  GetFWord64BE k -> readBytes "Word64BE" 8 (indexMemInBytes @_ @_ @Word64BE) >>= k
+  GetFInt64BE k -> readBytes "Int64BE" 8 (indexMemInBytes @_ @_ @Int64BE) >>= k
+  GetFFloatBE k -> readBytes "FloatBE" 4 (indexMemInBytes @_ @_ @FloatBE) >>= k
+  GetFDoubleBE k -> readBytes "DoubleBE" 8 (indexMemInBytes @_ @_ @DoubleBE) >>= k
   GetFShortByteString bc k ->
     readBytes "ShortByteString" bc (\mem off -> readSBSMem mem off bc) >>= k
   GetFStaticSeq gss -> readStaticSeq gss
@@ -332,7 +331,7 @@ interpGetInc (Get g) = flip iterM g $ \case
   GetFByteArray bc k ->
     readBytes "ByteArray" bc (\mem off -> cloneArrayMemInBytes mem off bc) >>= k
   GetFScope gs -> readScope gs
-  GetFSkip bc k -> readBytes "skip" bc (\_ _ -> ()) >> k
+  GetFSkip bc k -> readBytes "skip" bc (\_ _ -> pure ()) >> k
   GetFLookAhead gla -> readLookAhead gla
   GetFRemainingSize k -> do
     GetIncEnv gloAbsRef _ capStackRef _ _ <- GetIncM ask
@@ -343,7 +342,7 @@ interpGetInc (Get g) = flip iterM g $ \case
       _ :|> cap -> k (cap - gloAbs)
   GetFFail msg -> throwError (GetErrorFail msg)
 
-runGetIncInternal :: (ReadMem r, s ~ PrimState m, PrimMonad m) => Get a -> GetIncEnv s r -> GetIncCb r m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncInternal :: (MonadPrim s m, ReadMem r m) => Get a -> GetIncEnv s r -> GetIncCb r m -> m (Either GetError a, ByteCount, ByteCount)
 runGetIncInternal getter env cb = do
   let m = interpGetInc getter
   res <- runGetIncM m env cb
@@ -353,7 +352,7 @@ runGetIncInternal getter env cb = do
   let baseOff = gloAbs - gloRel + gicLocalOff curChunk
   pure (res, gloAbs, baseOff)
 
--- Put unsafe:
+-- Put:
 
 data PutEnv s q = PutEnv
   { peOff :: !(MutVar s ByteCount)
@@ -461,8 +460,8 @@ mkPutRun (PutM (F w)) = PutRun (w pure wrap)
 mkPutEff :: WriteMem q m => PutM a -> PutEff q m a
 mkPutEff = iterPutRun . mkPutRun
 
-runPutUnsafe :: WriteMem q m => ByteCount -> Put -> ByteCount -> q (PrimState m) -> m ByteCount
-runPutUnsafe off act len mem = do
+runPutInternal :: WriteMem q m => ByteCount -> Put -> ByteCount -> q (PrimState m) -> m ByteCount
+runPutInternal off act len mem = do
   let eff = mkPutRun act
       cap = off + len
   st@(PutEnv offRef _ _) <- newPutEnv off cap mem
@@ -531,14 +530,3 @@ runCount act =
   let eff = mkCountRun act
       (_, bc) = runCountRun eff 0
   in  bc
-
--- Put safe:
-
-primOnExc :: PrimBase m => m a -> Maybe (IO ()) -> m a
-primOnExc prim = maybe prim $ \onExc ->
-  unsafeIOToPrim (onException (unsafePrimToIO prim) onExc)
-
-runPutInternal :: (PrimBase m, WriteMem q m) => ByteCount -> Put -> ByteCount -> (ByteCount -> ByteCount -> m (q (PrimState m), Maybe (IO ()))) -> (q (PrimState m) -> ByteCount -> ByteCount -> m z) -> m z
-runPutInternal off act len mkMem useMem = do
-  (mem, rel) <- mkMem off len
-  primOnExc (runPutUnsafe off act len mem >>= useMem mem off) rel
