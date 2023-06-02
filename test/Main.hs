@@ -4,7 +4,6 @@
 module Main (main) where
 
 import Control.Monad (replicateM)
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
@@ -140,12 +139,16 @@ import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
-import Hedgehog (Gen, forAll, property, (===))
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
+import System.IO.Unsafe (unsafePerformIO)
+import Test.Falsify.Generator (Gen)
+import qualified Test.Falsify.Generator as FG
+import qualified Test.Falsify.Predicate as FC
+import Test.Falsify.Property (Property)
+import qualified Test.Falsify.Property as FP
+import qualified Test.Falsify.Range as FR
 import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Tasty.Falsify (testProperty)
 import Test.Tasty.HUnit (testCase, (@?=))
-import Test.Tasty.Hedgehog (testProperty)
 
 class (Eq z, Show z, BinaryGetTarget z IO, BinaryPutTarget z IO) => CaseTarget z where
   initSource :: [Word8] -> z
@@ -547,11 +550,11 @@ instance Binary WordX where
     WordX32 w -> put @Word8 4 >> put w
 
 wordXGen :: Gen WordX
-wordXGen = Gen.choice [gen8, gen16, gen32]
+wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
  where
-  gen8 = fmap WordX8 (Gen.integral (Range.constant 0 maxBound))
-  gen16 = fmap (WordX16 . Word16LE) (Gen.integral (Range.constant 0 maxBound))
-  gen32 = fmap (WordX32 . Word32LE) (Gen.integral (Range.constant 0 maxBound))
+  gen8 = fmap WordX8 (FG.integral (FR.between (0, maxBound)))
+  gen16 = fmap (WordX16 . Word16LE) (FG.integral (FR.between (0, maxBound)))
+  gen32 = fmap (WordX32 . Word32LE) (FG.integral (FR.between (0, maxBound)))
 
 takeDiff :: CaseTarget z => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> ([ByteCount], (ByteCount, z))
 takeDiff z pos had diff = go 0
@@ -560,50 +563,47 @@ takeDiff z pos had diff = go 0
     y : ys | acc < diff -> go (acc + y) ys
     ys -> (ys, (acc, sliceBuffer z pos (had + acc)))
 
+assertEq :: (Eq a, Show a) => a -> a -> Property ()
+assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
+
+hackLiftIO :: IO a -> Property a
+hackLiftIO = pure . unsafePerformIO
+
 testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
-testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ property $ do
+testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
   -- Generate some random elements
-  numElems <- forAll (Gen.integral (Range.linear 0 20))
-  xs <- forAll (replicateM numElems wordXGen)
+  numElems <- FP.gen @Int (FG.integral (FR.between (0, 20)))
+  xs <- FP.gen (replicateM numElems wordXGen)
   -- First some sanity checks that encode/decode work
-  length xs === numElems
-  wholeBuf <- liftIO (encode xs)
-  (exs, totLen) <- liftIO (decodeEnd (wholeBuf `asProxyTypeOf` p))
+  assertEq (length xs) numElems
+  wholeBuf <- hackLiftIO (encode xs)
+  (exs, totLen) <- hackLiftIO (decodeEnd (wholeBuf `asProxyTypeOf` p))
   case exs of
     Left err -> fail (show err)
     Right xs' -> do
-      xs' === xs
-      totLen === byteSize xs
-  sliceBuffer wholeBuf 0 totLen === wholeBuf
+      assertEq xs' xs
+      assertEq totLen (byteSize xs)
+  assertEq (sliceBuffer wholeBuf 0 totLen) wholeBuf
   -- Shuffle list to come up with splits and test incremental
-  ys <- forAll (Gen.shuffle (8 : fmap byteSize xs))
-  ysRef <- liftIO (newIORef ys)
-  sentRef <- liftIO (newIORef 0)
-  -- liftIO (putStrLn "=== WHOLE")
-  -- liftIO (print wholeBuf)
-  -- liftIO (readIORef ysRef >>= print)
-  -- liftIO (readIORef sentRef >>= print)
+  ys <- FP.gen (FG.shuffle (8 : fmap byteSize xs))
+  ysRef <- hackLiftIO (newIORef ys)
+  sentRef <- hackLiftIO (newIORef 0)
   let cb (GetIncRequest pos _ len) = do
         sent <- readIORef sentRef
         let had = sent - pos
         let diff = len - had
         (bufLen, buf) <- atomicModifyIORef' ysRef (takeDiff wholeBuf pos had diff)
-        -- putStrLn "--- PART"
-        -- print bufLen
-        -- print buf
         modifyIORef' sentRef (+ bufLen)
-        -- readIORef ysRef >>= print
-        -- readIORef sentRef >>= print
         pure $
           if bufLen == 0
             then Nothing
             else Just (buf `asProxyTypeOf` p)
-  (ezs, totLen', _) <- liftIO (decodeInc (Just totLen) cb)
+  (ezs, totLen', _) <- hackLiftIO (decodeInc (Just totLen) cb)
   case ezs of
     Left err -> fail (show err)
     Right zs -> do
-      zs === xs
-      totLen' === totLen
+      assertEq zs xs
+      assertEq totLen' totLen
 
 testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
 testMutPut n p = testGroup ("mut put (" ++ n ++ ")") (fmap (mutRunPutCase p) putCases)
