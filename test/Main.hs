@@ -8,7 +8,8 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
-  , BinaryTarget (..)
+  , BinaryGetTarget (..)
+  , BinaryPutTarget (..)
   , BoolByte (..)
   , ByteCount (..)
   , ByteString
@@ -29,7 +30,7 @@ import Dahdit
   , Int64BE
   , Int64LE
   , LiftedPrimArray (..)
-  , MutBinaryTarget (..)
+  , MutBinaryPutTarget (..)
   , Proxy (..)
   , Put
   , ShortByteString
@@ -146,7 +147,7 @@ import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 import Test.Tasty.Hedgehog (testProperty)
 
-class (Eq z, Show z, BinaryTarget z IO) => CaseTarget z where
+class (Eq z, Show z, BinaryGetTarget z IO, BinaryPutTarget z IO) => CaseTarget z where
   initSource :: [Word8] -> z
   consumeSink :: z -> [Word8]
   sliceBuffer :: z -> ByteCount -> ByteCount -> z
@@ -166,7 +167,7 @@ instance CaseTarget (Vector Word8) where
   consumeSink = VS.toList
   sliceBuffer buf off len = VS.take (coerce len) (VS.drop (coerce off) buf)
 
-class MutBinaryTarget u IO => MutCaseTarget u where
+class MutBinaryPutTarget u IO => MutCaseTarget u where
   newSink :: ByteCount -> IO u
   freezeSink :: u -> IO [Word8]
 
