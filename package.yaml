@@ -81,6 +81,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - dahdit
-    - falsify
+    - hedgehog
     - tasty
+    - tasty-hedgehog
     - tasty-hunit

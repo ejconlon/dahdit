@@ -4,6 +4,7 @@
 module Main (main) where
 
 import Control.Monad (replicateM)
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
@@ -134,17 +135,13 @@ import qualified Data.Vector.Storable as VS
 import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
-import Debug.Trace
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
-import Test.Falsify.Generator (Gen)
-import qualified Test.Falsify.Generator as FG
-import qualified Test.Falsify.Predicate as FC
-import Test.Falsify.Property (Property)
-import qualified Test.Falsify.Property as FP
-import qualified Test.Falsify.Range as FR
+import Hedgehog (Gen, forAll, property, (===))
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.Falsify (testProperty)
 import Test.Tasty.HUnit (testCase, (@?=))
+import Test.Tasty.Hedgehog (testProperty)
 
 class BinaryTarget z IO => CaseTarget z where
   initSource :: [Word8] -> z
@@ -496,28 +493,26 @@ instance Binary WordX where
     WordX32 w -> put @Word8 4 >> put w
 
 wordXGen :: Gen WordX
-wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
+wordXGen = Gen.choice [gen8, gen16, gen32]
  where
-  gen8 = fmap WordX8 (FG.integral (FR.between (0, maxBound)))
-  gen16 = fmap (WordX16 . Word16LE) (FG.integral (FR.between (0, maxBound)))
-  gen32 = fmap (WordX32 . Word32LE) (FG.integral (FR.between (0, maxBound)))
+  gen8 = fmap WordX8 (Gen.integral (Range.constant 0 maxBound))
+  gen16 = fmap (WordX16 . Word16LE) (Gen.integral (Range.constant 0 maxBound))
+  gen32 = fmap (WordX32 . Word32LE) (Gen.integral (Range.constant 0 maxBound))
 
--- assertEq :: (Eq a, Show a) => a -> a -> Property ()
--- assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
+testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
+testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ property $ do
+  -- Generate some random elements
+  numElems <- forAll (Gen.integral (Range.linear 0 20))
+  xs <- forAll (fmap Seq.fromList (replicateM numElems wordXGen))
+  -- First some sanity checks that encode/decode work
+  Seq.length xs === numElems
+  buf <- liftIO (encode xs)
+  (exs, _) <- liftIO (decodeEnd (buf `asProxyTypeOf` p))
+  case exs of
+    Left err -> fail (show err)
+    Right xs' -> xs' === xs
 
--- testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
--- testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
---   numElems <- FP.gen @Int (FG.integral (FR.between (0, 20)))
---   xs <- FP.gen (fmap Seq.fromList (replicateM numElems wordXGen))
---   assertEq (Seq.length xs) numElems
---   vec <- encode @(Seq WordX) @ShortByteString xs
---   traceShowM xs
---   traceShowM vec
---   --     (exs, _) = decodeEnd @_ @(Seq WordX) vec
---   -- case exs of
---   --   Left err -> fail (show err)
---   --   Right xs' -> assertEq xs' xs
---   pure ()
+-- TODO now feed buffer incrementally
 
 testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
 testMutPut n p = testGroup ("mut put (" ++ n ++ ")") (fmap (mutRunPutCase p) putCases)
@@ -562,7 +557,7 @@ testDahdit = testGroup "Dahdit" trees
       [ testGet name prox
       , testPut name prox
       , testGetOffset name prox
-      -- , testGetInc name prox
+      , testGetInc name prox
       ]
   mutTargetTrees =
     mutTargets >>= \(MutTargetDef name prox) ->
