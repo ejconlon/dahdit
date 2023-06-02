@@ -387,6 +387,29 @@ getCases =
   , GetCase "TB16 2" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2]))) [1, 2, 0, 0]
   , GetCase "TB16 3" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
   , GetCase "Seq Word16LE" (get @(Seq Word16LE)) (Just (12, 0, Seq.fromList [0xEC, 0x5D])) [2, 0, 0, 0, 0, 0, 0, 0, 0xEC, 0, 0x5D, 0]
+  , GetCase
+      "Seq WordX"
+      (get @(Seq WordX))
+      (Just (18, 0, Seq.fromList [WordX32 0, WordX32 0]))
+      [ 2
+      , 0
+      , 0
+      , 0
+      , 0
+      , 0
+      , 0
+      , 0
+      , 4
+      , 0
+      , 0
+      , 0
+      , 0
+      , 4
+      , 0
+      , 0
+      , 0
+      , 0
+      ]
   ]
 
 testGet :: CaseTarget z => String -> Proxy z -> TestTree
@@ -443,6 +466,28 @@ putCases =
   , PutCase "TB16 2" (put (TermBytes16 (BSS.pack [1, 2]))) [1, 2, 0, 0]
   , PutCase "TB16 3" (put (TermBytes16 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
   , PutCase "Seq Word16LE" (put @(Seq Word16LE) (Seq.fromList [0xEC, 0x5D])) [2, 0, 0, 0, 0, 0, 0, 0, 0xEC, 0, 0x5D, 0]
+  , PutCase
+      "Seq WordX"
+      (put @(Seq WordX) (Seq.fromList [WordX32 0, WordX32 0]))
+      [ 2
+      , 0
+      , 0
+      , 0
+      , 0
+      , 0
+      , 0
+      , 0
+      , 4
+      , 0
+      , 0
+      , 0
+      , 0
+      , 4
+      , 0
+      , 0
+      , 0
+      , 0
+      ]
   ]
 
 testPut :: CaseTarget z => String -> Proxy z -> TestTree
@@ -476,10 +521,11 @@ data WordX
   deriving stock (Eq, Ord, Show)
 
 instance Binary WordX where
-  byteSize = \case
-    WordX8 _ -> 1
-    WordX16 _ -> 2
-    WordX32 _ -> 4
+  byteSize =
+    succ . \case
+      WordX8 _ -> 1
+      WordX16 _ -> 2
+      WordX32 _ -> 4
   get = do
     w <- get @Word8
     case w of
