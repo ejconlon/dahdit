@@ -5,7 +5,9 @@ module Dahdit.Iface
   , MutBinaryTarget (..)
   , mutPutTargetOffset
   , mutPutTarget
+  , getEnd
   , decode
+  , decodeInc
   , decodeEnd
   , decodeFile
   , decodeFileEnd
@@ -21,7 +23,7 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (getRemainingSize)
 import Dahdit.Mem (mutViewVecMem, viewBSMem, viewSBSMem, viewVecMem, withBAMem, withBSMem, withSBSMem, withVecMem)
-import Dahdit.Run (GetError, runCount, runGetInternal, runPutInternal)
+import Dahdit.Run (GetError, GetIncCb, GetIncChunk (..), newGetIncEnv, runCount, runGetIncInternal, runGetInternal, runPutInternal)
 import Dahdit.Sizes (ByteCount (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -29,7 +31,7 @@ import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
-import Data.Primitive.ByteArray (ByteArray, MutableByteArray, sizeofByteArray)
+import Data.Primitive.ByteArray (ByteArray, MutableByteArray, emptyByteArray, sizeofByteArray)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
 import Data.Vector.Storable (Vector)
@@ -46,6 +48,10 @@ class PrimMonad m => BinaryTarget z m where
   -- | Get a value from the source given a starting offset, returning a result and final offset.
   -- On error, the offset will indicate where in the source the error occurred.
   getTargetOffset :: ByteCount -> Get a -> z -> m (Either GetError a, ByteCount)
+
+  -- | Get a value incrementally from sources yielded by the given callback, returning a
+  -- result, final offset in the whole stream, and final offset in the current chunk.
+  getTargetInc :: Get a -> GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
 
 -- | Get a value from the source, returning a result and final offset.
 getTarget :: BinaryTarget z m => Get a -> z -> m (Either GetError a, ByteCount)
@@ -67,26 +73,32 @@ mutPutTarget = mutPutTargetOffset 0
 instance BinaryTarget String IO where
   getTargetOffset = runGetString
   putTargetUnsafe = runPutString
+  getTargetInc = runGetIncString
 
 instance BinaryTarget Text IO where
   getTargetOffset = runGetText
   putTargetUnsafe = runPutText
+  getTargetInc = runGetIncText
 
 instance PrimMonad m => BinaryTarget ShortByteString m where
   getTargetOffset = runGetSBS
   putTargetUnsafe = runPutSBS
+  getTargetInc = runGetIncSBS
 
 instance BinaryTarget ByteString IO where
   getTargetOffset = runGetBS
   putTargetUnsafe = runPutBS
+  getTargetInc = runGetIncBS
 
 instance PrimMonad m => BinaryTarget ByteArray m where
   getTargetOffset = runGetBA
   putTargetUnsafe = runPutBA
+  getTargetInc = runGetIncBA
 
 instance BinaryTarget (Vector Word8) IO where
   getTargetOffset = runGetVec
   putTargetUnsafe = runPutVec
+  getTargetInc = runGetIncVec
 
 instance MonadPrim s m => MutBinaryTarget (MutableByteArray s) m where
   mutPutTargetOffsetUnsafe = runMutPutBA
@@ -94,6 +106,7 @@ instance MonadPrim s m => MutBinaryTarget (MutableByteArray s) m where
 instance MutBinaryTarget (IOVector Word8) IO where
   mutPutTargetOffsetUnsafe = runMutPutVec
 
+-- | Wrapper that asserts a get action has consumed to the end.
 getEnd :: Get a -> Get a
 getEnd getter = do
   a <- getter
@@ -104,6 +117,10 @@ getEnd getter = do
 -- | Decode a value from a source returning a result and consumed byte count.
 decode :: (Binary a, BinaryTarget z m) => z -> m (Either GetError a, ByteCount)
 decode = getTarget get
+
+-- | Decode a value incrementally from sources yielded by a callback.
+decodeInc :: (Binary a, BinaryTarget z m) => GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
+decodeInc = getTargetInc get
 
 -- | 'decode' but expect the end of input.
 decodeEnd :: (Binary a, BinaryTarget z m) => z -> m (Either GetError a, ByteCount)
@@ -151,6 +168,28 @@ runGetFile :: Get a -> FilePath -> IO (Either GetError a, ByteCount)
 runGetFile act fp = do
   bs <- BS.readFile fp
   runGetBS 0 act bs
+
+runGetIncString :: Get a -> GetIncCb String IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncString g cb = runGetIncBS g (fmap (fmap BSC.pack) . cb)
+
+runGetIncText :: Get a -> GetIncCb Text IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncText g cb = runGetIncBS g (fmap (fmap TE.encodeUtf8) . cb)
+
+runGetIncBA :: PrimMonad m => Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncBA = error "TODO"
+
+runGetIncSBS :: PrimMonad m => Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncSBS act cb = do
+  env <- newGetIncEnv Nothing (GetIncChunk 0 0 emptyByteArray)
+  let view s = GetIncChunk 0 (coerce (BSS.length s)) (viewSBSMem s)
+  let cb' = fmap (fmap view) . cb
+  runGetIncInternal act env cb'
+
+runGetIncBS :: Get a -> GetIncCb ByteString IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncBS = error "TODO"
+
+runGetIncVec :: Get a -> GetIncCb (Vector Word8) IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncVec = error "TODO"
 
 runPutString :: Put -> ByteCount -> IO String
 runPutString act len = fmap BSC.unpack (runPutBS act len)

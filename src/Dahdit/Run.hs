@@ -5,11 +5,19 @@ module Dahdit.Run
   ( GetError (..)
   , prettyGetError
   , runGetInternal
+  , GetIncEnv (..)
+  , newGetIncEnv
+  , GetIncChunk (..)
+  , GetIncRequest (..)
+  , GetIncSuspend (..)
+  , GetIncCb
+  , runGetIncInternal
   , runCount
   , runPutInternal
   )
 where
 
+-- import Debug.Trace
 import Control.Applicative (Alternative (..))
 import Control.Exception (Exception (..))
 import Control.Monad (replicateM_, unless)
@@ -159,31 +167,37 @@ newGetIncEnv mayCap chunk = do
   lookAheadVar <- newMutVar Empty
   pure (GetIncEnv gloAbsVar gloRelVar gloCapVar curChunkVar lookAheadVar)
 
-data GetIncState r = GetIncState
-  { gisBaseOff :: !ByteCount
-  , gisNeedLength :: !ByteCount
-  , gisCurChunk :: !(GetIncChunk r)
+-- | A request for more data. Includes absolute position, offset in the current buffer, and required length.
+data GetIncRequest = GetIncRequest
+  { girAbsPos :: !ByteCount
+  , girBaseOff :: !ByteCount
+  , girNeedLength :: !ByteCount
   }
+  deriving stock (Eq, Ord, Show)
 
 -- | See 'GetIncCb' - this is the functor-ized version so we can suspend execution.
-data GetIncDemand s r x = GetIncDemand !(GetIncState r) !(Maybe (GetIncChunk r) -> x)
+data GetIncSuspend z x = GetIncSuspend !GetIncRequest !(Maybe z -> x)
   deriving stock (Functor)
 
+type GetIncSuspendChunk r = GetIncSuspend (GetIncChunk r)
+
 -- Should not implement 'MonadReader' so we can prevent scoped operations like 'local'
-newtype GetIncM s r m a = GetIncM {unGetIncM :: ReaderT (GetIncEnv s r) (ExceptT GetError (FT (GetIncDemand s r) m)) a}
+newtype GetIncM s r m a = GetIncM {unGetIncM :: ReaderT (GetIncEnv s r) (ExceptT GetError (FT (GetIncSuspendChunk r) m)) a}
   deriving newtype
     ( Functor
     , Applicative
     , Monad
     , MonadError GetError
-    , MonadFree (GetIncDemand s r)
+    , MonadFree (GetIncSuspendChunk r)
     )
 
 instance MonadTrans (GetIncM s r) where
   lift = GetIncM . lift . lift . lift
 
 -- | Return new chunk containing enough data (or nothing).
-type GetIncCb r m = GetIncState r -> m (Maybe (GetIncChunk r))
+type GetIncCb z m = GetIncRequest -> m (Maybe z)
+
+type GetIncCbChunk r m = GetIncCb (GetIncChunk r) m
 
 pushMutVar :: MonadPrim s m => MutVar s (Seq a) -> a -> m ()
 pushMutVar v a = modifyMutVar' v (:|> a)
@@ -194,12 +208,12 @@ popMutVar v = modifyMutVar' v (\case Empty -> Empty; as :|> _ -> as)
 peekMutVar :: MonadPrim s m => MutVar s (Seq a) -> m (Maybe a)
 peekMutVar = fmap (\case Empty -> Nothing; _ :|> a -> Just a) . readMutVar
 
-runGetIncM :: MonadPrim s m => GetIncM s r m a -> GetIncEnv s r -> GetIncCb r m -> m (Either GetError a)
+runGetIncM :: MonadPrim s m => GetIncM s r m a -> GetIncEnv s r -> GetIncCbChunk r m -> m (Either GetError a)
 runGetIncM m env cb =
   runFT
     (runExceptT (runReaderT (unGetIncM m) env))
     pure
-    (\k2 (GetIncDemand st k1) -> cb st >>= k2 . k1)
+    (\k2 (GetIncSuspend req k1) -> cb req >>= k2 . k1)
 
 guardReadBytes :: MonadPrim s m => Text -> ByteCount -> GetIncM s r m (ByteCount, GetIncChunk r, ByteCount)
 guardReadBytes nm bc = do
@@ -216,14 +230,35 @@ guardReadBytes nm bc = do
   oldChunk@(GetIncChunk oldOff oldCap _) <- lift (readMutVar chunkRef)
   lookStack <- lift (readMutVar lookStackRef)
   let gloBaseStart = case lookStack of Empty -> gloAbsStart; x :<| _ -> x
-      gloBaseOffStart = gloBaseStart - gloRel + oldOff
-      gloBaseOffEnd = gloAbsStart - gloRel + oldOff + bc
+      baseOffStart = gloBaseStart - gloRel + oldOff
+      baseOffEnd = gloAbsStart - gloRel + oldOff + bc
   (newChunk, newLocOffStart) <-
-    if gloBaseOffEnd <= oldCap
-      then pure (oldChunk, gloBaseOffStart)
+    if baseOffEnd <= oldCap
+      then pure (oldChunk, baseOffStart)
       else do
-        -- TODO actually get more, then check that the new one is sufficient
-        throwError (GetErrorLocalCap nm oldCap gloBaseOffEnd)
+        let needLength = baseOffEnd - baseOffStart
+            req = GetIncRequest gloAbsStart baseOffStart needLength
+        -- traceM "*** PRE REQ"
+        -- traceShowM baseOffStart
+        -- traceShowM baseOffEnd
+        -- traceShowM oldCap
+        -- traceShowM req
+        wrap $ GetIncSuspend req $ \case
+          Nothing -> do
+            -- error "*** THROWING"
+            throwError (GetErrorLocalCap nm oldCap baseOffEnd)
+          Just newChunk -> do
+            -- TODO assert that new buffer length is sufficient
+            -- traceM "*** GOT NEW CHUNK"
+            -- traceM "Local offset"
+            -- traceShowM (gicLocalOff newChunk)
+            -- traceM "Local cap"
+            -- traceShowM (gicLocalCap newChunk)
+            -- traceM "New rel"
+            -- traceShowM gloBaseStart
+            lift (writeMutVar chunkRef newChunk)
+            lift (writeMutVar gloRelRef gloBaseStart)
+            pure (newChunk, gicLocalOff newChunk)
   pure (gloAbsEnd, newChunk, newLocOffStart)
 
 -- let needLength = gloAbsEnd -
@@ -342,7 +377,7 @@ interpGetInc (Get g) = flip iterM g $ \case
       _ :|> cap -> k (cap - gloAbs)
   GetFFail msg -> throwError (GetErrorFail msg)
 
-runGetIncInternal :: (MonadPrim s m, ReadMem r m) => Get a -> GetIncEnv s r -> GetIncCb r m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncInternal :: (MonadPrim s m, ReadMem r m) => Get a -> GetIncEnv s r -> GetIncCbChunk r m -> m (Either GetError a, ByteCount, ByteCount)
 runGetIncInternal getter env cb = do
   let m = interpGetInc getter
   res <- runGetIncM m env cb
