@@ -3,7 +3,7 @@
 
 module Main (main) where
 
-import Control.Monad (replicateM, unless)
+import Control.Monad (replicateM)
 import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
@@ -640,54 +640,11 @@ mutTargets =
   , MutTargetDef "IOVector" (Proxy :: Proxy (IOVector Word8))
   ]
 
--- Gets bytestring until delimiter (consuming delimiter but not including in string)
-getPayload :: Get ShortByteString
-getPayload = go
- where
-  go = do
-    len <- getLookAhead (goFind 0)
-    s <- getByteString len
-    _ <- get @Word8
-    pure s
-  goFind !i = do
-    w <- get @Word8
-    if w == 0xF7
-      then pure i
-      else goFind (i + 1)
-
-data UnivSysEx = UnivSysEx
-  { useSubId :: !Word8
-  , usePayload :: !ShortByteString
-  }
-  deriving stock (Eq, Ord, Show)
-
-instance Binary UnivSysEx where
-  byteSize (UnivSysEx _ p) = 2 + ByteCount (BSS.length p)
-  get = do
-    i <- get @Word8
-    unless (i == 0x7E || i == 0x7F) (fail ("Expected universal sys ex id: " ++ show i))
-    fmap (UnivSysEx i) getPayload
-  put (UnivSysEx i s) = do
-    put i
-    putByteString s
-    put @Word8 0xF7
-
--- Generate a bytestring not including the delimiter
-genPayload :: Gen ShortByteString
-genPayload = fmap BSS.pack (FG.list (FR.between (0, 3)) (FG.integral @Word8 (FR.between (0, 127))))
-
-genUnivSysEx :: Gen UnivSysEx
-genUnivSysEx = UnivSysEx <$> FG.choose (pure 0x7E) (pure 0x7F) <*> genPayload
-
-testLookAhead :: TestTree
-testLookAhead = testCase "lookahead" $ do
-  pure ()
-
 testDahdit :: TestTree
 testDahdit = testGroup "Dahdit" trees
  where
   trees = baseTrees ++ targetTrees ++ mutTargetTrees
-  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray, testLookAhead]
+  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray]
   targetTrees =
     targets >>= \(TargetDef name prox) ->
       [ testGet name prox
