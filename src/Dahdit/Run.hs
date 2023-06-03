@@ -284,7 +284,7 @@ readScope (GetScopeF sm bc g k) = do
       | sm == ScopeModeExact && gloAbsMax > cap ->
           throwError (GetErrorGlobalCap "scope" cap gloAbsMax)
     _ -> pure ()
-  lift (pushMutVar capStackRef bc)
+  lift (pushMutVar capStackRef gloAbsMax)
   a <- interpGetInc g
   lift (popMutVar capStackRef)
   gloAbsEnd <- lift (readMutVar gloAbsRef)
