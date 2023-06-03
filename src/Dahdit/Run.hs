@@ -17,6 +17,7 @@ module Dahdit.Run
   )
 where
 
+-- import Debug.Trace
 import Control.Applicative (Alternative (..))
 import Control.Exception (Exception (..))
 import Control.Monad (replicateM_, unless)
@@ -222,20 +223,33 @@ guardReadBytes nm bc = do
   gloAbsStart <- lift (readMutVar gloAbsRef)
   let gloAbsEnd = gloAbsStart + bc
   mayCap <- lift (peekMutVar capStackRef)
+  -- traceM "*** GUARD"
+  -- traceM ("name=" ++ show nm)
+  -- traceM ("bc=" ++ show bc)
+  -- traceM ("gloAbsStart=" ++ show gloAbsStart)
+  -- traceM ("gloAbsEnd=" ++ show gloAbsEnd)
+  -- traceM ("mayCap=" ++ show mayCap)
   case mayCap of
     Just cap | gloAbsEnd > cap -> throwError (GetErrorGlobalCap nm cap gloAbsEnd)
     _ -> pure ()
   -- Now check that we have enough in the local buf
   gloRel <- lift (readMutVar gloRelRef)
   oldChunk@(GetIncChunk oldOff oldCap _) <- lift (readMutVar chunkRef)
-  lookStack <- lift (readMutVar lookStackRef)
-  let gloBaseStart = case lookStack of Empty -> gloAbsStart; x :<| _ -> x
-      baseOffStart = gloBaseStart - gloRel + oldOff
-      baseOffEnd = gloAbsStart - gloRel + oldOff + bc
+  let oldLocOffStart = gloAbsStart - gloRel + oldOff
+      oldLocOffEnd = oldLocOffStart + bc
   (newChunk, newLocOffStart) <-
-    if baseOffEnd <= oldCap
-      then pure (oldChunk, baseOffStart)
+    if oldLocOffEnd <= oldCap
+      then pure (oldChunk, oldLocOffStart)
       else do
+        lookStack <- lift (readMutVar lookStackRef)
+        let gloBaseStart = case lookStack of Empty -> gloAbsStart; x :<| _ -> x
+            baseOffStart = gloBaseStart - gloRel + oldOff
+            baseOffEnd = gloAbsStart - gloRel + oldOff + bc
+        -- traceM ("gloRel=" ++ show gloRel)
+        -- traceM ("lookStack=" ++ show lookStack)
+        -- traceM ("gloBaseStart=" ++ show gloBaseStart)
+        -- traceM ("baseOffStart=" ++ show baseOffStart)
+        -- traceM ("baseOffEnd=" ++ show baseOffEnd)
         let needLength = baseOffEnd - baseOffStart
             req = GetIncRequest gloAbsStart baseOffStart needLength
         wrap $ GetIncSuspend req $ \case
@@ -246,6 +260,7 @@ guardReadBytes nm bc = do
             lift (writeMutVar chunkRef newChunk)
             lift (writeMutVar gloRelRef gloBaseStart)
             pure (newChunk, gicLocalOff newChunk)
+  -- traceM ("newLocOffStart=" ++ show newLocOffStart)
   pure (gloAbsEnd, newChunk, newLocOffStart)
 
 -- Memory read function takes local start offset
