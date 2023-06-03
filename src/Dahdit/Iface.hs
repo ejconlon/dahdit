@@ -15,7 +15,6 @@ module Dahdit.Iface
   , encode
   , encodeFile
   , mutEncode
-  , handleGetIncCb
   )
 where
 
@@ -25,14 +24,13 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (getRemainingSize)
 import Dahdit.Mem (MemPtr (..), emptyMemPtr, mutViewVecMem, viewBSMem, viewSBSMem, viewVecMem, withBAMem, withBSMem, withSBSMem, withVecMem)
-import Dahdit.Run (GetError, GetIncCb, GetIncChunk (..), GetIncRequest (..), newGetIncEnv, runCount, runGetIncInternal, runGetInternal, runPutInternal)
+import Dahdit.Run (GetError, GetIncCb, GetIncChunk (..), newGetIncEnv, runCount, runGetIncInternal, runGetInternal, runPutInternal)
 import Dahdit.Sizes (ByteCount (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
 import Data.Coerce (coerce)
-import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Primitive.ByteArray (ByteArray, MutableByteArray, emptyByteArray, sizeofByteArray)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
@@ -40,9 +38,6 @@ import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
 import Data.Vector.Storable.Mutable (IOVector)
 import Data.Word (Word8)
-import System.IO (Handle, IOMode (..), hFileSize, withFile)
-
--- import System.IO (Handle)
 
 -- | Abstracts over the sources we can read from.
 class PrimMonad m => BinaryGetTarget z m where
@@ -220,14 +215,6 @@ runGetIncBS mayCap act cb = runGetIncMemPtr mayCap act (fmap (fmap viewBSMem) . 
 runGetIncVec :: Maybe ByteCount -> Get a -> GetIncCb (Vector Word8) IO -> IO (Either GetError a, ByteCount, ByteCount)
 runGetIncVec mayCap act cb = runGetIncMemPtr mayCap act (fmap (fmap viewVecMem) . cb)
 
--- Not used currently, but here's how you would do it...
-runGetIncFile :: Get a -> FilePath -> IO (Either GetError a, ByteCount, ByteCount)
-runGetIncFile act fp = do
-  withFile fp ReadMode $ \h -> do
-    sz <- hFileSize h
-    cb <- handleGetIncCb h
-    runGetIncBS (Just (fromInteger sz)) act cb
-
 runPutString :: Put -> ByteCount -> IO String
 runPutString act len = fmap BSC.unpack (runPutBS act len)
 
@@ -256,13 +243,3 @@ runMutPutBA = runPutInternal
 
 runMutPutVec :: ByteCount -> Put -> ByteCount -> IOVector Word8 -> IO ByteCount
 runMutPutVec off act len mvec = runPutInternal off act len (mutViewVecMem mvec)
-
-handleGetIncCb :: Handle -> IO (GetIncCb ByteString IO)
-handleGetIncCb h = do
-  ref <- newIORef mempty
-  pure $ \(GetIncRequest _ off len) -> do
-    lastBs <- readIORef ref
-    nextPartBs <- BS.hGet h (coerce (len - off))
-    let nextBs = BS.drop (coerce off) lastBs <> nextPartBs
-    writeIORef ref nextBs
-    pure (if BS.null nextBs then Nothing else Just nextBs)
