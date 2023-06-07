@@ -1,6 +1,7 @@
 module Dahdit.Mem
   ( MemPtr (..)
   , emptyMemPtr
+  , MutableMem (..)
   , ReadMem (..)
   , readSBSMem
   , viewSBSMem
@@ -47,6 +48,17 @@ emptyMemPtr = allocPtrMem 0
 
 withMemPtr :: MemPtr RealWorld -> (Ptr Word8 -> IO a) -> IO a
 withMemPtr (MemPtr fp off _) f = withForeignPtr fp (\ptr -> f (plusPtr ptr (coerce off)))
+
+class PrimMonad m => MutableMem r w m | w m -> r where
+  unsafeViewFrozenMem :: w -> m r
+  unsafeUseFrozenMem :: w -> (r -> m a) -> m a
+  unsafeUseFrozenMem w f = unsafeViewFrozenMem w >>= f
+
+instance MonadPrim s m => MutableMem ByteArray (MutableByteArray s) m where
+  unsafeViewFrozenMem = unsafeFreezeByteArray
+
+instance MutableMem (VS.Vector Word8) (IOVector Word8) IO where
+  unsafeViewFrozenMem = VS.unsafeFreeze
 
 class PrimMonad m => ReadMem r m where
   indexMemInBytes :: LiftedPrim a => r -> ByteCount -> m a

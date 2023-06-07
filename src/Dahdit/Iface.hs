@@ -18,12 +18,12 @@ module Dahdit.Iface
   )
 where
 
-import Control.Monad (unless)
+import Control.Monad (unless, (>=>))
 import Control.Monad.Primitive (MonadPrim, PrimMonad (..), RealWorld)
 import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (getRemainingSize)
-import Dahdit.Mem (MemPtr (..), emptyMemPtr, mutViewVecMem, viewBSMem, viewSBSMem, viewVecMem, withBAMem, withBSMem, withSBSMem, withVecMem)
+import Dahdit.Mem (MemPtr (..), MutableMem (..), emptyMemPtr, mutViewVecMem, viewBSMem, viewSBSMem, viewVecMem, withBAMem, withBSMem, withSBSMem, withVecMem)
 import Dahdit.Run (GetError, GetIncCb, GetIncChunk (..), newGetIncEnv, runCount, runGetIncInternal, runGetInternal, runPutInternal)
 import Dahdit.Sizes (ByteCount (..))
 import Data.ByteString (ByteString)
@@ -64,8 +64,7 @@ class BinaryGetTarget z m => BinaryPutTarget z m where
 putTarget :: BinaryPutTarget z m => Put -> m z
 putTarget p = putTargetUnsafe p (runCount p)
 
--- TODO require implement get
-class PrimMonad m => MutBinaryPutTarget z m where
+class BinaryGetTarget z m => MutBinaryPutTarget z m where
   mutPutTargetOffsetUnsafe :: ByteCount -> Put -> ByteCount -> z -> m ByteCount
 
 mutPutTargetOffset :: MutBinaryPutTarget z m => ByteCount -> Put -> z -> m ByteCount
@@ -116,8 +115,16 @@ instance BinaryGetTarget (Vector Word8) IO where
 instance BinaryPutTarget (Vector Word8) IO where
   putTargetUnsafe = runPutVec
 
+instance MonadPrim s m => BinaryGetTarget (MutableByteArray s) m where
+  getTargetOffset bc g z = unsafeUseFrozenMem z (getTargetOffset bc g)
+  getTargetInc mbc g cb = getTargetInc mbc g (cb >=> maybe (pure Nothing) (fmap Just . unsafeViewFrozenMem))
+
 instance MonadPrim s m => MutBinaryPutTarget (MutableByteArray s) m where
   mutPutTargetOffsetUnsafe = runMutPutBA
+
+instance BinaryGetTarget (IOVector Word8) IO where
+  getTargetOffset bc g z = unsafeUseFrozenMem z (getTargetOffset bc g)
+  getTargetInc mbc g cb = getTargetInc mbc g (cb >=> maybe (pure Nothing) (fmap Just . unsafeViewFrozenMem))
 
 instance MutBinaryPutTarget (IOVector Word8) IO where
   mutPutTargetOffsetUnsafe = runMutPutVec

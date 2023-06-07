@@ -3,7 +3,7 @@
 
 module Main (main) where
 
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, (>=>))
 import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
@@ -126,7 +126,7 @@ import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString (..))
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
-import Data.IORef (atomicModifyIORef', modifyIORef', newIORef, readIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, byteArrayFromList, freezeByteArray, newByteArray, sizeofMutableByteArray)
 import Data.Proxy (asProxyTypeOf)
@@ -150,27 +150,27 @@ import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Falsify (testProperty)
 import Test.Tasty.HUnit (testCase, (@?=))
 
-class (Eq z, Show z, BinaryGetTarget z IO, BinaryPutTarget z IO) => CaseTarget z where
-  initSource :: [Word8] -> z
-  consumeSink :: z -> [Word8]
-  sliceBuffer :: z -> ByteCount -> ByteCount -> z
+class (Eq z, Show z) => CaseTarget z where
+  initSource :: [Word8] -> IO z
+  consumeSink :: z -> IO [Word8]
+  sliceBuffer :: z -> ByteCount -> ByteCount -> IO z
 
 instance CaseTarget ShortByteString where
-  initSource = BSS.pack
-  consumeSink = BSS.unpack
-  sliceBuffer buf off len = BSS.take (coerce len) (BSS.drop (coerce off) buf)
+  initSource = pure . BSS.pack
+  consumeSink = pure . BSS.unpack
+  sliceBuffer buf off len = pure (BSS.take (coerce len) (BSS.drop (coerce off) buf))
 
 instance CaseTarget ByteString where
-  initSource = BS.pack
-  consumeSink = BS.unpack
-  sliceBuffer buf off len = BS.take (coerce len) (BS.drop (coerce off) buf)
+  initSource = pure . BS.pack
+  consumeSink = pure . BS.unpack
+  sliceBuffer buf off len = pure (BS.take (coerce len) (BS.drop (coerce off) buf))
 
 instance CaseTarget (Vector Word8) where
-  initSource = VS.fromList
-  consumeSink = VS.toList
-  sliceBuffer buf off len = VS.take (coerce len) (VS.drop (coerce off) buf)
+  initSource = pure . VS.fromList
+  consumeSink = pure . VS.toList
+  sliceBuffer buf off len = pure (VS.take (coerce len) (VS.drop (coerce off) buf))
 
-class MutBinaryPutTarget u IO => MutCaseTarget u where
+class MutCaseTarget u where
   newSink :: ByteCount -> IO u
   freezeSink :: u -> IO [Word8]
 
@@ -180,7 +180,7 @@ instance MutCaseTarget (MutableByteArray RealWorld) where
 
 instance MutCaseTarget (IOVector Word8) where
   newSink = VSM.new . unByteCount
-  freezeSink = fmap consumeSink . VS.freeze
+  freezeSink = VS.freeze >=> consumeSink
 
 data DynFoo = DynFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
@@ -202,11 +202,11 @@ mkStaBytes = StaticBytes . BSS.toShort . BSC.pack
 data GetCase where
   GetCase :: (Show a, Eq a) => String -> Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> GetCase
 
-runGetCase :: CaseTarget z => Proxy z -> GetCase -> TestTree
+runGetCase :: (BinaryGetTarget z IO, CaseTarget z) => Proxy z -> GetCase -> TestTree
 runGetCase p (GetCase name getter mayRes buf) = testCase name $ do
-  let src = initSource buf `asProxyTypeOf` p
-      totLen = coerce (length buf)
-  (result, actOff) <- getTarget getter src
+  src <- initSource buf
+  let totLen = coerce (length buf)
+  (result, actOff) <- getTarget getter (src `asProxyTypeOf` p)
   case (result, mayRes) of
     (Left _, Nothing) -> pure ()
     (Left err, Just (_, _, expecVal)) -> fail ("Got error <" ++ show err ++ ">, expected value <" ++ show expecVal ++ ">")
@@ -219,18 +219,18 @@ runGetCase p (GetCase name getter mayRes buf) = testCase name $ do
 data PutCase where
   PutCase :: String -> Put -> [Word8] -> PutCase
 
-runPutCase :: CaseTarget z => Proxy z -> PutCase -> TestTree
+runPutCase :: (BinaryPutTarget z IO, CaseTarget z) => Proxy z -> PutCase -> TestTree
 runPutCase p (PutCase name putter expecBs) = testCase name $ do
   let expecBc = coerce (length expecBs)
       estBc = runCount putter
   estBc @?= expecBc
   actSink <- putTargetUnsafe putter expecBc
-  let actBs = consumeSink (actSink `asProxyTypeOf` p)
-      actBc = coerce (length actBs)
+  actBs <- consumeSink (actSink `asProxyTypeOf` p)
+  let actBc = coerce (length actBs)
   actBs @?= expecBs
   actBc @?= expecBc
 
-mutRunPutCase :: MutCaseTarget z => Proxy z -> PutCase -> TestTree
+mutRunPutCase :: (MutBinaryPutTarget z IO, MutCaseTarget z) => Proxy z -> PutCase -> TestTree
 mutRunPutCase p (PutCase name putter expecBs) = testCase name $ do
   let expecBc = coerce (length expecBs)
   actSink <- fmap (`asProxyTypeOf` p) (newSink expecBc)
@@ -404,28 +404,10 @@ getCases =
       "Seq WordX"
       (get @(Seq WordX))
       (Just (18, 0, Seq.fromList [WordX32 0, WordX32 0]))
-      [ 2
-      , 0
-      , 0
-      , 0
-      , 0
-      , 0
-      , 0
-      , 0
-      , 4
-      , 0
-      , 0
-      , 0
-      , 0
-      , 4
-      , 0
-      , 0
-      , 0
-      , 0
-      ]
+      [2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 4, 0, 0, 0, 0]
   ]
 
-testGet :: CaseTarget z => String -> Proxy z -> TestTree
+testGet :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGet n p = testGroup ("get (" ++ n ++ ")") (fmap (runGetCase p) getCases)
 
 putCases :: [PutCase]
@@ -503,7 +485,7 @@ putCases =
       ]
   ]
 
-testPut :: CaseTarget z => String -> Proxy z -> TestTree
+testPut :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testPut n p = testGroup ("put (" ++ n ++ ")") (fmap (runPutCase p) putCases)
 
 testLiftedPrimArray :: TestTree
@@ -513,11 +495,11 @@ testLiftedPrimArray = testCase "liftedPrimArray" $ do
   sizeofLiftedPrimArray arr @?= 6
   lengthLiftedPrimArray arr @?= 3
 
-testGetOffset :: CaseTarget z => String -> Proxy z -> TestTree
+testGetOffset :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
   let buf = [0x12, 0x34, 0x56, 0x78]
-      src = initSource buf `asProxyTypeOf` p
-  (ez1, c1) <- getTargetOffset 0 getWord8 src
+  src <- initSource buf
+  (ez1, c1) <- getTargetOffset 0 getWord8 (src `asProxyTypeOf` p)
   ez1 @?= Right 0x12
   c1 @?= 1
   (ez2, c2) <- getTargetOffset 1 getWord16LE src
@@ -558,12 +540,14 @@ wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
   gen16 = fmap (WordX16 . Word16LE) (FG.integral (FR.between (0, maxBound)))
   gen32 = fmap (WordX32 . Word32LE) (FG.integral (FR.between (0, maxBound)))
 
-takeDiff :: CaseTarget z => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> ([ByteCount], (ByteCount, z))
+takeDiff :: CaseTarget z => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> IO ([ByteCount], (ByteCount, z))
 takeDiff z pos had diff = go 0
  where
   go !acc = \case
     y : ys | acc < diff -> go (acc + y) ys
-    ys -> (ys, (acc, sliceBuffer z pos (had + acc)))
+    ys -> do
+      zz <- sliceBuffer z pos (had + acc)
+      pure (ys, (acc, zz))
 
 assertEq :: (Eq a, Show a) => a -> a -> Property ()
 assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
@@ -571,7 +555,7 @@ assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
 hackLiftIO :: IO a -> Property a
 hackLiftIO = pure . unsafePerformIO
 
-testGetInc :: CaseTarget z => String -> Proxy z -> TestTree
+testGetInc :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
   -- Generate some random elements
   numElems <- FP.gen @Int (FG.integral (FR.between (0, 20)))
@@ -585,7 +569,8 @@ testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
     Right xs' -> do
       assertEq xs' xs
       assertEq totLen (byteSize xs)
-  assertEq (sliceBuffer wholeBuf 0 totLen) wholeBuf
+  wholeBuf' <- hackLiftIO (sliceBuffer wholeBuf 0 totLen)
+  assertEq wholeBuf' wholeBuf
   -- Shuffle list to come up with splits and test incremental
   ys <- FP.gen (FG.shuffle (8 : fmap byteSize xs))
   ysRef <- hackLiftIO (newIORef ys)
@@ -594,7 +579,9 @@ testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
         sent <- readIORef sentRef
         let had = sent - pos
         let diff = len - had
-        (bufLen, buf) <- atomicModifyIORef' ysRef (takeDiff wholeBuf pos had diff)
+        ys' <- readIORef ysRef
+        (ys'', (bufLen, buf)) <- takeDiff wholeBuf pos had diff ys'
+        writeIORef ysRef ys''
         modifyIORef' sentRef (+ bufLen)
         pure $
           if bufLen == 0
@@ -607,10 +594,10 @@ testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
       assertEq zs xs
       assertEq totLen' totLen
 
-testMutPut :: MutCaseTarget u => String -> Proxy u -> TestTree
+testMutPut :: (MutBinaryPutTarget z IO, MutCaseTarget z) => String -> Proxy z -> TestTree
 testMutPut n p = testGroup ("mut put (" ++ n ++ ")") (fmap (mutRunPutCase p) putCases)
 
-testMutPutOffset :: MutCaseTarget u => String -> Proxy u -> TestTree
+testMutPutOffset :: (MutBinaryPutTarget z IO, MutCaseTarget z) => String -> Proxy z -> TestTree
 testMutPutOffset n p = testCase ("mut put offset (" ++ n ++ ")") $ do
   u <- newSink 4
   c1 <- mutPutTargetOffset 0 (putWord8 0x12) u
@@ -622,7 +609,7 @@ testMutPutOffset n p = testCase ("mut put offset (" ++ n ++ ")") $ do
   pure ()
 
 data TargetDef where
-  TargetDef :: CaseTarget z => String -> Proxy z -> TargetDef
+  TargetDef :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TargetDef
 
 targets :: [TargetDef]
 targets =
@@ -632,7 +619,7 @@ targets =
   ]
 
 data MutTargetDef where
-  MutTargetDef :: MutCaseTarget u => String -> Proxy u -> MutTargetDef
+  MutTargetDef :: (MutBinaryPutTarget z IO, MutCaseTarget z) => String -> Proxy z -> MutTargetDef
 
 mutTargets :: [MutTargetDef]
 mutTargets =
@@ -648,12 +635,15 @@ testDahdit = testGroup "Dahdit" trees
   targetTrees =
     targets >>= \(TargetDef name prox) ->
       [ testGet name prox
-      , testPut name prox
       , testGetOffset name prox
       , testGetInc name prox
+      , testPut name prox
       ]
   mutTargetTrees =
     mutTargets >>= \(MutTargetDef name prox) ->
+      -- [ testGet name prox
+      -- , testGetOffset name prox
+      -- , testGetInc name prox
       [ testMutPut name prox
       , testMutPutOffset name prox
       ]
