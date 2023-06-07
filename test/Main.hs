@@ -3,6 +3,7 @@
 
 module Main (main) where
 
+import Control.Applicative (liftA2)
 import Control.Monad (replicateM, (>=>))
 import Control.Monad.Primitive (RealWorld)
 import Dahdit
@@ -606,7 +607,16 @@ testMutPutOffset n p = testCase ("mut put offset (" ++ n ++ ")") $ do
   c2 @?= 3
   x <- freezeSink (u `asProxyTypeOf` p)
   take 3 x @?= [0x12, 0x34, 0x56]
-  pure ()
+  -- Use this opportunity to test getting
+  (w, h) <- getTarget (liftA2 (,) (get @Word8) (get @Word16LE)) u
+  w @?= Right (0x12, 0x5634)
+  h @?= 3
+  (y, i) <- getTargetOffset 0 (get @Word8) u
+  y @?= Right 0x12
+  i @?= 1
+  (z, j) <- getTargetOffset 1 (get @Word16LE) u
+  z @?= Right 0x5634
+  j @?= 3
 
 data TargetDef where
   TargetDef :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TargetDef
@@ -641,9 +651,6 @@ testDahdit = testGroup "Dahdit" trees
       ]
   mutTargetTrees =
     mutTargets >>= \(MutTargetDef name prox) ->
-      -- [ testGet name prox
-      -- , testGetOffset name prox
-      -- , testGetInc name prox
       [ testMutPut name prox
       , testMutPutOffset name prox
       ]

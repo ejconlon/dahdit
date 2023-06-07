@@ -26,7 +26,7 @@ import qualified Data.ByteString.Internal as BSI
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, unsafeFreezeByteArray)
+import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, unsafeFreezeByteArray, unsafeThawByteArray)
 import Data.Primitive.Ptr (copyPtrToMutableByteArray)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
@@ -50,15 +50,20 @@ withMemPtr :: MemPtr RealWorld -> (Ptr Word8 -> IO a) -> IO a
 withMemPtr (MemPtr fp off _) f = withForeignPtr fp (\ptr -> f (plusPtr ptr (coerce off)))
 
 class PrimMonad m => MutableMem r w m | w m -> r where
-  unsafeViewFrozenMem :: w -> m r
+  unsafeThawMem :: r -> m w
+  unsafeUseThawedMem :: r -> (w -> m a) -> m a
+  unsafeUseThawedMem r f = unsafeThawMem r >>= f
+  unsafeFreezeMem :: w -> m r
   unsafeUseFrozenMem :: w -> (r -> m a) -> m a
-  unsafeUseFrozenMem w f = unsafeViewFrozenMem w >>= f
+  unsafeUseFrozenMem w f = unsafeFreezeMem w >>= f
 
 instance MonadPrim s m => MutableMem ByteArray (MutableByteArray s) m where
-  unsafeViewFrozenMem = unsafeFreezeByteArray
+  unsafeThawMem = unsafeThawByteArray
+  unsafeFreezeMem = unsafeFreezeByteArray
 
 instance MutableMem (VS.Vector Word8) (IOVector Word8) IO where
-  unsafeViewFrozenMem = VS.unsafeFreeze
+  unsafeThawMem = VS.unsafeThaw
+  unsafeFreezeMem = VS.unsafeFreeze
 
 class PrimMonad m => ReadMem r m where
   indexMemInBytes :: LiftedPrim a => r -> ByteCount -> m a

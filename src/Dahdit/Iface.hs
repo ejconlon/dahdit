@@ -117,14 +117,14 @@ instance BinaryPutTarget (Vector Word8) IO where
 
 instance MonadPrim s m => BinaryGetTarget (MutableByteArray s) m where
   getTargetOffset bc g z = unsafeUseFrozenMem z (getTargetOffset bc g)
-  getTargetInc mbc g cb = getTargetInc mbc g (cb >=> maybe (pure Nothing) (fmap Just . unsafeViewFrozenMem))
+  getTargetInc mbc g cb = getTargetInc mbc g (cb >=> maybe (pure Nothing) (fmap Just . unsafeFreezeMem))
 
 instance MonadPrim s m => MutBinaryPutTarget (MutableByteArray s) m where
   mutPutTargetOffsetUnsafe = runMutPutBA
 
 instance BinaryGetTarget (IOVector Word8) IO where
   getTargetOffset bc g z = unsafeUseFrozenMem z (getTargetOffset bc g)
-  getTargetInc mbc g cb = getTargetInc mbc g (cb >=> maybe (pure Nothing) (fmap Just . unsafeViewFrozenMem))
+  getTargetInc mbc g cb = getTargetInc mbc g (cb >=> maybe (pure Nothing) (fmap Just . unsafeFreezeMem))
 
 instance MutBinaryPutTarget (IOVector Word8) IO where
   mutPutTargetOffsetUnsafe = runMutPutVec
