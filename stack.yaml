@@ -4,7 +4,7 @@ ghc-options:
   "$everything": -haddock
 
 packages:
-- .
+- dahdit
 
 extra-deps:
 - data-sword-0.2.0.3

@@ -1,8 +1,8 @@
-/.hie
-/.stack-work
-/.vscode
-/dist
-/dist-newstyle
+.hie
+.stack-work
+.vscode
+dist
+dist-newstyle
 *~
 *.swo
 *.swp
