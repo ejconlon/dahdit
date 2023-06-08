@@ -4,16 +4,15 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           dahdit
+name:           dahdit-test
 version:        0.5.0
-synopsis:       Binary parsing and serialization with integrated size
-description:    Please see the README on GitHub at <https://github.com/ejconlon/dahdit#readme>
-category:       Data
-homepage:       https://github.com/ejconlon/dahdit#readme
-bug-reports:    https://github.com/ejconlon/dahdit/issues
+synopsis:       Test utils for Dahdit serde
+description:    Please see the README on GitHub at <https://github.com/ejconlon/dahdit-test#readme>
+homepage:       https://github.com/ejconlon/dahdit-test#readme
+bug-reports:    https://github.com/ejconlon/dahdit-test/issues
 author:         Eric Conlon
 maintainer:     ejconlon@gmail.com
-copyright:      (c) 2022 Eric Conlon
+copyright:      (c) 2023 Eric Conlon
 license:        BSD3
 build-type:     Simple
 tested-with:
@@ -23,28 +22,14 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/ejconlon/dahdit
+  location: https://github.com/ejconlon/dahdit-test
 
 library
   exposed-modules:
-      Dahdit
-      Dahdit.Binary
-      Dahdit.BinaryRep
-      Dahdit.Fancy
-      Dahdit.Free
-      Dahdit.Funs
-      Dahdit.Generic
-      Dahdit.Iface
-      Dahdit.Internal
-      Dahdit.LiftedPrim
-      Dahdit.LiftedPrimArray
-      Dahdit.Mem
-      Dahdit.Nums
-      Dahdit.Proxy
-      Dahdit.Run
-      Dahdit.Sizes
+      Test.Dahdit.Arb
+      Test.Dahdit.Daytripper
   other-modules:
-      Paths_dahdit
+      Paths_dahdit_test
   hs-source-dirs:
       src
   default-extensions:
@@ -65,7 +50,6 @@ library
       LambdaCase
       KindSignatures
       MultiParamTypeClasses
-      MultiWayIf
       Rank2Types
       ScopedTypeVariables
       StandaloneDeriving
@@ -73,27 +57,23 @@ library
       TypeApplications
       TypeOperators
       TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds
   build-depends:
       base >=4.12 && <5
     , bytestring ==0.11.*
     , containers ==0.6.*
-    , data-default ==0.7.*
-    , data-sword ==0.2.*
-    , free ==5.1.*
-    , ghc-typelits-knownnat ==0.7.*
-    , mtl ==2.2.*
-    , primitive >=0.7 && <0.9
+    , dahdit ==0.5.*
+    , daytripper ==0.1.*
+    , directory ==1.3.*
+    , falsify ==0.1.*
     , text >=1.2 && <2.1
-    , transformers ==0.5.*
-    , vector >=0.12 && <0.14
-  default-language: Haskell2010
+  default-language: GHC2021
 
-test-suite dahdit-test
+test-suite dahdit-test-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Paths_dahdit
+      Paths_dahdit_test
   hs-source-dirs:
       test
   default-extensions:
@@ -114,7 +94,6 @@ test-suite dahdit-test
       LambdaCase
       KindSignatures
       MultiParamTypeClasses
-      MultiWayIf
       Rank2Types
       ScopedTypeVariables
       StandaloneDeriving
@@ -122,22 +101,16 @@ test-suite dahdit-test
       TypeApplications
       TypeOperators
       TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
     , bytestring ==0.11.*
     , containers ==0.6.*
-    , dahdit
-    , data-default ==0.7.*
-    , data-sword ==0.2.*
+    , dahdit ==0.5.*
+    , dahdit-test
+    , daytripper ==0.1.*
+    , directory ==1.3.*
     , falsify ==0.1.*
-    , free ==5.1.*
-    , ghc-typelits-knownnat ==0.7.*
-    , mtl ==2.2.*
-    , primitive >=0.7 && <0.9
     , tasty ==1.4.*
-    , tasty-hunit ==0.10.*
     , text >=1.2 && <2.1
-    , transformers ==0.5.*
-    , vector >=0.12 && <0.14
-  default-language: Haskell2010
+  default-language: GHC2021

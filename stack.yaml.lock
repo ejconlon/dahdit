@@ -12,6 +12,13 @@ packages:
   original:
     hackage: data-sword-0.2.0.3
 - completed:
+    hackage: daytripper-0.1.0@sha256:43cd5652cae79e24b9c9c1861e520033d5981e3a318dd80ec4fdc65136e2c5d3,2971
+    pantry-tree:
+      sha256: 0e25cf380ed8c220897c5790681fab26eb6bbc0c8068d1977dd225e528e1c6d3
+      size: 224
+  original:
+    hackage: daytripper-0.1.0
+- completed:
     hackage: falsify-0.1.1@sha256:49c4d6acba99a2647b18502ff0265fb98570b77d7893c355ede4f2db17295cc1,5236
     pantry-tree:
       sha256: 96d0d0b4ef5b87b88f4c7e6ca93de6a9cfca5f788713be8faf32d6125000aa60
