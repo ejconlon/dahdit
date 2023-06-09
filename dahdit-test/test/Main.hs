@@ -11,7 +11,7 @@ import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Test.Dahdit.Arb (Arb (..), ArbGeneric (..), DahditIdx)
-import Test.Dahdit.Daytripper (expectBytes, expectCodec, expectText)
+import Test.Dahdit.Daytripper (expectBytes, expectCodecOk, expectText)
 import Test.Daytripper (daytripperMain, mkFileRT, mkPropRT, mkUnitRT, testRT)
 import Test.Falsify.Generator (Gen)
 import Test.Tasty (testGroup)
@@ -42,10 +42,10 @@ main =
     testGroup "DahditTest" $
       fmap
         testRT
-        [ mkPropRT "DynFoo prop" expectCodec (arbI (Proxy @DynFoo))
-        , mkUnitRT "DynFoo unit" (expectBytes [1, 2, 0] expectCodec) (DynFoo 1 2)
-        , mkFileRT "DynFoo file" expectCodec "testdata/dynfoo.bin" (Just (DynFoo 1 2))
-        , mkPropRT "StaFoo prop" expectCodec (arbI (Proxy @StaFoo))
-        , mkUnitRT "StaFoo unit" (expectText "\ETX\EOT\NUL" expectCodec) (StaFoo 3 4)
-        , mkFileRT "DynFoo file" expectCodec "testdata/stafoo.bin" (Just (StaFoo 1 2))
+        [ mkPropRT "DynFoo prop" expectCodecOk (arbI (Proxy @DynFoo))
+        , mkUnitRT "DynFoo unit" (expectBytes [1, 2, 0] expectCodecOk) (DynFoo 1 2)
+        , mkFileRT "DynFoo file" expectCodecOk "testdata/dynfoo.bin" (Just (DynFoo 1 2))
+        , mkPropRT "StaFoo prop" expectCodecOk (arbI (Proxy @StaFoo))
+        , mkUnitRT "StaFoo unit" (expectText "\ETX\EOT\NUL" expectCodecOk) (StaFoo 3 4)
+        , mkFileRT "DynFoo file" expectCodecOk "testdata/stafoo.bin" (Just (StaFoo 1 2))
         ]

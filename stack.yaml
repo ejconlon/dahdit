@@ -10,5 +10,5 @@ packages:
 
 extra-deps:
 - data-sword-0.2.0.3
-- daytripper-0.1.0
+- daytripper-0.2.0
 - falsify-0.1.1
