@@ -21,11 +21,8 @@ data P
 
 type I = DahditTag P
 
-proxyI :: Proxy a -> Proxy (I, a)
-proxyI _ = Proxy
-
-genDefaultI :: (FD.GenDefault I a) => Proxy a -> Gen a
-genDefaultI _ = FD.genDefault (Proxy @I)
+genDefaultI :: (FD.GenDefault I a) => Gen a
+genDefaultI = FD.genDefault (Proxy @I)
 
 data DynFoo = DynFoo !Word8 !Word16LE
   deriving stock (Eq, Show, Generic)
@@ -43,10 +40,10 @@ main =
     testGroup "DahditTest" $
       fmap
         testRT
-        [ mkPropRT "DynFoo prop" expectCodecOk (genDefaultI (Proxy @DynFoo))
+        [ mkPropRT "DynFoo prop" expectCodecOk (genDefaultI @DynFoo)
         , mkUnitRT "DynFoo unit" (expectBytes [1, 2, 0] expectCodecOk) (DynFoo 1 2)
         , mkFileRT "DynFoo file" expectCodecOk "testdata/dynfoo.bin" (Just (DynFoo 1 2))
-        , mkPropRT "StaFoo prop" expectCodecOk (genDefaultI (Proxy @StaFoo))
+        , mkPropRT "StaFoo prop" expectCodecOk (genDefaultI @StaFoo)
         , mkUnitRT "StaFoo unit" (expectText "\ETX\EOT\NUL" expectCodecOk) (StaFoo 3 4)
         , mkFileRT "DynFoo file" expectCodecOk "testdata/stafoo.bin" (Just (StaFoo 1 2))
         ]
