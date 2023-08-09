@@ -11,7 +11,7 @@ newtype ViaFromIntegral (n :: Nat) x y = ViaFromIntegral {unViaFromIntegral :: y
   deriving newtype (Num)
 
 -- Types that can swap endianness - swapEndian is its own inverse
-class Num w => SwapEndian w where
+class (Num w) => SwapEndian w where
   swapEndian :: w -> w
 
 instance (SwapEndian x, Integral x, Integral y) => SwapEndian (ViaFromIntegral n x y) where

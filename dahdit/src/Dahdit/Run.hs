@@ -123,7 +123,7 @@ prettyGetError = \case
   GetErrorRemaining ac -> "Cannot read remaining length in stream context (read " <> T.pack (show (unByteCount ac)) <> ")"
 
 -- | Get from a single buffer
-runGetInternal :: ReadMem r m => ByteCount -> Get a -> ByteCount -> r -> m (Either GetError a, ByteCount)
+runGetInternal :: (ReadMem r m) => ByteCount -> Get a -> ByteCount -> r -> m (Either GetError a, ByteCount)
 runGetInternal off act cap mem = do
   let chunk = GetIncChunk off cap mem
   env <- newGetIncEnv (Just (cap - off)) chunk
@@ -158,7 +158,7 @@ data GetIncEnv s r = GetIncEnv
   -- Top of stack is end of sequence.
   }
 
-newGetIncEnv :: MonadPrim s m => Maybe ByteCount -> GetIncChunk r -> m (GetIncEnv s r)
+newGetIncEnv :: (MonadPrim s m) => Maybe ByteCount -> GetIncChunk r -> m (GetIncEnv s r)
 newGetIncEnv mayCap chunk = do
   gloAbsVar <- newMutVar 0
   gloRelVar <- newMutVar 0
@@ -199,23 +199,23 @@ type GetIncCb z m = GetIncRequest -> m (Maybe z)
 
 type GetIncCbChunk r m = GetIncCb (GetIncChunk r) m
 
-pushMutVar :: MonadPrim s m => MutVar s (Seq a) -> a -> m ()
+pushMutVar :: (MonadPrim s m) => MutVar s (Seq a) -> a -> m ()
 pushMutVar v a = modifyMutVar' v (:|> a)
 
-popMutVar :: MonadPrim s m => MutVar s (Seq a) -> m ()
+popMutVar :: (MonadPrim s m) => MutVar s (Seq a) -> m ()
 popMutVar v = modifyMutVar' v (\case Empty -> Empty; as :|> _ -> as)
 
-peekMutVar :: MonadPrim s m => MutVar s (Seq a) -> m (Maybe a)
+peekMutVar :: (MonadPrim s m) => MutVar s (Seq a) -> m (Maybe a)
 peekMutVar = fmap (\case Empty -> Nothing; _ :|> a -> Just a) . readMutVar
 
-runGetIncM :: MonadPrim s m => GetIncM s r m a -> GetIncEnv s r -> GetIncCbChunk r m -> m (Either GetError a)
+runGetIncM :: (MonadPrim s m) => GetIncM s r m a -> GetIncEnv s r -> GetIncCbChunk r m -> m (Either GetError a)
 runGetIncM m env cb =
   runFT
     (runExceptT (runReaderT (unGetIncM m) env))
     pure
     (\k2 (GetIncSuspend req k1) -> cb req >>= k2 . k1)
 
-guardReadBytes :: MonadPrim s m => Text -> ByteCount -> GetIncM s r m (ByteCount, GetIncChunk r, ByteCount)
+guardReadBytes :: (MonadPrim s m) => Text -> ByteCount -> GetIncM s r m (ByteCount, GetIncChunk r, ByteCount)
 guardReadBytes nm bc = do
   GetIncEnv gloAbsRef gloRelRef capStackRef chunkRef lookStackRef <- GetIncM ask
   -- First check if we're in cap
@@ -251,7 +251,7 @@ guardReadBytes nm bc = do
   pure (gloAbsEnd, newChunk, newLocOffStart)
 
 -- Memory read function takes local start offset
-readBytes :: MonadPrim s m => Text -> ByteCount -> (r -> ByteCount -> m a) -> GetIncM s r m a
+readBytes :: (MonadPrim s m) => Text -> ByteCount -> (r -> ByteCount -> m a) -> GetIncM s r m a
 readBytes nm bc f = do
   (gloAbsEnd, newChunk, newLocOffStart) <- guardReadBytes nm bc
   let mem = gicArray newChunk
@@ -366,7 +366,7 @@ data PutEnv s q = PutEnv
   -- ^ Destination buffer
   }
 
-newPutEnv :: PrimMonad m => ByteCount -> ByteCount -> q (PrimState m) -> m (PutEnv (PrimState m) q)
+newPutEnv :: (PrimMonad m) => ByteCount -> ByteCount -> q (PrimState m) -> m (PutEnv (PrimState m) q)
 newPutEnv off cap mem = do
   offRef <- newMutVar off
   pure (PutEnv offRef cap mem)
@@ -379,13 +379,13 @@ deriving newtype instance (Monad m, s ~ PrimState m) => MonadReader (PutEnv s q)
 runPutEff :: PutEff q m a -> PutEnv (PrimState m) q -> m a
 runPutEff act = runReaderT (unPutEff act)
 
-stPutEff :: Monad m => m a -> PutEff q m a
+stPutEff :: (Monad m) => m a -> PutEff q m a
 stPutEff = PutEff . lift
 
 newtype PutRun q m a = PutRun {unPutRun :: FT PutF (PutEff q m) a}
   deriving newtype (Functor, Applicative, Monad)
 
-writeBytes :: PrimMonad m => ByteCount -> (q (PrimState m) -> ByteCount -> m ()) -> PutEff q m ()
+writeBytes :: (PrimMonad m) => ByteCount -> (q (PrimState m) -> ByteCount -> m ()) -> PutEff q m ()
 writeBytes bc f = do
   PutEnv offRef _ mem <- ask
   stPutEff $ do
@@ -394,7 +394,7 @@ writeBytes bc f = do
     let newOff = off + bc
     writeMutVar offRef newOff
 
-writeStaticSeq :: WriteMem q m => PutStaticSeqF (PutEff q m a) -> PutEff q m a
+writeStaticSeq :: (WriteMem q m) => PutStaticSeqF (PutEff q m a) -> PutEff q m a
 writeStaticSeq (PutStaticSeqF n mz p s k) = do
   for_ (take (coerce n) (toList s)) $ \a -> do
     mkPutEff (p a)
@@ -404,7 +404,7 @@ writeStaticSeq (PutStaticSeqF n mz p s k) = do
     replicateM_ (coerce n - e) q
   k
 
-writeStaticArray :: WriteMem q m => PutStaticArrayF (PutEff q m a) -> PutEff q m a
+writeStaticArray :: (WriteMem q m) => PutStaticArrayF (PutEff q m a) -> PutEff q m a
 writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = do
   let elemSize = putStaticArrayElemSize psa
       haveElems = sizeofLiftedPrimArray a
@@ -419,7 +419,7 @@ writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = d
       Just z -> writeBytes extraBc (setMemInBytes extraBc z)
   k
 
-execPutRun :: WriteMem q m => PutF (PutEff q m a) -> PutEff q m a
+execPutRun :: (WriteMem q m) => PutF (PutEff q m a) -> PutEff q m a
 execPutRun = \case
   PutFWord8 x k -> writeBytes 1 (writeMemInBytes x) >> k
   PutFInt8 x k -> writeBytes 1 (writeMemInBytes x) >> k
@@ -451,19 +451,19 @@ execPutRun = \case
     writeBytes bc (copyArrayMemInBytes barr 0 bc) >> k
   PutFStaticHint (PutStaticHintF _ p k) -> mkPutEff p >> k
 
-runPutRun :: WriteMem q m => PutRun q m a -> PutEnv (PrimState m) q -> m a
+runPutRun :: (WriteMem q m) => PutRun q m a -> PutEnv (PrimState m) q -> m a
 runPutRun = runPutEff . iterPutRun
 
-iterPutRun :: WriteMem q m => PutRun q m a -> PutEff q m a
+iterPutRun :: (WriteMem q m) => PutRun q m a -> PutEff q m a
 iterPutRun act = iterT execPutRun (unPutRun act)
 
 mkPutRun :: PutM a -> PutRun q m a
 mkPutRun (PutM (F w)) = PutRun (w pure wrap)
 
-mkPutEff :: WriteMem q m => PutM a -> PutEff q m a
+mkPutEff :: (WriteMem q m) => PutM a -> PutEff q m a
 mkPutEff = iterPutRun . mkPutRun
 
-runPutInternal :: WriteMem q m => ByteCount -> Put -> ByteCount -> q (PrimState m) -> m ByteCount
+runPutInternal :: (WriteMem q m) => ByteCount -> Put -> ByteCount -> q (PrimState m) -> m ByteCount
 runPutInternal off act len mem = do
   let eff = mkPutRun act
       cap = off + len

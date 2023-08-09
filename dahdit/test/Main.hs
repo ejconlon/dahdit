@@ -537,11 +537,11 @@ instance Binary WordX where
 wordXGen :: Gen WordX
 wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
  where
-  gen8 = fmap WordX8 (FG.integral (FR.between (0, maxBound)))
-  gen16 = fmap (WordX16 . Word16LE) (FG.integral (FR.between (0, maxBound)))
-  gen32 = fmap (WordX32 . Word32LE) (FG.integral (FR.between (0, maxBound)))
+  gen8 = fmap WordX8 (FG.inRange (FR.between (0, maxBound)))
+  gen16 = fmap (WordX16 . Word16LE) (FG.inRange (FR.between (0, maxBound)))
+  gen32 = fmap (WordX32 . Word32LE) (FG.inRange (FR.between (0, maxBound)))
 
-takeDiff :: CaseTarget z => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> IO ([ByteCount], (ByteCount, z))
+takeDiff :: (CaseTarget z) => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> IO ([ByteCount], (ByteCount, z))
 takeDiff z pos had diff = go 0
  where
   go !acc = \case
@@ -559,7 +559,7 @@ hackLiftIO = pure . unsafePerformIO
 testGetInc :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
   -- Generate some random elements
-  numElems <- FP.gen @Int (FG.integral (FR.between (0, 20)))
+  numElems <- FP.gen @Int (FG.inRange (FR.between (0, 20)))
   xs <- FP.gen (replicateM numElems wordXGen)
   -- First some sanity checks that encode/decode work
   assertEq (length xs) numElems

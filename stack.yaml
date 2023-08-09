@@ -1,4 +1,4 @@
-resolver: lts-21.0
+resolver: lts-21.6
 
 ghc-options:
   "$everything": -haddock
@@ -11,4 +11,9 @@ packages:
 extra-deps:
 - data-sword-0.2.0.3
 - daytripper-0.2.0
-- falsify-0.1.1
+# TODO Use Hackage release with GenDefault
+# - falsify-0.1.1
+- git: git@github.com:ejconlon/falsify.git
+  commit: b141ea3e8c4c52dfdd63a86838880caacdf500e7
+  subdirs:
+  - lib

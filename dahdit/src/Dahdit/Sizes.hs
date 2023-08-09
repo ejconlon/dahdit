@@ -53,7 +53,7 @@ newtype ElemCount = ElemCount {unElemCount :: Int}
 
 -- StaticByteSized
 
-class KnownNat (StaticSize a) => StaticByteSized a where
+class (KnownNat (StaticSize a)) => StaticByteSized a where
   type StaticSize a :: Nat
   staticByteSize :: Proxy a -> ByteCount
   staticByteSize = fromInteger . natVal . staticByteProxy
@@ -196,5 +196,5 @@ deriving via (ViaEndianPair 8 DoubleLE DoubleBE) instance StaticByteSized Double
 staticByteSizeFoldable :: (Foldable f, StaticByteSized a) => f a -> ByteCount
 staticByteSizeFoldable fa = staticByteSize (proxyForF fa) * coerce (length fa)
 
-byteSizeViaStatic :: StaticByteSized a => a -> ByteCount
+byteSizeViaStatic :: (StaticByteSized a) => a -> ByteCount
 byteSizeViaStatic = staticByteSize . proxyFor

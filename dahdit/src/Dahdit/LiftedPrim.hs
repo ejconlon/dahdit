@@ -52,13 +52,13 @@ import Foreign.Ptr (Ptr)
 
 -- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
 -- It's all about reading and writing structures from lifted byte arrays and pointers.
-class StaticByteSized a => LiftedPrim a where
+class (StaticByteSized a) => LiftedPrim a where
   indexArrayLiftedInBytes :: ByteArray -> ByteCount -> a
-  writeArrayLiftedInBytes :: PrimMonad m => MutableByteArray (PrimState m) -> ByteCount -> a -> m ()
+  writeArrayLiftedInBytes :: (PrimMonad m) => MutableByteArray (PrimState m) -> ByteCount -> a -> m ()
   indexPtrLiftedInBytes :: Ptr Word8 -> ByteCount -> a
-  writePtrLiftedInBytes :: PrimMonad m => Ptr Word8 -> ByteCount -> a -> m ()
+  writePtrLiftedInBytes :: (PrimMonad m) => Ptr Word8 -> ByteCount -> a -> m ()
 
-indexArrayLiftedInElems :: LiftedPrim a => Proxy a -> ByteArray -> ElemCount -> a
+indexArrayLiftedInElems :: (LiftedPrim a) => Proxy a -> ByteArray -> ElemCount -> a
 indexArrayLiftedInElems prox arr pos =
   indexArrayLiftedInBytes arr (coerce pos * staticByteSize prox)
 
@@ -66,7 +66,7 @@ writeArrayLiftedInElems :: (PrimMonad m, LiftedPrim a) => MutableByteArray (Prim
 writeArrayLiftedInElems arr pos val =
   writeArrayLiftedInBytes arr (coerce pos * staticByteSize (proxyFor val)) val
 
-indexPtrLiftedInElems :: LiftedPrim a => Proxy a -> Ptr Word8 -> ElemCount -> a
+indexPtrLiftedInElems :: (LiftedPrim a) => Proxy a -> Ptr Word8 -> ElemCount -> a
 indexPtrLiftedInElems prox ptr pos =
   indexPtrLiftedInBytes ptr (coerce pos * staticByteSize prox)
 

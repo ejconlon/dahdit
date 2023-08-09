@@ -33,10 +33,10 @@ expectCodecOk = expectCodec (maybe (expectAssertBool "expected ok" . isRight) (\
 expectCodecErr :: (MonadExpect m, Binary a) => Expect m a ByteString (Either GetError a)
 expectCodecErr = expectCodec (const (expectAssertBool "expected error" . isLeft))
 
-expectBytes :: MonadExpect m => [Word8] -> Expect m a ByteString c -> Expect m a ByteString c
+expectBytes :: (MonadExpect m) => [Word8] -> Expect m a ByteString c -> Expect m a ByteString c
 expectBytes ws = expectDuring (\_ bs -> expectAssertEq bs (BS.pack ws))
 
-expectText :: MonadExpect m => Text -> Expect m a ByteString c -> Expect m a ByteString c
+expectText :: (MonadExpect m) => Text -> Expect m a ByteString c -> Expect m a ByteString c
 expectText t = expectDuring (\_ bs -> expectAssertEq bs (TE.encodeUtf8 t))
 
 proxyBefore :: Expect m a b c -> Proxy a

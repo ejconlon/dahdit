@@ -255,21 +255,21 @@ instance Binary Int where
   get = fmap fromIntegral getInt64LE
   put = putInt64LE . fromIntegral
 
-instance Binary a => Binary [a] where
+instance (Binary a) => Binary [a] where
   byteSize as = 8 + byteSizeFoldable as
   get = do
     ec <- get @Int
     getList (coerce ec) get
   put s = put @Int (length s) *> putList put s
 
-instance Binary a => Binary (Seq a) where
+instance (Binary a) => Binary (Seq a) where
   byteSize as = 8 + byteSizeFoldable as
   get = do
     ec <- get @Int
     getSeq (coerce ec) get
   put s = put @Int (Seq.length s) *> putSeq put s
 
-instance Binary a => Binary (Set a) where
+instance (Binary a) => Binary (Set a) where
   byteSize = byteSize . Set.toAscList
   get = fmap Set.fromDistinctAscList get
   put = put . Set.toAscList
@@ -284,12 +284,12 @@ instance Binary IntSet where
   get = fmap IntSet.fromDistinctAscList get
   put = put . IntSet.toAscList
 
-instance Binary v => Binary (IntMap v) where
+instance (Binary v) => Binary (IntMap v) where
   byteSize = byteSize . IntMap.toAscList
   get = fmap IntMap.fromDistinctAscList get
   put = put . IntMap.toAscList
 
-instance Binary a => Binary (Maybe a) where
+instance (Binary a) => Binary (Maybe a) where
   byteSize = \case
     Nothing -> 1
     Just a -> 1 + byteSize a

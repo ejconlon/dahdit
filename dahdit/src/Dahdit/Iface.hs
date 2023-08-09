@@ -40,7 +40,7 @@ import Data.Vector.Storable.Mutable (IOVector)
 import Data.Word (Word8)
 
 -- | Abstracts over the sources we can read from.
-class PrimMonad m => BinaryGetTarget z m where
+class (PrimMonad m) => BinaryGetTarget z m where
   -- | Get a value from the source given a starting offset, returning a result and final offset.
   -- On error, the offset will indicate where in the source the error occurred.
   getTargetOffset :: ByteCount -> Get a -> z -> m (Either GetError a, ByteCount)
@@ -51,26 +51,26 @@ class PrimMonad m => BinaryGetTarget z m where
   getTargetInc :: Maybe ByteCount -> Get a -> GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
 
 -- | Get a value from the source, returning a result and final offset.
-getTarget :: BinaryGetTarget z m => Get a -> z -> m (Either GetError a, ByteCount)
+getTarget :: (BinaryGetTarget z m) => Get a -> z -> m (Either GetError a, ByteCount)
 getTarget = getTargetOffset 0
 
 -- | Abstracts over the immutable sinks we can render to.
-class BinaryGetTarget z m => BinaryPutTarget z m where
+class (BinaryGetTarget z m) => BinaryPutTarget z m where
   -- | Put an action to the sink with the given length.
   -- Prefer 'putTarget' to safely count capacity, or use 'encode' to use byte size.
   putTargetUnsafe :: Put -> ByteCount -> m z
 
 -- | Put an action to the sink with calculated capacity.
-putTarget :: BinaryPutTarget z m => Put -> m z
+putTarget :: (BinaryPutTarget z m) => Put -> m z
 putTarget p = putTargetUnsafe p (runCount p)
 
-class BinaryGetTarget z m => MutBinaryPutTarget z m where
+class (BinaryGetTarget z m) => MutBinaryPutTarget z m where
   mutPutTargetOffsetUnsafe :: ByteCount -> Put -> ByteCount -> z -> m ByteCount
 
-mutPutTargetOffset :: MutBinaryPutTarget z m => ByteCount -> Put -> z -> m ByteCount
+mutPutTargetOffset :: (MutBinaryPutTarget z m) => ByteCount -> Put -> z -> m ByteCount
 mutPutTargetOffset off p = mutPutTargetOffsetUnsafe off p (runCount p)
 
-mutPutTarget :: MutBinaryPutTarget z m => Put -> z -> m ByteCount
+mutPutTarget :: (MutBinaryPutTarget z m) => Put -> z -> m ByteCount
 mutPutTarget = mutPutTargetOffset 0
 
 instance BinaryGetTarget String IO where
@@ -87,11 +87,11 @@ instance BinaryGetTarget Text IO where
 instance BinaryPutTarget Text IO where
   putTargetUnsafe = runPutText
 
-instance PrimMonad m => BinaryGetTarget ShortByteString m where
+instance (PrimMonad m) => BinaryGetTarget ShortByteString m where
   getTargetOffset = runGetSBS
   getTargetInc = runGetIncSBS
 
-instance PrimMonad m => BinaryPutTarget ShortByteString m where
+instance (PrimMonad m) => BinaryPutTarget ShortByteString m where
   putTargetUnsafe = runPutSBS
 
 instance BinaryGetTarget ByteString IO where
@@ -101,11 +101,11 @@ instance BinaryGetTarget ByteString IO where
 instance BinaryPutTarget ByteString IO where
   putTargetUnsafe = runPutBS
 
-instance PrimMonad m => BinaryGetTarget ByteArray m where
+instance (PrimMonad m) => BinaryGetTarget ByteArray m where
   getTargetOffset = runGetBA
   getTargetInc = runGetIncBA
 
-instance PrimMonad m => BinaryPutTarget ByteArray m where
+instance (PrimMonad m) => BinaryPutTarget ByteArray m where
   putTargetUnsafe = runPutBA
 
 instance BinaryGetTarget (Vector Word8) IO where
@@ -115,11 +115,11 @@ instance BinaryGetTarget (Vector Word8) IO where
 instance BinaryPutTarget (Vector Word8) IO where
   putTargetUnsafe = runPutVec
 
-instance MonadPrim s m => BinaryGetTarget (MutableByteArray s) m where
+instance (MonadPrim s m) => BinaryGetTarget (MutableByteArray s) m where
   getTargetOffset bc g z = unsafeUseFrozenMem z (getTargetOffset bc g)
   getTargetInc mbc g cb = getTargetInc mbc g (cb >=> maybe (pure Nothing) (fmap Just . unsafeFreezeMem))
 
-instance MonadPrim s m => MutBinaryPutTarget (MutableByteArray s) m where
+instance (MonadPrim s m) => MutBinaryPutTarget (MutableByteArray s) m where
   mutPutTargetOffsetUnsafe = runMutPutBA
 
 instance BinaryGetTarget (IOVector Word8) IO where
@@ -150,11 +150,11 @@ decodeEnd :: (Binary a, BinaryGetTarget z m) => z -> m (Either GetError a, ByteC
 decodeEnd = getTarget (getEnd get)
 
 -- | Decode a value from a file.
-decodeFile :: Binary a => FilePath -> IO (Either GetError a, ByteCount)
+decodeFile :: (Binary a) => FilePath -> IO (Either GetError a, ByteCount)
 decodeFile = runGetFile get
 
 -- | 'decodeFile' but expect the end of file.
-decodeFileEnd :: Binary a => FilePath -> IO (Either GetError a, ByteCount)
+decodeFileEnd :: (Binary a) => FilePath -> IO (Either GetError a, ByteCount)
 decodeFileEnd = runGetFile (getEnd get)
 
 -- | Encode a value to a sink.
@@ -162,7 +162,7 @@ encode :: (Binary a, BinaryPutTarget z m) => a -> m z
 encode a = putTargetUnsafe (put a) (byteSize a)
 
 -- | Encode a value to a file.
-encodeFile :: Binary a => a -> FilePath -> IO ()
+encodeFile :: (Binary a) => a -> FilePath -> IO ()
 encodeFile a = runPutFile (put a) (byteSize a)
 
 -- | Encode a value to a mutable buffer, returning number of bytes filled.
@@ -175,10 +175,10 @@ runGetString off act = runGetBS off act . BSC.pack
 runGetText :: ByteCount -> Get a -> Text -> IO (Either GetError a, ByteCount)
 runGetText off act = runGetBS off act . TE.encodeUtf8
 
-runGetBA :: PrimMonad m => ByteCount -> Get a -> ByteArray -> m (Either GetError a, ByteCount)
+runGetBA :: (PrimMonad m) => ByteCount -> Get a -> ByteArray -> m (Either GetError a, ByteCount)
 runGetBA off act ba = runGetInternal off act (coerce (sizeofByteArray ba)) ba
 
-runGetSBS :: PrimMonad m => ByteCount -> Get a -> ShortByteString -> m (Either GetError a, ByteCount)
+runGetSBS :: (PrimMonad m) => ByteCount -> Get a -> ShortByteString -> m (Either GetError a, ByteCount)
 runGetSBS off act = runGetBA off act . viewSBSMem
 
 runGetBS :: ByteCount -> Get a -> ByteString -> IO (Either GetError a, ByteCount)
@@ -198,14 +198,14 @@ runGetIncString mayCap g cb = runGetIncBS mayCap g (fmap (fmap BSC.pack) . cb)
 runGetIncText :: Maybe ByteCount -> Get a -> GetIncCb Text IO -> IO (Either GetError a, ByteCount, ByteCount)
 runGetIncText mayCap g cb = runGetIncBS mayCap g (fmap (fmap TE.encodeUtf8) . cb)
 
-runGetIncBA :: PrimMonad m => Maybe ByteCount -> Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncBA :: (PrimMonad m) => Maybe ByteCount -> Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
 runGetIncBA mayCap act cb = do
   env <- newGetIncEnv mayCap (GetIncChunk 0 0 emptyByteArray)
   let view s = GetIncChunk 0 (coerce (sizeofByteArray s)) s
   let cb' = fmap (fmap view) . cb
   runGetIncInternal act env cb'
 
-runGetIncSBS :: PrimMonad m => Maybe ByteCount -> Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncSBS :: (PrimMonad m) => Maybe ByteCount -> Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
 runGetIncSBS mayCap act cb = runGetIncBA mayCap act (fmap (fmap viewSBSMem) . cb)
 
 runGetIncMemPtr :: Maybe ByteCount -> Get a -> GetIncCb (MemPtr RealWorld) IO -> IO (Either GetError a, ByteCount, ByteCount)
@@ -228,10 +228,10 @@ runPutString act len = fmap BSC.unpack (runPutBS act len)
 runPutText :: Put -> ByteCount -> IO Text
 runPutText act len = fmap TE.decodeUtf8 (runPutBS act len)
 
-runPutBA :: PrimMonad m => Put -> ByteCount -> m ByteArray
+runPutBA :: (PrimMonad m) => Put -> ByteCount -> m ByteArray
 runPutBA act len = withBAMem len (runPutInternal 0 act len)
 
-runPutSBS :: PrimMonad m => Put -> ByteCount -> m ShortByteString
+runPutSBS :: (PrimMonad m) => Put -> ByteCount -> m ShortByteString
 runPutSBS act len = withSBSMem len (runPutInternal 0 act len)
 
 runPutBS :: Put -> ByteCount -> IO ByteString
@@ -245,7 +245,7 @@ runPutFile act cap fp = do
   bs <- runPutBS act cap
   BS.writeFile fp bs
 
-runMutPutBA :: MonadPrim s m => ByteCount -> Put -> ByteCount -> MutableByteArray s -> m ByteCount
+runMutPutBA :: (MonadPrim s m) => ByteCount -> Put -> ByteCount -> MutableByteArray s -> m ByteCount
 runMutPutBA = runPutInternal
 
 runMutPutVec :: ByteCount -> Put -> ByteCount -> IOVector Word8 -> IO ByteCount
