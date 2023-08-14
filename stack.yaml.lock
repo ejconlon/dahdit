@@ -19,17 +19,17 @@ packages:
   original:
     hackage: daytripper-0.2.0
 - completed:
-    commit: b141ea3e8c4c52dfdd63a86838880caacdf500e7
-    git: git@github.com:ejconlon/falsify.git
+    commit: 51fc95d907ffe008f27a8c450dbf41854668e07d
+    git: git@github.com:well-typed/falsify.git
     name: falsify
     pantry-tree:
-      sha256: 1490c2a57878cc3999514b35a61a80b46e1c599557e89d311500d26ac682965a
-      size: 3309
+      sha256: f1451c36b81fd6bb6d47306849b0bf55aa4f9ac3ad11b5bfd013ae928e332582
+      size: 3378
     subdir: lib
     version: 0.1.1
   original:
-    commit: b141ea3e8c4c52dfdd63a86838880caacdf500e7
-    git: git@github.com:ejconlon/falsify.git
+    commit: 51fc95d907ffe008f27a8c450dbf41854668e07d
+    git: git@github.com:well-typed/falsify.git
     subdir: lib
 snapshots:
 - completed:
