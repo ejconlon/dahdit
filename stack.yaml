@@ -1,4 +1,4 @@
-resolver: lts-20.24
+resolver: lts-21.19
 
 ghc-options:
   "$everything": -haddock
@@ -10,5 +10,5 @@ packages:
 
 extra-deps:
 - data-sword-0.2.0.3
-- daytripper-0.2.0
-- falsify-0.1.1
+- daytripper-0.3.0
+- falsify-0.2.0

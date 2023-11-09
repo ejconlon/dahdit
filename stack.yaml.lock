@@ -12,22 +12,22 @@ packages:
   original:
     hackage: data-sword-0.2.0.3
 - completed:
-    hackage: daytripper-0.2.0@sha256:07e4636faf9c30782e86f942e342f46f80f7cb8e913639f24218968b7601a043,2971
+    hackage: daytripper-0.3.0@sha256:84902eac28c5c1f529fc5d058398b3ca869320218677281ce78fc3c935d8ef8f,2971
     pantry-tree:
-      sha256: 92130fd90f26bf9476f76fb5777e6eda8e136c3abd9b271639ee2cc12710e5ff
+      sha256: 14e26f6e89e647c4659c99e9778043f271bcee9a1247dce9f492ef87f5410fce
       size: 225
   original:
-    hackage: daytripper-0.2.0
+    hackage: daytripper-0.3.0
 - completed:
-    hackage: falsify-0.1.1@sha256:49c4d6acba99a2647b18502ff0265fb98570b77d7893c355ede4f2db17295cc1,5236
+    hackage: falsify-0.2.0@sha256:a9ec175cfb20dc5afeedac69f424c77589729fce23733030abf22dc2053abc41,5265
     pantry-tree:
-      sha256: 96d0d0b4ef5b87b88f4c7e6ca93de6a9cfca5f788713be8faf32d6125000aa60
-      size: 3162
+      sha256: c798208320e84b3d05564d73a63c6686499a68d667e33e2b8873035f15eaf81b
+      size: 3378
   original:
-    hackage: falsify-0.1.1
+    hackage: falsify-0.2.0
 snapshots:
 - completed:
-    sha256: e019cd29e3f7f9dbad500225829a3f7a50f73c674614f2f452e21bb8bf5d99ea
-    size: 650253
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/24.yaml
-  original: lts-20.24
+    sha256: fb482b8e2d5d061cdda4ba1da2957c012740c893a5ee1c1b99001adae7b1fbe7
+    size: 640046
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/19.yaml
+  original: lts-21.19
