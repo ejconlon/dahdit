@@ -58,7 +58,7 @@ sockGetIncCb sock = do
 newtype Decoder k = Decoder {unDecoder :: forall a. Get a -> IO (k, Either GetError a)}
   deriving stock (Functor)
 
-runDecoder :: Binary a => Decoder k -> IO (k, Either GetError a)
+runDecoder :: (Binary a) => Decoder k -> IO (k, Either GetError a)
 runDecoder dec = unDecoder dec get
 
 -- | Decodes a stream of packets incrementally for TCP
@@ -86,7 +86,7 @@ datagramClientDecoder mayLim sock =
 
 newtype Encoder k = Encoder {unEncoder :: k -> Put -> IO ()}
 
-runEncoder :: Binary a => Encoder k -> k -> a -> IO ()
+runEncoder :: (Binary a) => Encoder k -> k -> a -> IO ()
 runEncoder enc k = unEncoder enc k . put
 
 streamEncoder :: NS.Socket -> Encoder ()
@@ -180,7 +180,7 @@ tcpClientConn mayLim hp to = do
   let enc = streamEncoder sock
   pure (addr, Conn dec enc)
 
-withTcpClientConn :: MonadUnliftIO m => Maybe ByteCount -> HostPort -> TcpOpts -> (NS.SockAddr -> Conn () -> m a) -> m a
+withTcpClientConn :: (MonadUnliftIO m) => Maybe ByteCount -> HostPort -> TcpOpts -> (NS.SockAddr -> Conn () -> m a) -> m a
 withTcpClientConn mayLim hp to = withAcquire (tcpClientConn mayLim hp to) . uncurry
 
 tcpServerSock :: HostPort -> Acquire NS.Socket
@@ -220,7 +220,7 @@ udpClientConn mayLim hp = do
       enc = datagramClientEncoder sock
   pure (addr, Conn dec enc)
 
-withUdpClientConn :: MonadUnliftIO m => Maybe ByteCount -> HostPort -> (NS.SockAddr -> Conn () -> m a) -> m a
+withUdpClientConn :: (MonadUnliftIO m) => Maybe ByteCount -> HostPort -> (NS.SockAddr -> Conn () -> m a) -> m a
 withUdpClientConn mayLim hp = withAcquire (udpClientConn mayLim hp) . uncurry
 
 udpServerSock :: HostPort -> Acquire NS.Socket
@@ -236,5 +236,5 @@ udpServerConn mayLim hp = do
       enc = datagramServerEncoder sock
   pure (Conn dec enc)
 
-withUdpServerConn :: MonadUnliftIO m => Maybe ByteCount -> HostPort -> (Conn NS.SockAddr -> m a) -> m a
+withUdpServerConn :: (MonadUnliftIO m) => Maybe ByteCount -> HostPort -> (Conn NS.SockAddr -> m a) -> m a
 withUdpServerConn mayLim hp = withAcquire (udpServerConn mayLim hp)

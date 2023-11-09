@@ -12,7 +12,7 @@ import Dahdit.Binary (Binary (..))
 import Dahdit.Sizes (StaticByteSized (..))
 import Data.Proxy (Proxy (..))
 
-class Binary x => BinaryRep x a | a -> x where
+class (Binary x) => BinaryRep x a | a -> x where
   fromBinaryRep :: x -> Either String a
   toBinaryRep :: a -> x
 
@@ -38,7 +38,7 @@ instance (StaticByteSized x, BinaryRep x a) => StaticByteSized (ViaBinaryRep x a
   type StaticSize (ViaBinaryRep x a) = StaticSize x
   staticByteSize _ = staticByteSize (Proxy :: Proxy x)
 
-instance BinaryRep x a => Binary (ViaBinaryRep x a) where
+instance (BinaryRep x a) => Binary (ViaBinaryRep x a) where
   byteSize = byteSize . toBinaryRep . unViaBinaryRep
   get = get >>= either fail (pure . ViaBinaryRep) . fromBinaryRep
   put = put . toBinaryRep . unViaBinaryRep

@@ -112,7 +112,7 @@ newtype StaticBytes (n :: Nat) = StaticBytes {unStaticBytes :: ShortByteString}
   deriving stock (Show)
   deriving newtype (IsString)
 
-mkStaticBytes :: KnownNat n => Proxy n -> ShortByteString -> StaticBytes n
+mkStaticBytes :: (KnownNat n) => Proxy n -> ShortByteString -> StaticBytes n
 mkStaticBytes prox sbs =
   let n = fromInteger (natVal prox)
   in  if BSS.length sbs == n
@@ -125,16 +125,16 @@ mkStaticBytes prox sbs =
                   then x1
                   else x1 <> BSS.replicate (n - l) 0
 
-normStaticBytes :: KnownNat n => StaticBytes n -> StaticBytes n
+normStaticBytes :: (KnownNat n) => StaticBytes n -> StaticBytes n
 normStaticBytes sb@(StaticBytes sbs) = mkStaticBytes (proxyForNatF sb) sbs
 
-instance KnownNat n => Eq (StaticBytes n) where
+instance (KnownNat n) => Eq (StaticBytes n) where
   x == y =
     let StaticBytes x' = normStaticBytes x
         StaticBytes y' = normStaticBytes y
     in  x' == y'
 
-instance KnownNat n => Ord (StaticBytes n) where
+instance (KnownNat n) => Ord (StaticBytes n) where
   compare x y =
     let StaticBytes x' = normStaticBytes x
         StaticBytes y' = normStaticBytes y
@@ -143,10 +143,10 @@ instance KnownNat n => Ord (StaticBytes n) where
 instance Default (StaticBytes n) where
   def = StaticBytes BSS.empty
 
-instance KnownNat n => StaticByteSized (StaticBytes n) where
+instance (KnownNat n) => StaticByteSized (StaticBytes n) where
   type StaticSize (StaticBytes n) = n
 
-instance KnownNat n => Binary (StaticBytes n) where
+instance (KnownNat n) => Binary (StaticBytes n) where
   byteSize = byteSizeViaStatic
   get = fmap StaticBytes (getByteString (fromInteger (natVal (Proxy :: Proxy n))))
   put fb@(StaticBytes sbs) = putFixedString 0 (fromInteger (natVal fb)) sbs

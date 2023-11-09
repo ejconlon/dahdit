@@ -37,7 +37,7 @@ instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaSt
   get = fmap (ViaStaticGeneric . to) gget
   put = putStaticHint (gput . from . unViaStaticGeneric)
 
-instance GStaticByteSized (Rep t) => StaticByteSized (ViaStaticGeneric t) where
+instance (GStaticByteSized (Rep t)) => StaticByteSized (ViaStaticGeneric t) where
   type StaticSize (ViaStaticGeneric t) = GStaticSize (Rep t)
   staticByteSize _ = gstaticByteSize (Proxy :: Proxy (Rep t))
 
@@ -55,7 +55,7 @@ instance (GByteSized a, GByteSized b, o ~ n + m) => GByteSized (a :*: b) where
   gbyteSize (x :*: y) = gbyteSize x + gbyteSize y
 
 -- Metadata
-instance GByteSized a => GByteSized (M1 i c a) where
+instance (GByteSized a) => GByteSized (M1 i c a) where
   gbyteSize = gbyteSize . unM1
 
 -- Sum
@@ -66,12 +66,12 @@ instance (GByteSized a, GByteSized b, SumSize a, SumSize b) => GByteSized (a :+:
       R1 b -> gbyteSize b
 
 -- Field
-instance Binary a => GByteSized (K1 i a) where
+instance (Binary a) => GByteSized (K1 i a) where
   gbyteSize = byteSize . unK1
 
 -- StaticByteSized:
 
-class KnownNat (GStaticSize f) => GStaticByteSized (f :: Type -> Type) where
+class (KnownNat (GStaticSize f)) => GStaticByteSized (f :: Type -> Type) where
   type GStaticSize f :: Nat
   gstaticByteSize :: Proxy f -> ByteCount
   gstaticByteSize = fromInteger . natVal . gstaticByteProxy
@@ -85,7 +85,7 @@ instance GStaticByteSized U1 where
 instance (GStaticByteSized a, GStaticByteSized b) => GStaticByteSized (a :*: b) where
   type GStaticSize (a :*: b) = GStaticSize a + GStaticSize b
 
-instance GStaticByteSized a => GStaticByteSized (M1 i c a) where
+instance (GStaticByteSized a) => GStaticByteSized (M1 i c a) where
   type GStaticSize (M1 i c a) = GStaticSize a
 
 -- GHC BUG: KnownNat is not actually redundant
@@ -110,11 +110,11 @@ instance (GBinary a, GBinary b) => GBinary (a :*: b) where
   gget = liftA2 (:*:) gget gget
   gput (x :*: y) = gput x *> gput y
 
-instance GBinary a => GBinary (M1 i c a) where
+instance (GBinary a) => GBinary (M1 i c a) where
   gget = fmap M1 gget
   gput = gput . unM1
 
-instance Binary a => GBinary (K1 i a) where
+instance (Binary a) => GBinary (K1 i a) where
   gget = fmap K1 get
   gput = put . unK1
 
@@ -151,7 +151,7 @@ instance
    where
     size = unTagged (sumSize :: Tagged (a :+: b))
 
-sizeError :: Show size => String -> size -> error
+sizeError :: (Show size) => String -> size -> error
 sizeError s size = error ("Can't " ++ s ++ " a type with " ++ show size ++ " constructors")
 
 checkGetSum
@@ -182,7 +182,7 @@ instance (GSumBinary a, GSumBinary b) => GSumBinary (a :+: b) where
     sizeL = size `shiftR` 1
     sizeR = size - sizeL
 
-instance GBinary a => GSumBinary (C1 c a) where
+instance (GBinary a) => GSumBinary (C1 c a) where
   getSum _ _ = gget
   putSum !code _ x = put code <> gput x
 
@@ -197,7 +197,7 @@ instance (SumSize a, SumSize b) => SumSize (a :+: b) where
 instance SumSize (C1 c a) where
   sumSize = Tagged 1
 
-sumSizeFor :: SumSize f => f a -> Tagged f
+sumSizeFor :: (SumSize f) => f a -> Tagged f
 sumSizeFor = const sumSize
 
 taggedBytes :: Tagged f -> ByteCount
@@ -207,5 +207,5 @@ taggedBytes (Tagged size)
   | size - 1 <= (maxBound :: Word32LE) = 4
   | otherwise = sizeError "size" size
 
-sumSizeBytes :: SumSize f => f a -> ByteCount
+sumSizeBytes :: (SumSize f) => f a -> ByteCount
 sumSizeBytes = taggedBytes . sumSizeFor

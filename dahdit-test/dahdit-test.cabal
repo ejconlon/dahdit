@@ -26,8 +26,8 @@ source-repository head
 
 library
   exposed-modules:
-      Test.Dahdit.Arb
       Test.Dahdit.Daytripper
+      Test.Dahdit.GenDefault
   other-modules:
       Paths_dahdit_test
   hs-source-dirs:
