@@ -282,7 +282,14 @@ getRemainingStaticSeq g = do
   let left = rem bc ebc
   if left == 0
     then getStaticSeq (coerce (div bc ebc)) g
-    else fail ("Leftover bytes for remaining static seq (have " ++ show (unByteCount left) ++ ", need " ++ show (unByteCount ebc) ++ ")")
+    else
+      fail
+        ( "Leftover bytes for remaining static seq (have "
+            ++ show (unByteCount left)
+            ++ ", need "
+            ++ show (unByteCount ebc)
+            ++ ")"
+        )
 
 getRemainingStaticArray :: (LiftedPrim a) => Proxy a -> Get (LiftedPrimArray a)
 getRemainingStaticArray prox = do
@@ -291,7 +298,14 @@ getRemainingStaticArray prox = do
   let left = rem bc ebc
   if left == 0
     then getStaticArray (coerce (div bc ebc))
-    else fail ("Leftover bytes for remaining static array (have " ++ show (unByteCount left) ++ ", need " ++ show (unByteCount ebc) ++ ")")
+    else
+      fail
+        ( "Leftover bytes for remaining static array (have "
+            ++ show (unByteCount left)
+            ++ ", need "
+            ++ show (unByteCount ebc)
+            ++ ")"
+        )
 
 getRemainingByteArray :: Get ByteArray
 getRemainingByteArray = getRemainingSize >>= getByteArray
@@ -305,7 +319,14 @@ getRemainingLiftedPrimArray prox = do
     then do
       let ec = coerce (div bc ebc)
       getLiftedPrimArray prox ec
-    else fail ("Leftover bytes for remaining lifted prim array (have " ++ show (unByteCount left) ++ ", need " ++ show (unByteCount ebc) ++ ")")
+    else
+      fail
+        ( "Leftover bytes for remaining lifted prim array (have "
+            ++ show (unByteCount left)
+            ++ ", need "
+            ++ show (unByteCount ebc)
+            ++ ")"
+        )
 
 getExpect :: (Eq a, Show a) => String -> Get a -> a -> Get ()
 getExpect typ getter expec = do

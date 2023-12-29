@@ -11,7 +11,23 @@ module Dahdit.LiftedPrim
 where
 
 import Control.Monad.Primitive (PrimMonad (..))
-import Dahdit.Internal (EndianPair (..), ViaEndianPair (..), ViaFromIntegral (..), mkDoubleLE, mkFloatLE, mkWord16LE, mkWord24LE, mkWord32LE, mkWord64LE, unMkDoubleLE, unMkFloatLE, unMkWord16LE, unMkWord24LE, unMkWord32LE, unMkWord64LE)
+import Dahdit.Internal
+  ( EndianPair (..)
+  , ViaEndianPair (..)
+  , ViaFromIntegral (..)
+  , mkDoubleLE
+  , mkFloatLE
+  , mkWord16LE
+  , mkWord24LE
+  , mkWord32LE
+  , mkWord64LE
+  , unMkDoubleLE
+  , unMkFloatLE
+  , unMkWord16LE
+  , unMkWord24LE
+  , unMkWord32LE
+  , unMkWord64LE
+  )
 import Dahdit.Nums
   ( DoubleBE
   , DoubleLE (..)
@@ -322,7 +338,8 @@ deriving via (ViaEndianPair 4 FloatLE FloatBE) instance LiftedPrim FloatBE
 deriving via (ViaEndianPair 8 DoubleLE DoubleBE) instance LiftedPrim DoubleBE
 
 -- | Fill a byte array with the given value
-setByteArrayLifted :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> a -> m ()
+setByteArrayLifted
+  :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> a -> m ()
 setByteArrayLifted arr off len val = do
   let elemSize = staticByteSize (proxyFor val)
       elemLen = div (coerce len) elemSize

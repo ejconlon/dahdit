@@ -129,7 +129,14 @@ import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Int (Int16, Int32, Int64, Int8)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, byteArrayFromList, freezeByteArray, newByteArray, sizeofMutableByteArray)
+import Data.Primitive.ByteArray
+  ( ByteArray (..)
+  , MutableByteArray
+  , byteArrayFromList
+  , freezeByteArray
+  , newByteArray
+  , sizeofMutableByteArray
+  )
 import Data.Proxy (asProxyTypeOf)
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
@@ -363,15 +370,27 @@ getCases =
   , GetCase "Int64BE" getInt64BE (Just (8, 0, 0x5DEC6EFD12345678)) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
   , GetCase "FloatLE" getFloatLE (Just (4, 0, FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D]
   , GetCase "FloatBE" getFloatBE (Just (4, 0, FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD]
-  , GetCase "DoubleLE" getDoubleLE (Just (8, 0, DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
-  , GetCase "DoubleBE" getDoubleBE (Just (8, 0, DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , GetCase
+      "DoubleLE"
+      getDoubleLE
+      (Just (8, 0, DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678)))
+      [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase
+      "DoubleBE"
+      getDoubleBE
+      (Just (8, 0, DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678)))
+      [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
   , GetCase "ShortByteString" (getByteString 2) (Just (2, 1, BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D, 0xBB]
   , GetCase "Text" (getText 2) (Just (2, 1, "hi")) [0x68, 0x69, 0xBB]
   , GetCase "Two Word8" ((,) <$> getWord8 <*> getWord8) (Just (2, 0, (0x5D, 0xBB))) [0x5D, 0xBB]
   , GetCase "Two Word16LE" ((,) <$> getWord16LE <*> getWord16LE) (Just (4, 0, (0x5DEC, 0x4020))) [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "Seq" (getSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "StaticSeq" (getStaticSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
-  , GetCase "StaticArray" (getStaticArray @Word16LE 2) (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , GetCase
+      "StaticArray"
+      (getStaticArray @Word16LE 2)
+      (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020]))
+      [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "DynFoo" (get @DynFoo) (Just (3, 0, DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , GetCase "StaFoo" (get @StaFoo) (Just (3, 0, StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , GetCase "getRemainingSize" getRemainingSize (Just (0, 3, 3)) [0xBB, 0xEC, 0x5D]
@@ -387,8 +406,16 @@ getCases =
   , GetCase "getWithin gt" (getWithin 3 getWord16LE) (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
   , GetCase "BoolByte True" (get @BoolByte) (Just (1, 0, BoolByte True)) [0x01]
   , GetCase "BoolByte False" (get @BoolByte) (Just (1, 0, BoolByte False)) [0x00]
-  , GetCase "getByteArray" (getByteArray 3) (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC, 0x5D]
-  , GetCase "getLiftedPrimArray" (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3) (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D]
+  , GetCase
+      "getByteArray"
+      (getByteArray 3)
+      (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC]))
+      [0xFD, 0x6E, 0xEC, 0x5D]
+  , GetCase
+      "getLiftedPrimArray"
+      (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3)
+      (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC]))
+      [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D]
   , GetCase "StaBytes" (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21]
   , GetCase "TagFoo (one)" (get @TagFoo) (Just (2, 0, TagFooOne 7)) [0x00, 0x07]
   , GetCase "TagFoo (two)" (get @TagFoo) (Just (3, 0, TagFooTwo 7)) [0x01, 0x07, 0x00]
@@ -400,7 +427,11 @@ getCases =
   , GetCase "TB16 1" (get @TermBytes16) (Just (2, 0, TermBytes16 (BSS.pack [1]))) [1, 0]
   , GetCase "TB16 2" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2]))) [1, 2, 0, 0]
   , GetCase "TB16 3" (get @TermBytes16) (Just (4, 0, TermBytes16 (BSS.pack [1, 2, 3]))) [1, 2, 3, 0]
-  , GetCase "Seq Word16LE" (get @(Seq Word16LE)) (Just (12, 0, Seq.fromList [0xEC, 0x5D])) [2, 0, 0, 0, 0, 0, 0, 0, 0xEC, 0, 0x5D, 0]
+  , GetCase
+      "Seq Word16LE"
+      (get @(Seq Word16LE))
+      (Just (12, 0, Seq.fromList [0xEC, 0x5D]))
+      [2, 0, 0, 0, 0, 0, 0, 0, 0xEC, 0, 0x5D, 0]
   , GetCase
       "Seq WordX"
       (get @(Seq WordX))
@@ -433,8 +464,14 @@ putCases =
   , PutCase "Int64BE" (putInt64BE 0x5DEC6EFD12345678) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
   , PutCase "FloatLE" (putFloatLE (FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D]
   , PutCase "FloatBE" (putFloatBE (FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD]
-  , PutCase "DoubleLE" (putDoubleLE (DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
-  , PutCase "DoubleBE" (putDoubleBE (DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678))) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
+  , PutCase
+      "DoubleLE"
+      (putDoubleLE (DoubleLE (castWord64ToDouble 0x5DEC6EFD12345678)))
+      [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
+  , PutCase
+      "DoubleBE"
+      (putDoubleBE (DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678)))
+      [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
   , PutCase "ShortByteString" (putByteString (BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D]
   , PutCase "Text" (putText "hi") [0x68, 0x69]
   , PutCase "Two Word8" (putWord8 0x5D *> putWord8 0xBB) [0x5D, 0xBB]
@@ -447,7 +484,10 @@ putCases =
   , PutCase "BoolByte True" (put (BoolByte True)) [0x01]
   , PutCase "BoolByte False" (put (BoolByte False)) [0x00]
   , PutCase "putByteArray" (putByteArray (byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC]
-  , PutCase "putLiftedPrimArray" (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC])) [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]
+  , PutCase
+      "putLiftedPrimArray"
+      (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC]))
+      [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]
   , PutCase "StaBytes" (put (mkStaBytes "hi")) [0x68, 0x69]
   , PutCase "StaBytes (less)" (put (mkStaBytes "h")) [0x68, 0x00]
   , PutCase "StaBytes (more)" (put (mkStaBytes "hi!")) [0x68, 0x69]
@@ -541,7 +581,8 @@ wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
   gen16 = fmap (WordX16 . Word16LE) (FG.inRange (FR.between (0, maxBound)))
   gen32 = fmap (WordX32 . Word32LE) (FG.inRange (FR.between (0, maxBound)))
 
-takeDiff :: (CaseTarget z) => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> IO ([ByteCount], (ByteCount, z))
+takeDiff
+  :: (CaseTarget z) => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> IO ([ByteCount], (ByteCount, z))
 takeDiff z pos had diff = go 0
  where
   go !acc = \case

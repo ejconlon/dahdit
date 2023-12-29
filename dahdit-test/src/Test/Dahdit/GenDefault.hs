@@ -230,7 +230,8 @@ deriving via
 deriving via
   (ViaGeneric (D p) (a, b, c, d, e))
   instance
-    (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c, GenDefault (D p) d, GenDefault (D p) e) => GenDefault (D p) (a, b, c, d, e)
+    (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c, GenDefault (D p) d, GenDefault (D p) e)
+    => GenDefault (D p) (a, b, c, d, e)
 
 instance (LengthBounds (D p) [a], GenDefault (D p) a) => GenDefault (D p) [a] where
   genDefault = genListLike id

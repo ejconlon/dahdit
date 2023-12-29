@@ -1,5 +1,5 @@
 name: dahdit-network
-version: 0.5.0
+version: 0.5.1
 
 github: ejconlon/dahdit-network
 license: BSD3
@@ -20,7 +20,7 @@ dependencies:
 - bytestring >= 0.11 && < 0.12
 - dahdit >= 0.5 && < 0.6
 - network >= 3.1 && < 3.2
-- resourcet >= 1.2 && < 1.3
+- resourcet >= 1.2 && < 1.4
 - unliftio-core >= 0.2 && < 0.3
 
 default-extensions:

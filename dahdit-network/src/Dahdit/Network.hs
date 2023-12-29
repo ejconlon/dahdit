@@ -20,7 +20,19 @@ where
 import Control.Monad (unless, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.IO.Unlift (MonadUnliftIO)
-import Dahdit (Binary (..), ByteCount (..), Get, GetError, GetIncCb, GetIncRequest (..), Put, getEnd, getTarget, getTargetInc, putTarget)
+import Dahdit
+  ( Binary (..)
+  , ByteCount (..)
+  , Get
+  , GetError
+  , GetIncCb
+  , GetIncRequest (..)
+  , Put
+  , getEnd
+  , getTarget
+  , getTargetInc
+  , putTarget
+  )
 import Data.Acquire (Acquire, mkAcquire, withAcquire)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
@@ -180,7 +192,8 @@ tcpClientConn mayLim hp to = do
   let enc = streamEncoder sock
   pure (addr, Conn dec enc)
 
-withTcpClientConn :: (MonadUnliftIO m) => Maybe ByteCount -> HostPort -> TcpOpts -> (NS.SockAddr -> Conn () -> m a) -> m a
+withTcpClientConn
+  :: (MonadUnliftIO m) => Maybe ByteCount -> HostPort -> TcpOpts -> (NS.SockAddr -> Conn () -> m a) -> m a
 withTcpClientConn mayLim hp to = withAcquire (tcpClientConn mayLim hp to) . uncurry
 
 tcpServerSock :: HostPort -> Acquire NS.Socket

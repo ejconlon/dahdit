@@ -23,8 +23,29 @@ import Control.Monad.Primitive (MonadPrim, PrimMonad (..), RealWorld)
 import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (getRemainingSize)
-import Dahdit.Mem (MemPtr (..), MutableMem (..), emptyMemPtr, mutViewVecMem, viewBSMem, viewSBSMem, viewVecMem, withBAMem, withBSMem, withSBSMem, withVecMem)
-import Dahdit.Run (GetError, GetIncCb, GetIncChunk (..), newGetIncEnv, runCount, runGetIncInternal, runGetInternal, runPutInternal)
+import Dahdit.Mem
+  ( MemPtr (..)
+  , MutableMem (..)
+  , emptyMemPtr
+  , mutViewVecMem
+  , viewBSMem
+  , viewSBSMem
+  , viewVecMem
+  , withBAMem
+  , withBSMem
+  , withSBSMem
+  , withVecMem
+  )
+import Dahdit.Run
+  ( GetError
+  , GetIncCb
+  , GetIncChunk (..)
+  , newGetIncEnv
+  , runCount
+  , runGetIncInternal
+  , runGetInternal
+  , runPutInternal
+  )
 import Dahdit.Sizes (ByteCount (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -142,7 +163,8 @@ decode :: (Binary a, BinaryGetTarget z m) => z -> m (Either GetError a, ByteCoun
 decode = getTarget get
 
 -- | Decode a value incrementally from sources yielded by a callback.
-decodeInc :: (Binary a, BinaryGetTarget z m) => Maybe ByteCount -> GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
+decodeInc
+  :: (Binary a, BinaryGetTarget z m) => Maybe ByteCount -> GetIncCb z m -> m (Either GetError a, ByteCount, ByteCount)
 decodeInc mayCap = getTargetInc mayCap get
 
 -- | 'decode' but expect the end of input.
@@ -198,17 +220,20 @@ runGetIncString mayCap g cb = runGetIncBS mayCap g (fmap (fmap BSC.pack) . cb)
 runGetIncText :: Maybe ByteCount -> Get a -> GetIncCb Text IO -> IO (Either GetError a, ByteCount, ByteCount)
 runGetIncText mayCap g cb = runGetIncBS mayCap g (fmap (fmap TE.encodeUtf8) . cb)
 
-runGetIncBA :: (PrimMonad m) => Maybe ByteCount -> Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncBA
+  :: (PrimMonad m) => Maybe ByteCount -> Get a -> GetIncCb ByteArray m -> m (Either GetError a, ByteCount, ByteCount)
 runGetIncBA mayCap act cb = do
   env <- newGetIncEnv mayCap (GetIncChunk 0 0 emptyByteArray)
   let view s = GetIncChunk 0 (coerce (sizeofByteArray s)) s
   let cb' = fmap (fmap view) . cb
   runGetIncInternal act env cb'
 
-runGetIncSBS :: (PrimMonad m) => Maybe ByteCount -> Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
+runGetIncSBS
+  :: (PrimMonad m) => Maybe ByteCount -> Get a -> GetIncCb ShortByteString m -> m (Either GetError a, ByteCount, ByteCount)
 runGetIncSBS mayCap act cb = runGetIncBA mayCap act (fmap (fmap viewSBSMem) . cb)
 
-runGetIncMemPtr :: Maybe ByteCount -> Get a -> GetIncCb (MemPtr RealWorld) IO -> IO (Either GetError a, ByteCount, ByteCount)
+runGetIncMemPtr
+  :: Maybe ByteCount -> Get a -> GetIncCb (MemPtr RealWorld) IO -> IO (Either GetError a, ByteCount, ByteCount)
 runGetIncMemPtr mayCap act cb = do
   mem <- emptyMemPtr
   env <- newGetIncEnv mayCap (GetIncChunk 0 0 mem)

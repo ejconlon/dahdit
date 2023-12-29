@@ -26,7 +26,17 @@ import qualified Data.ByteString.Internal as BSI
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray, cloneByteArray, copyByteArray, copyByteArrayToPtr, freezeByteArray, newByteArray, unsafeFreezeByteArray, unsafeThawByteArray)
+import Data.Primitive.ByteArray
+  ( ByteArray (..)
+  , MutableByteArray
+  , cloneByteArray
+  , copyByteArray
+  , copyByteArrayToPtr
+  , freezeByteArray
+  , newByteArray
+  , unsafeFreezeByteArray
+  , unsafeThawByteArray
+  )
 import Data.Primitive.Ptr (copyPtrToMutableByteArray)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS

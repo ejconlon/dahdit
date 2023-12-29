@@ -64,13 +64,15 @@ indexLiftedPrimArray (LiftedPrimArray arr) = indexArrayLiftedInElems Proxy arr
 writeLiftedPrimArray :: (LiftedPrim a, PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> a -> m ()
 writeLiftedPrimArray (MutableLiftedPrimArray arr) = writeArrayLiftedInElems arr
 
-freezeLiftedPrimArray :: (PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> ElemCount -> m (LiftedPrimArray a)
+freezeLiftedPrimArray
+  :: (PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> ElemCount -> m (LiftedPrimArray a)
 freezeLiftedPrimArray (MutableLiftedPrimArray arr) off len = fmap LiftedPrimArray (freezeByteArray arr (coerce off) (coerce len))
 
 unsafeFreezeLiftedPrimArray :: (PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> m (LiftedPrimArray a)
 unsafeFreezeLiftedPrimArray (MutableLiftedPrimArray arr) = fmap LiftedPrimArray (unsafeFreezeByteArray arr)
 
-thawLiftedPrimArray :: (PrimMonad m) => LiftedPrimArray a -> ElemCount -> ElemCount -> m (MutableLiftedPrimArray (PrimState m) a)
+thawLiftedPrimArray
+  :: (PrimMonad m) => LiftedPrimArray a -> ElemCount -> ElemCount -> m (MutableLiftedPrimArray (PrimState m) a)
 thawLiftedPrimArray (LiftedPrimArray arr) off len = fmap MutableLiftedPrimArray (thawByteArray arr (coerce off) (coerce len))
 
 unsafeThawLiftedPrimArray :: (PrimMonad m) => LiftedPrimArray a -> m (MutableLiftedPrimArray (PrimState m) a)
