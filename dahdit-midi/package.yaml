@@ -1,4 +1,4 @@
-name: dahdit-network
+name: dahdit-midi
 version: 0.5.1
 
 github: ejconlon/dahdit
@@ -6,7 +6,7 @@ license: BSD3
 author: Eric Conlon
 maintainer: ejconlon@gmail.com
 copyright: (c) 2023 Eric Conlon
-synopsis: Network protocol helpers for Dahdit
+synopsis: MIDI and OSC parsing/printing with dahdit
 description: Please see the README on GitHub at <https://github.com/ejconlon/dahdit#readme>
 tested-with: GHC == 9.2.7
 
@@ -63,7 +63,7 @@ library:
   source-dirs: src
 
 tests:
-  dahdit-network-test:
+  dahdit-midi-test:
     main: Main.hs
     source-dirs: test
     ghc-options:
@@ -71,7 +71,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - dahdit-network
+    - dahdit-midi
     - async >= 2.2 && < 2.3
     - stm >= 2.5 && < 2.6
     - tasty >= 1.4 && < 1.5
