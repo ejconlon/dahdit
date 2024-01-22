@@ -80,6 +80,7 @@ test-suite dahdit-midi-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.Dahdit.Midi.GenDefault
       Paths_dahdit_midi
   hs-source-dirs:
       test
@@ -111,20 +112,22 @@ test-suite dahdit-midi-test
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      async ==2.2.*
-    , base >=4.12 && <5
+      base >=4.12 && <5
     , bytestring ==0.11.*
     , containers ==0.6.*
     , dahdit ==0.5.*
     , dahdit-midi
+    , dahdit-test
     , data-sword >=0.2.0.3 && <0.3
+    , daytripper
+    , directory
+    , falsify
+    , filepath
     , hashable ==1.4.*
     , nanotime ==0.1.*
     , newtype ==0.2.*
     , primitive >=0.7 && <0.9
-    , stm ==2.5.*
-    , tasty ==1.4.*
-    , tasty-hunit ==0.10.*
+    , tasty
     , text >=1.2 && <2.1
     , vector >=0.12 && <0.14
   default-language: GHC2021
