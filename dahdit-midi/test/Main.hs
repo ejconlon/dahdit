@@ -10,5 +10,4 @@ main =
   defaultMain $
     testGroup
       "DahditMidi"
-      [
-      ]
+      []
