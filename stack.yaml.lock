@@ -26,12 +26,12 @@ packages:
   original:
     hackage: falsify-0.2.0
 - completed:
-    hackage: nanotime-0.1.0@sha256:394c44f44fcb0dab9abe267e490ceb836501147abd92fd97a2b9218b1e293700,2827
+    hackage: nanotime-0.2.0@sha256:79aa8dd2d0776173d98dad4447e238f200d3638d6318991852a19d5357f086ed,2827
     pantry-tree:
-      sha256: 63b85e0fa5eb344d72e41b9e3e998c46bea374d022e4ca93793a67a068e26c80
-      size: 167
+      sha256: 7b9aca6ec0a989e7d7862c0827c90376420fd274843d0157fc6aae0b122996c9
+      size: 168
   original:
-    hackage: nanotime-0.1.0
+    hackage: nanotime-0.2.0
 snapshots:
 - completed:
     sha256: 7b975b104cb3dbf0c297dfd01f936a4d2ee523241dd0b1ae960522b833fe3027
