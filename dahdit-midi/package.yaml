@@ -1,5 +1,5 @@
 name: dahdit-midi
-version: 0.5.2
+version: 0.5.3
 
 github: ejconlon/dahdit
 license: BSD3
@@ -22,7 +22,7 @@ dependencies:
 - containers >= 0.6 && < 0.7
 - data-sword >= 0.2.0.3 && < 0.3
 - hashable >= 1.4 && < 1.5
-- nanotime >= 0.2 && < 0.3
+- nanotime >= 0.3 && < 0.4
 - newtype >= 0.2 && < 0.3
 - primitive >= 0.7 && < 0.9
 - text >= 1.2 && < 2.1
