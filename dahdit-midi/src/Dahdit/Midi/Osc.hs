@@ -162,6 +162,33 @@ datumType = \case
   DatumTime _ -> DatumTypeTime
   DatumMidi _ -> DatumTypeMidi
 
+class IsDatum a where
+  toDatum :: a -> Datum
+
+instance IsDatum Int32 where
+  toDatum = DatumInt32
+
+instance IsDatum Int64 where
+  toDatum = DatumInt64
+
+instance IsDatum Float where
+  toDatum = DatumFloat
+
+instance IsDatum Double where
+  toDatum = DatumDouble
+
+instance IsDatum Text where
+  toDatum = DatumString
+
+instance IsDatum ShortByteString where
+  toDatum = DatumBlob
+
+instance IsDatum NtpTime where
+  toDatum = DatumTime
+
+instance IsDatum PortMsg where
+  toDatum = DatumMidi
+
 newtype Sig = Sig {unSig :: Seq DatumType}
   deriving stock (Show)
   deriving newtype (Eq, Ord)
