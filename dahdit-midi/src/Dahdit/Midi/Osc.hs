@@ -165,6 +165,9 @@ datumType = \case
 class IsDatum a where
   toDatum :: a -> Datum
 
+instance IsDatum Datum where
+  toDatum = id
+
 instance IsDatum Int32 where
   toDatum = DatumInt32
 
