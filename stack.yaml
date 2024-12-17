@@ -1,4 +1,4 @@
-resolver: lts-22.33
+resolver: lts-23.0
 
 ghc-options:
   "$everything": -haddock
@@ -11,7 +11,7 @@ packages:
 
 extra-deps:
 - data-sword-0.2.0.3
-- daytripper-0.3.1
-- falsify-0.2.0@r1
+- daytripper-0.4.0
+- prop-unit-0.2.0
 - nanotime-0.3.2
 

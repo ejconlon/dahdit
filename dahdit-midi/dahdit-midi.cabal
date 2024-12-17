@@ -1,11 +1,11 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
 name:           dahdit-midi
-version:        0.5.5
+version:        0.6.0
 synopsis:       MIDI and OSC parsing/printing with dahdit
 description:    Please see the README on GitHub at <https://github.com/ejconlon/dahdit#readme>
 homepage:       https://github.com/ejconlon/dahdit#readme
@@ -16,7 +16,7 @@ copyright:      (c) 2023 Eric Conlon
 license:        BSD3
 build-type:     Simple
 tested-with:
-    GHC == 9.2.7
+    GHC == 9.8.4
 extra-source-files:
     README.md
 
@@ -64,15 +64,15 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds
   build-depends:
       base >=4.12 && <5
-    , bytestring ==0.11.*
+    , bytestring >=0.11 && <0.13
     , containers ==0.6.*
-    , dahdit ==0.5.*
+    , dahdit ==0.6.*
     , data-sword >=0.2.0.3 && <0.3
     , hashable ==1.4.*
     , nanotime ==0.3.*
     , newtype ==0.2.*
-    , primitive >=0.7 && <0.9
-    , text >=1.2 && <2.1
+    , primitive >=0.7 && <0.10
+    , text >=1.2 && <2.2
     , vector >=0.12 && <0.14
   default-language: GHC2021
 
@@ -113,21 +113,21 @@ test-suite dahdit-midi-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
-    , bytestring ==0.11.*
+    , bytestring >=0.11 && <0.13
     , containers ==0.6.*
-    , dahdit ==0.5.*
+    , dahdit ==0.6.*
     , dahdit-midi
     , dahdit-test
     , data-sword >=0.2.0.3 && <0.3
-    , daytripper
+    , daytripper ==0.4.*
     , directory
-    , falsify
     , filepath
     , hashable ==1.4.*
+    , hedgehog ==1.5.*
     , nanotime ==0.3.*
     , newtype ==0.2.*
-    , primitive >=0.7 && <0.9
-    , tasty
-    , text >=1.2 && <2.1
+    , primitive >=0.7 && <0.10
+    , prop-unit ==0.2.*
+    , text >=1.2 && <2.2
     , vector >=0.12 && <0.14
   default-language: GHC2021

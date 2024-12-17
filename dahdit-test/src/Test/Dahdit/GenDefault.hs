@@ -11,9 +11,6 @@ module Test.Dahdit.GenDefault
   , genString
   , genSBS
   , genText
-  , ViaSigned (..)
-  , ViaUnsigned (..)
-  , ViaFractional (..)
   , LengthBounds (..)
   , DahditTag
   )
@@ -32,8 +29,8 @@ import Dahdit
   , Int32LE (..)
   , Int64BE (..)
   , Int64LE (..)
-  -- , StaticBytes (..)
-  -- , StaticSeq (..)
+  , StaticBytes (..)
+  , StaticSeq (..)
   , TermBytes16 (..)
   , TermBytes8 (..)
   , Word16BE (..)
@@ -43,7 +40,6 @@ import Dahdit
   , Word64BE (..)
   , Word64LE (..)
   )
-import Data.Bits (FiniteBits (..))
 import Data.ByteString.Internal (w2c)
 import Data.ByteString.Short (ShortByteString)
 import Data.ByteString.Short qualified as BSS
@@ -64,37 +60,38 @@ import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Word (Word16, Word32, Word64, Word8)
-import Test.Falsify.GenDefault (GenDefault (..), ViaGeneric (..))
-import Test.Falsify.Generator (Gen)
-import Test.Falsify.Generator qualified as FG
-import Test.Falsify.Range qualified as FR
+import GHC.TypeLits (KnownNat, natVal)
+import Hedgehog (Gen)
+import Hedgehog.Gen qualified as Gen
+import Hedgehog.Range qualified as Range
+import PropUnit (GenDefault (..), genDefaultGeneric)
 
 genPrintableChar :: Gen Char
-genPrintableChar = fmap w2c (FG.inRange (FR.between (32, 126)))
+genPrintableChar = fmap w2c (Gen.integral (Range.constant 32 126))
 
-genSigned :: (Integral a, FiniteBits a, Bounded a) => Gen a
-genSigned = FG.inRange (FR.withOrigin (minBound, maxBound) 0)
+genSigned :: (Integral a, Bounded a) => Gen a
+genSigned = Gen.integral (Range.constantFrom 0 minBound maxBound)
 
-genUnsigned :: (Integral a, FiniteBits a, Bounded a) => Gen a
-genUnsigned = FG.inRange (FR.between (0, maxBound))
+genUnsigned :: (Integral a, Bounded a) => Gen a
+genUnsigned = Gen.integral (Range.constant 0 maxBound)
 
 genFractional :: (Fractional a) => Gen a
 genFractional = do
   -- Picked so bound**2 fits in int
   let bound = 3037000499 :: Int
-  n <- FG.inRange (FR.between (0, bound))
-  b <- FG.inRange (FR.between (1, bound))
-  a <- FG.inRange (FR.withOrigin ((-n) * b, n * b) 0)
+  n <- Gen.integral (Range.constant 0 bound)
+  b <- Gen.integral (Range.constant 1 bound)
+  a <- Gen.integral (Range.constantFrom 0 ((-n) * b) (n * b))
   return (fromRational (fromIntegral a % fromIntegral b))
 
 genEnum :: (Enum a, Bounded a) => Gen a
-genEnum = let b = minBound in FG.elem (b :| drop 1 [b .. maxBound])
+genEnum = Gen.enumBounded
 
 genSum :: NonEmpty (Gen a) -> Gen a
-genSum (g :| gs) = foldr FG.choose g gs
+genSum (g :| gs) = Gen.choice (g : gs)
 
 genList :: Word -> Word -> Gen a -> Gen [a]
-genList mn mx = FG.list (FR.between (mn, mx))
+genList mn mx = Gen.list (Range.constant (fromIntegral mn) (fromIntegral mx))
 
 genSeq :: Word -> Word -> Gen a -> Gen (Seq a)
 genSeq mn mx = fmap Seq.fromList . genList mn mx
@@ -110,12 +107,12 @@ genText mn mx = fmap T.pack (genString mn mx)
 
 newtype ViaSigned a = ViaSigned {unViaSigned :: a}
 
-instance (Integral a, FiniteBits a, Bounded a) => GenDefault p (ViaSigned a) where
+instance (Integral a, Bounded a) => GenDefault p (ViaSigned a) where
   genDefault _ = fmap ViaSigned genSigned
 
 newtype ViaUnsigned a = ViaUnsigned {unViaUnsigned :: a}
 
-instance (Integral a, FiniteBits a, Bounded a) => GenDefault p (ViaUnsigned a) where
+instance (Integral a, Bounded a) => GenDefault p (ViaUnsigned a) where
   genDefault _ = fmap ViaUnsigned genUnsigned
 
 newtype ViaFractional a = ViaFractional {unViaFractional :: a}
@@ -138,100 +135,116 @@ data DahditTag p
 
 type D = DahditTag
 
-deriving via (ViaUnsigned Word8) instance GenDefault (D p) Word8
+instance GenDefault (D p) Word8 where
+  genDefault _ = genUnsigned
 
-deriving via (ViaSigned Int8) instance GenDefault (D p) Int8
+instance GenDefault (D p) Int8 where
+  genDefault _ = genSigned
 
-deriving via (ViaUnsigned Word16) instance GenDefault (D p) Word16
+instance GenDefault (D p) Word16 where
+  genDefault _ = genUnsigned
 
-deriving via (ViaSigned Int16) instance GenDefault (D p) Int16
+instance GenDefault (D p) Int16 where
+  genDefault _ = genSigned
 
-deriving via (ViaUnsigned Word32) instance GenDefault (D p) Word32
+instance GenDefault (D p) Word32 where
+  genDefault _ = genUnsigned
 
-deriving via (ViaSigned Int32) instance GenDefault (D p) Int32
+instance GenDefault (D p) Int32 where
+  genDefault _ = genSigned
 
-deriving via (ViaUnsigned Word64) instance GenDefault (D p) Word64
+instance GenDefault (D p) Word64 where
+  genDefault _ = genUnsigned
 
-deriving via (ViaSigned Int64) instance GenDefault (D p) Int64
+instance GenDefault (D p) Int64 where
+  genDefault _ = genSigned
 
-deriving via (ViaFractional Float) instance GenDefault (D p) Float
+instance GenDefault (D p) Float where
+  genDefault _ = genFractional
 
-deriving via (ViaFractional Double) instance GenDefault (D p) Double
+instance GenDefault (D p) Double where
+  genDefault _ = genFractional
 
-deriving via (ViaSigned Int) instance GenDefault (D p) Int
+instance GenDefault (D p) Int where
+  genDefault _ = genSigned
 
-deriving newtype instance GenDefault (D p) Word16LE
+instance GenDefault (D p) Word16LE where
+  genDefault = fmap Word16LE . genDefault
 
-deriving newtype instance GenDefault (D p) Int16LE
+instance GenDefault (D p) Int16LE where
+  genDefault = fmap Int16LE . genDefault
 
-deriving newtype instance GenDefault (D p) Word32LE
+instance GenDefault (D p) Word32LE where
+  genDefault = fmap Word32LE . genDefault
 
-deriving newtype instance GenDefault (D p) Int32LE
+instance GenDefault (D p) Int32LE where
+  genDefault = fmap Int32LE . genDefault
 
-deriving newtype instance GenDefault (D p) Word64LE
+instance GenDefault (D p) Word64LE where
+  genDefault = fmap Word64LE . genDefault
 
-deriving newtype instance GenDefault (D p) Int64LE
+instance GenDefault (D p) Int64LE where
+  genDefault = fmap Int64LE . genDefault
 
-deriving newtype instance GenDefault (D p) FloatLE
+instance GenDefault (D p) FloatLE where
+  genDefault = fmap FloatLE . genDefault
 
-deriving newtype instance GenDefault (D p) DoubleLE
+instance GenDefault (D p) DoubleLE where
+  genDefault = fmap DoubleLE . genDefault
 
-deriving newtype instance GenDefault (D p) Word16BE
+instance GenDefault (D p) Word16BE where
+  genDefault = fmap Word16BE . genDefault
 
-deriving newtype instance GenDefault (D p) Int16BE
+instance GenDefault (D p) Int16BE where
+  genDefault = fmap Int16BE . genDefault
 
-deriving newtype instance GenDefault (D p) Word32BE
+instance GenDefault (D p) Word32BE where
+  genDefault = fmap Word32BE . genDefault
 
-deriving newtype instance GenDefault (D p) Int32BE
+instance GenDefault (D p) Int32BE where
+  genDefault = fmap Int32BE . genDefault
 
-deriving newtype instance GenDefault (D p) Word64BE
+instance GenDefault (D p) Word64BE where
+  genDefault = fmap Word64BE . genDefault
 
-deriving newtype instance GenDefault (D p) Int64BE
+instance GenDefault (D p) Int64BE where
+  genDefault = fmap Int64BE . genDefault
 
-deriving newtype instance GenDefault (D p) FloatBE
+instance GenDefault (D p) FloatBE where
+  genDefault = fmap FloatBE . genDefault
 
-deriving newtype instance GenDefault (D p) DoubleBE
+instance GenDefault (D p) DoubleBE where
+  genDefault = fmap DoubleBE . genDefault
 
 instance GenDefault (D p) Char where
   genDefault = fmap w2c . genDefault
 
-deriving via (ViaGeneric (D p) ()) instance GenDefault (D p) ()
+instance GenDefault (D p) () where
+  genDefault = genDefaultGeneric
 
-deriving via
-  (ViaGeneric (D p) Bool)
-  instance
-    GenDefault (D p) Bool
+instance GenDefault (D p) Bool where
+  genDefault = genDefaultGeneric
 
-deriving via
-  (ViaGeneric (D p) (Maybe a))
-  instance
-    (GenDefault (D p) a) => GenDefault (D p) (Maybe a)
+instance (GenDefault (D p) a) => GenDefault (D p) (Maybe a) where
+  genDefault = genDefaultGeneric
 
-deriving via
-  (ViaGeneric (D p) (Either a b))
-  instance
-    (GenDefault (D p) a, GenDefault (D p) b) => GenDefault (D p) (Either a b)
+instance (GenDefault (D p) a, GenDefault (D p) b) => GenDefault (D p) (Either a b) where
+  genDefault = genDefaultGeneric
 
-deriving via
-  (ViaGeneric (D p) (a, b))
-  instance
-    (GenDefault (D p) a, GenDefault (D p) b) => GenDefault (D p) (a, b)
+instance (GenDefault (D p) a, GenDefault (D p) b) => GenDefault (D p) (a, b) where
+  genDefault = genDefaultGeneric
 
-deriving via
-  (ViaGeneric (D p) (a, b, c))
-  instance
-    (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c) => GenDefault (D p) (a, b, c)
+instance (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c) => GenDefault (D p) (a, b, c) where
+  genDefault = genDefaultGeneric
 
-deriving via
-  (ViaGeneric (D p) (a, b, c, d))
-  instance
-    (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c, GenDefault (D p) d) => GenDefault (D p) (a, b, c, d)
+instance (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c, GenDefault (D p) d) => GenDefault (D p) (a, b, c, d) where
+  genDefault = genDefaultGeneric
 
-deriving via
-  (ViaGeneric (D p) (a, b, c, d, e))
-  instance
-    (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c, GenDefault (D p) d, GenDefault (D p) e)
-    => GenDefault (D p) (a, b, c, d, e)
+instance
+  (GenDefault (D p) a, GenDefault (D p) b, GenDefault (D p) c, GenDefault (D p) d, GenDefault (D p) e)
+  => GenDefault (D p) (a, b, c, d, e)
+  where
+  genDefault = genDefaultGeneric
 
 instance (LengthBounds (D p) [a], GenDefault (D p) a) => GenDefault (D p) [a] where
   genDefault = genListLike id
@@ -257,11 +270,15 @@ instance (LengthBounds (D p) TermBytes8) => GenDefault (D p) TermBytes8 where
 instance (LengthBounds (D p) TermBytes16) => GenDefault (D p) TermBytes16 where
   genDefault = genListLike (TermBytes16 . BSS.pack)
 
--- instance LengthBounds (D p) => GenDefault (D p) (StaticBytes n) where
---   genDefault = genListLike (StaticBytes . BSS.pack)
+instance (KnownNat n) => GenDefault (D p) (StaticBytes n) where
+  genDefault _ =
+    let mn = fromInteger (natVal (Proxy @n))
+    in  fmap (StaticBytes . BSS.pack) (genList mn mn (genDefault @(D p) Proxy))
 
--- instance (LengthBounds (D p), GenDefault (D p) a) => GenDefault (D p) (StaticSeq n a) where
---   genDefault = genListLike (StaticSeq . Seq.fromList)
+instance (KnownNat n, GenDefault (D p) a) => GenDefault (D p) (StaticSeq n a) where
+  genDefault _ =
+    let mn = fromInteger (natVal (Proxy @n))
+    in  fmap (StaticSeq . Seq.fromList) (genList mn mn (genDefault @(D p) Proxy))
 
 instance GenDefault (D p) BoolByte where
   genDefault = fmap BoolByte . genDefault

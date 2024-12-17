@@ -7,7 +7,6 @@ module Dahdit.Generic
   )
 where
 
-import Control.Applicative (liftA2)
 import Dahdit.Binary (Binary (..))
 import Dahdit.Free (Get, Put)
 import Dahdit.Funs (putStaticHint)
@@ -37,7 +36,7 @@ instance (Generic t, GStaticByteSized (Rep t), GBinary (Rep t)) => Binary (ViaSt
   get = fmap (ViaStaticGeneric . to) gget
   put = putStaticHint (gput . from . unViaStaticGeneric)
 
-instance (GStaticByteSized (Rep t)) => StaticByteSized (ViaStaticGeneric t) where
+instance (GStaticByteSized (Rep t), KnownNat (GStaticSize (Rep t))) => StaticByteSized (ViaStaticGeneric t) where
   type StaticSize (ViaStaticGeneric t) = GStaticSize (Rep t)
   staticByteSize _ = gstaticByteSize (Proxy :: Proxy (Rep t))
 
@@ -88,7 +87,6 @@ instance (GStaticByteSized a, GStaticByteSized b) => GStaticByteSized (a :*: b) 
 instance (GStaticByteSized a) => GStaticByteSized (M1 i c a) where
   type GStaticSize (M1 i c a) = GStaticSize a
 
--- GHC BUG: KnownNat is not actually redundant
 instance (StaticByteSized a) => GStaticByteSized (K1 i a) where
   type GStaticSize (K1 i a) = StaticSize a
 

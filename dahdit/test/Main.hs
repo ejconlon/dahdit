@@ -3,8 +3,8 @@
 
 module Main (main) where
 
-import Control.Applicative (liftA2)
 import Control.Monad (replicateM, (>=>))
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
@@ -134,8 +134,8 @@ import Data.Primitive.ByteArray
   , MutableByteArray
   , byteArrayFromList
   , freezeByteArray
+  , getSizeofMutableByteArray
   , newByteArray
-  , sizeofMutableByteArray
   )
 import Data.Proxy (asProxyTypeOf)
 import Data.Sequence (Seq (..))
@@ -147,16 +147,9 @@ import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
-import System.IO.Unsafe (unsafePerformIO)
-import Test.Falsify.Generator (Gen)
-import qualified Test.Falsify.Generator as FG
-import qualified Test.Falsify.Predicate as FC
-import Test.Falsify.Property (Property)
-import qualified Test.Falsify.Property as FP
-import qualified Test.Falsify.Range as FR
-import Test.Tasty (TestTree, defaultMain, testGroup)
-import Test.Tasty.Falsify (testProperty)
-import Test.Tasty.HUnit (testCase, (@?=))
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
+import PropUnit (Gen, TestLimit, TestTree, forAll, testGroup, testMain, testProp, testUnit, (===))
 
 class (Eq z, Show z) => CaseTarget z where
   initSource :: [Word8] -> IO z
@@ -184,7 +177,7 @@ class MutCaseTarget u where
 
 instance MutCaseTarget (MutableByteArray RealWorld) where
   newSink = newByteArray . unByteCount
-  freezeSink u = fmap (\(ByteArray arr) -> BSS.unpack (SBS arr)) (freezeByteArray u 0 (sizeofMutableByteArray u))
+  freezeSink u = fmap (\(ByteArray arr) -> BSS.unpack (SBS arr)) (getSizeofMutableByteArray u >>= freezeByteArray u 0)
 
 instance MutCaseTarget (IOVector Word8) where
   newSink = VSM.new . unByteCount
@@ -211,136 +204,136 @@ data GetCase where
   GetCase :: (Show a, Eq a) => String -> Get a -> Maybe (ByteCount, ByteCount, a) -> [Word8] -> GetCase
 
 runGetCase :: (BinaryGetTarget z IO, CaseTarget z) => Proxy z -> GetCase -> TestTree
-runGetCase p (GetCase name getter mayRes buf) = testCase name $ do
-  src <- initSource buf
+runGetCase p (GetCase name getter mayRes buf) = testUnit name $ do
+  src <- liftIO (initSource buf)
   let totLen = coerce (length buf)
-  (result, actOff) <- getTarget getter (src `asProxyTypeOf` p)
+  (result, actOff) <- liftIO (getTarget getter (src `asProxyTypeOf` p))
   case (result, mayRes) of
     (Left _, Nothing) -> pure ()
     (Left err, Just (_, _, expecVal)) -> fail ("Got error <" ++ show err ++ ">, expected value <" ++ show expecVal ++ ">")
     (Right actVal, Nothing) -> fail ("Got value <" ++ show actVal ++ ">, expected error")
     (Right actVal, Just (expecOff, expecLeft, expecVal)) -> do
-      actVal @?= expecVal
-      actOff @?= expecOff
-      totLen - actOff @?= expecLeft
+      actVal === expecVal
+      actOff === expecOff
+      totLen - actOff === expecLeft
 
 data PutCase where
   PutCase :: String -> Put -> [Word8] -> PutCase
 
 runPutCase :: (BinaryPutTarget z IO, CaseTarget z) => Proxy z -> PutCase -> TestTree
-runPutCase p (PutCase name putter expecBs) = testCase name $ do
+runPutCase p (PutCase name putter expecBs) = testUnit name $ do
   let expecBc = coerce (length expecBs)
       estBc = runCount putter
-  estBc @?= expecBc
-  actSink <- putTargetUnsafe putter expecBc
-  actBs <- consumeSink (actSink `asProxyTypeOf` p)
+  estBc === expecBc
+  actSink <- liftIO (putTargetUnsafe putter expecBc)
+  actBs <- liftIO (consumeSink (actSink `asProxyTypeOf` p))
   let actBc = coerce (length actBs)
-  actBs @?= expecBs
-  actBc @?= expecBc
+  actBs === expecBs
+  actBc === expecBc
 
 mutRunPutCase :: (MutBinaryPutTarget z IO, MutCaseTarget z) => Proxy z -> PutCase -> TestTree
-mutRunPutCase p (PutCase name putter expecBs) = testCase name $ do
+mutRunPutCase p (PutCase name putter expecBs) = testUnit name $ do
   let expecBc = coerce (length expecBs)
-  actSink <- fmap (`asProxyTypeOf` p) (newSink expecBc)
-  endOff <- mutPutTarget putter actSink
-  endOff @?= expecBc
-  actBs <- freezeSink actSink
+  actSink <- liftIO (fmap (`asProxyTypeOf` p) (newSink expecBc))
+  endOff <- liftIO (mutPutTarget putter actSink)
+  endOff === expecBc
+  actBs <- liftIO (freezeSink actSink)
   let actBc = coerce (length actBs)
-  actBs @?= expecBs
-  actBc @?= expecBc
+  actBs === expecBs
+  actBc === expecBc
 
 testByteSize :: TestTree
 testByteSize =
   testGroup
     "byteSize"
-    [ testCase "Word8" (byteSize @Word8 0 @?= 1)
-    , testCase "Int8" (byteSize @Int8 0 @?= 1)
-    , testCase "Word16" (byteSize @Word16 0 @?= 2)
-    , testCase "Int16" (byteSize @Int16 0 @?= 2)
-    , testCase "Word24" (byteSize @Word24 0 @?= 3)
-    , testCase "Int24" (byteSize @Int24 0 @?= 3)
-    , testCase "Word32" (byteSize @Word32 0 @?= 4)
-    , testCase "Int32" (byteSize @Int32 0 @?= 4)
-    , testCase "Word64" (byteSize @Word64 0 @?= 8)
-    , testCase "Int64" (byteSize @Int64 0 @?= 8)
-    , testCase "Float" (byteSize @Float 0 @?= 4)
-    , testCase "Double" (byteSize @Double 0 @?= 8)
-    , testCase "()" (byteSize @() () @?= 0)
-    , testCase "Bool" (byteSize @Bool False @?= 1)
-    , testCase "Char" (byteSize @Char 'a' @?= 1)
-    , testCase "Int" (byteSize @Int 0 @?= 8)
-    , testCase "Word16LE" (byteSize @Word16LE 0 @?= 2)
-    , testCase "Int16LE" (byteSize @Int16LE 0 @?= 2)
-    , testCase "Word24LE" (byteSize @Word24LE 0 @?= 3)
-    , testCase "Int24LE" (byteSize @Int24LE 0 @?= 3)
-    , testCase "Word32LE" (byteSize @Word32LE 0 @?= 4)
-    , testCase "Int32LE" (byteSize @Int32LE 0 @?= 4)
-    , testCase "Word64LE" (byteSize @Word64LE 0 @?= 8)
-    , testCase "Int64LE" (byteSize @Int64LE 0 @?= 8)
-    , testCase "FloatLE" (byteSize (FloatLE (castWord32ToFloat 0)) @?= 4)
-    , testCase "DoubleLE" (byteSize (DoubleLE (castWord64ToDouble 0)) @?= 8)
-    , testCase "Word16BE" (byteSize @Word16BE 0 @?= 2)
-    , testCase "Int16BE" (byteSize @Int16BE 0 @?= 2)
-    , testCase "Word24BE" (byteSize @Word24BE 0 @?= 3)
-    , testCase "Int24BE" (byteSize @Int24BE 0 @?= 3)
-    , testCase "Word32BE" (byteSize @Word32BE 0 @?= 4)
-    , testCase "Int32BE" (byteSize @Int32BE 0 @?= 4)
-    , testCase "Word64BE" (byteSize @Word64BE 0 @?= 8)
-    , testCase "Int64BE" (byteSize @Int64BE 0 @?= 8)
-    , testCase "FloatBE" (byteSize (FloatBE (castWord32ToFloat 0)) @?= 4)
-    , testCase "DoubleBE" (byteSize (DoubleBE (castWord64ToDouble 0)) @?= 8)
-    , testCase "DynFoo" (byteSize (DynFoo 0xBB 0x5DEC) @?= 3)
-    , testCase "StaFoo" (byteSize (StaFoo 0xBB 0x5DEC) @?= 3)
-    , testCase "StaBytes" (byteSize (mkStaBytes "hi") @?= 2)
-    , testCase "StaBytes (less)" (byteSize (mkStaBytes "h") @?= 2)
-    , testCase "StaBytes (more)" (byteSize (mkStaBytes "hi!") @?= 2)
-    , testCase "TagFoo (one)" (byteSize (TagFooOne 7) @?= 2)
-    , testCase "TagFoo (two)" (byteSize (TagFooTwo 7) @?= 3)
+    [ testUnit "Word8" (byteSize @Word8 0 === 1)
+    , testUnit "Int8" (byteSize @Int8 0 === 1)
+    , testUnit "Word16" (byteSize @Word16 0 === 2)
+    , testUnit "Int16" (byteSize @Int16 0 === 2)
+    , testUnit "Word24" (byteSize @Word24 0 === 3)
+    , testUnit "Int24" (byteSize @Int24 0 === 3)
+    , testUnit "Word32" (byteSize @Word32 0 === 4)
+    , testUnit "Int32" (byteSize @Int32 0 === 4)
+    , testUnit "Word64" (byteSize @Word64 0 === 8)
+    , testUnit "Int64" (byteSize @Int64 0 === 8)
+    , testUnit "Float" (byteSize @Float 0 === 4)
+    , testUnit "Double" (byteSize @Double 0 === 8)
+    , testUnit "()" (byteSize @() () === 0)
+    , testUnit "Bool" (byteSize @Bool False === 1)
+    , testUnit "Char" (byteSize @Char 'a' === 1)
+    , testUnit "Int" (byteSize @Int 0 === 8)
+    , testUnit "Word16LE" (byteSize @Word16LE 0 === 2)
+    , testUnit "Int16LE" (byteSize @Int16LE 0 === 2)
+    , testUnit "Word24LE" (byteSize @Word24LE 0 === 3)
+    , testUnit "Int24LE" (byteSize @Int24LE 0 === 3)
+    , testUnit "Word32LE" (byteSize @Word32LE 0 === 4)
+    , testUnit "Int32LE" (byteSize @Int32LE 0 === 4)
+    , testUnit "Word64LE" (byteSize @Word64LE 0 === 8)
+    , testUnit "Int64LE" (byteSize @Int64LE 0 === 8)
+    , testUnit "FloatLE" (byteSize (FloatLE (castWord32ToFloat 0)) === 4)
+    , testUnit "DoubleLE" (byteSize (DoubleLE (castWord64ToDouble 0)) === 8)
+    , testUnit "Word16BE" (byteSize @Word16BE 0 === 2)
+    , testUnit "Int16BE" (byteSize @Int16BE 0 === 2)
+    , testUnit "Word24BE" (byteSize @Word24BE 0 === 3)
+    , testUnit "Int24BE" (byteSize @Int24BE 0 === 3)
+    , testUnit "Word32BE" (byteSize @Word32BE 0 === 4)
+    , testUnit "Int32BE" (byteSize @Int32BE 0 === 4)
+    , testUnit "Word64BE" (byteSize @Word64BE 0 === 8)
+    , testUnit "Int64BE" (byteSize @Int64BE 0 === 8)
+    , testUnit "FloatBE" (byteSize (FloatBE (castWord32ToFloat 0)) === 4)
+    , testUnit "DoubleBE" (byteSize (DoubleBE (castWord64ToDouble 0)) === 8)
+    , testUnit "DynFoo" (byteSize (DynFoo 0xBB 0x5DEC) === 3)
+    , testUnit "StaFoo" (byteSize (StaFoo 0xBB 0x5DEC) === 3)
+    , testUnit "StaBytes" (byteSize (mkStaBytes "hi") === 2)
+    , testUnit "StaBytes (less)" (byteSize (mkStaBytes "h") === 2)
+    , testUnit "StaBytes (more)" (byteSize (mkStaBytes "hi!") === 2)
+    , testUnit "TagFoo (one)" (byteSize (TagFooOne 7) === 2)
+    , testUnit "TagFoo (two)" (byteSize (TagFooTwo 7) === 3)
     ]
 
 testStaticByteSize :: TestTree
 testStaticByteSize =
   testGroup
     "staticByteSize"
-    [ testCase "Word8" (staticByteSize @Word8 Proxy @?= 1)
-    , testCase "Int8" (staticByteSize @Int8 Proxy @?= 1)
-    , testCase "Word16" (staticByteSize @Word16 Proxy @?= 2)
-    , testCase "Int16" (staticByteSize @Int16 Proxy @?= 2)
-    , testCase "Word24" (staticByteSize @Word24 Proxy @?= 3)
-    , testCase "Int24" (staticByteSize @Int24 Proxy @?= 3)
-    , testCase "Word32" (staticByteSize @Word32 Proxy @?= 4)
-    , testCase "Int32" (staticByteSize @Int32 Proxy @?= 4)
-    , testCase "Word64" (staticByteSize @Word64 Proxy @?= 8)
-    , testCase "Int64" (staticByteSize @Int64 Proxy @?= 8)
-    , testCase "Float" (staticByteSize @Float Proxy @?= 4)
-    , testCase "Double" (staticByteSize @Double Proxy @?= 8)
-    , testCase "()" (staticByteSize @() Proxy @?= 0)
-    , testCase "Bool" (staticByteSize @Bool Proxy @?= 1)
-    , testCase "Char" (staticByteSize @Char Proxy @?= 1)
-    , testCase "Int" (staticByteSize @Int Proxy @?= 8)
-    , testCase "Word16LE" (staticByteSize @Word16LE Proxy @?= 2)
-    , testCase "Int16LE" (staticByteSize @Int16LE Proxy @?= 2)
-    , testCase "Word24LE" (staticByteSize @Word24LE Proxy @?= 3)
-    , testCase "Int24LE" (staticByteSize @Int24LE Proxy @?= 3)
-    , testCase "Word32LE" (staticByteSize @Word32LE Proxy @?= 4)
-    , testCase "Int32LE" (staticByteSize @Int32LE Proxy @?= 4)
-    , testCase "Word64LE" (staticByteSize @Word64LE Proxy @?= 8)
-    , testCase "Int64LE" (staticByteSize @Int64LE Proxy @?= 8)
-    , testCase "FloatLE" (staticByteSize @FloatLE Proxy @?= 4)
-    , testCase "DoubleLE" (staticByteSize @DoubleLE Proxy @?= 8)
-    , testCase "Word16BE" (staticByteSize @Word16BE Proxy @?= 2)
-    , testCase "Int16BE" (staticByteSize @Int16BE Proxy @?= 2)
-    , testCase "Word24BE" (staticByteSize @Word24BE Proxy @?= 3)
-    , testCase "Int24BE" (staticByteSize @Int24BE Proxy @?= 3)
-    , testCase "Word32BE" (staticByteSize @Word32BE Proxy @?= 4)
-    , testCase "Int32BE" (staticByteSize @Int32BE Proxy @?= 4)
-    , testCase "Word64BE" (staticByteSize @Word64BE Proxy @?= 8)
-    , testCase "Int64BE" (staticByteSize @Int64BE Proxy @?= 8)
-    , testCase "FloatBE" (staticByteSize @FloatBE Proxy @?= 4)
-    , testCase "DoubleBE" (staticByteSize @DoubleBE Proxy @?= 8)
-    , testCase "StaFoo" (staticByteSize @StaFoo Proxy @?= 3)
-    , testCase "BoolByte" (staticByteSize @BoolByte Proxy @?= 1)
-    , testCase "StaBytes" (staticByteSize @StaBytes Proxy @?= 2)
+    [ testUnit "Word8" (staticByteSize @Word8 Proxy === 1)
+    , testUnit "Int8" (staticByteSize @Int8 Proxy === 1)
+    , testUnit "Word16" (staticByteSize @Word16 Proxy === 2)
+    , testUnit "Int16" (staticByteSize @Int16 Proxy === 2)
+    , testUnit "Word24" (staticByteSize @Word24 Proxy === 3)
+    , testUnit "Int24" (staticByteSize @Int24 Proxy === 3)
+    , testUnit "Word32" (staticByteSize @Word32 Proxy === 4)
+    , testUnit "Int32" (staticByteSize @Int32 Proxy === 4)
+    , testUnit "Word64" (staticByteSize @Word64 Proxy === 8)
+    , testUnit "Int64" (staticByteSize @Int64 Proxy === 8)
+    , testUnit "Float" (staticByteSize @Float Proxy === 4)
+    , testUnit "Double" (staticByteSize @Double Proxy === 8)
+    , testUnit "()" (staticByteSize @() Proxy === 0)
+    , testUnit "Bool" (staticByteSize @Bool Proxy === 1)
+    , testUnit "Char" (staticByteSize @Char Proxy === 1)
+    , testUnit "Int" (staticByteSize @Int Proxy === 8)
+    , testUnit "Word16LE" (staticByteSize @Word16LE Proxy === 2)
+    , testUnit "Int16LE" (staticByteSize @Int16LE Proxy === 2)
+    , testUnit "Word24LE" (staticByteSize @Word24LE Proxy === 3)
+    , testUnit "Int24LE" (staticByteSize @Int24LE Proxy === 3)
+    , testUnit "Word32LE" (staticByteSize @Word32LE Proxy === 4)
+    , testUnit "Int32LE" (staticByteSize @Int32LE Proxy === 4)
+    , testUnit "Word64LE" (staticByteSize @Word64LE Proxy === 8)
+    , testUnit "Int64LE" (staticByteSize @Int64LE Proxy === 8)
+    , testUnit "FloatLE" (staticByteSize @FloatLE Proxy === 4)
+    , testUnit "DoubleLE" (staticByteSize @DoubleLE Proxy === 8)
+    , testUnit "Word16BE" (staticByteSize @Word16BE Proxy === 2)
+    , testUnit "Int16BE" (staticByteSize @Int16BE Proxy === 2)
+    , testUnit "Word24BE" (staticByteSize @Word24BE Proxy === 3)
+    , testUnit "Int24BE" (staticByteSize @Int24BE Proxy === 3)
+    , testUnit "Word32BE" (staticByteSize @Word32BE Proxy === 4)
+    , testUnit "Int32BE" (staticByteSize @Int32BE Proxy === 4)
+    , testUnit "Word64BE" (staticByteSize @Word64BE Proxy === 8)
+    , testUnit "Int64BE" (staticByteSize @Int64BE Proxy === 8)
+    , testUnit "FloatBE" (staticByteSize @FloatBE Proxy === 4)
+    , testUnit "DoubleBE" (staticByteSize @DoubleBE Proxy === 8)
+    , testUnit "StaFoo" (staticByteSize @StaFoo Proxy === 3)
+    , testUnit "BoolByte" (staticByteSize @BoolByte Proxy === 1)
+    , testUnit "StaBytes" (staticByteSize @StaBytes Proxy === 2)
     ]
 
 getCases :: [GetCase]
@@ -530,25 +523,25 @@ testPut :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testPut n p = testGroup ("put (" ++ n ++ ")") (fmap (runPutCase p) putCases)
 
 testLiftedPrimArray :: TestTree
-testLiftedPrimArray = testCase "liftedPrimArray" $ do
+testLiftedPrimArray = testUnit "liftedPrimArray" $ do
   let arr = LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]) :: LiftedPrimArray Word16LE
-  liftedPrimArrayFromList [0xFD, 0x6E, 0xEC] @?= arr
-  sizeofLiftedPrimArray arr @?= 6
-  lengthLiftedPrimArray arr @?= 3
+  liftedPrimArrayFromList [0xFD, 0x6E, 0xEC] === arr
+  sizeofLiftedPrimArray arr === 6
+  lengthLiftedPrimArray arr === 3
 
 testGetOffset :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
-testGetOffset n p = testCase ("get offset (" ++ n ++ ")") $ do
+testGetOffset n p = testUnit ("get offset (" ++ n ++ ")") $ do
   let buf = [0x12, 0x34, 0x56, 0x78]
-  src <- initSource buf
-  (ez1, c1) <- getTargetOffset 0 getWord8 (src `asProxyTypeOf` p)
-  ez1 @?= Right 0x12
-  c1 @?= 1
-  (ez2, c2) <- getTargetOffset 1 getWord16LE src
-  ez2 @?= Right 0x5634
-  c2 @?= 3
-  (ez3, c3) <- getTargetOffset 3 getWord16LE src
-  ez3 @?= Left (GetErrorGlobalCap "Word16LE" 1 2)
-  c3 @?= 3
+  src <- liftIO (initSource buf)
+  (ez1, c1) <- liftIO (getTargetOffset 0 getWord8 (src `asProxyTypeOf` p))
+  ez1 === Right 0x12
+  c1 === 1
+  (ez2, c2) <- liftIO (getTargetOffset 1 getWord16LE src)
+  ez2 === Right 0x5634
+  c2 === 3
+  (ez3, c3) <- liftIO (getTargetOffset 3 getWord16LE src)
+  ez3 === Left (GetErrorGlobalCap "Word16LE" 1 2)
+  c3 === 3
 
 data WordX
   = WordX8 !Word8
@@ -575,11 +568,11 @@ instance Binary WordX where
     WordX32 w -> put @Word8 4 >> put w
 
 wordXGen :: Gen WordX
-wordXGen = FG.choose gen8 (FG.choose gen16 gen32)
+wordXGen = Gen.choice [gen8, gen16, gen32]
  where
-  gen8 = fmap WordX8 (FG.inRange (FR.between (0, maxBound)))
-  gen16 = fmap (WordX16 . Word16LE) (FG.inRange (FR.between (0, maxBound)))
-  gen32 = fmap (WordX32 . Word32LE) (FG.inRange (FR.between (0, maxBound)))
+  gen8 = fmap WordX8 (Gen.integral (Range.constant 0 maxBound))
+  gen16 = fmap (WordX16 . Word16LE) (Gen.integral (Range.constant 0 maxBound))
+  gen32 = fmap (WordX32 . Word32LE) (Gen.integral (Range.constant 0 maxBound))
 
 takeDiff
   :: (CaseTarget z) => z -> ByteCount -> ByteCount -> ByteCount -> [ByteCount] -> IO ([ByteCount], (ByteCount, z))
@@ -591,32 +584,26 @@ takeDiff z pos had diff = go 0
       zz <- sliceBuffer z pos (had + acc)
       pure (ys, (acc, zz))
 
-assertEq :: (Eq a, Show a) => a -> a -> Property ()
-assertEq x y = FP.assert (FC.eq FC..$ ("LHS", x) FC..$ ("RHS", y))
-
-hackLiftIO :: IO a -> Property a
-hackLiftIO = pure . unsafePerformIO
-
-testGetInc :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
-testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
+testGetInc :: (BinaryPutTarget z IO, CaseTarget z) => TestLimit -> String -> Proxy z -> TestTree
+testGetInc lim n p = testProp ("get inc (" ++ n ++ ")") lim $ do
   -- Generate some random elements
-  numElems <- FP.gen @Int (FG.inRange (FR.between (0, 20)))
-  xs <- FP.gen (replicateM numElems wordXGen)
+  numElems <- forAll (Gen.integral (Range.constant 0 20))
+  xs <- forAll (replicateM numElems wordXGen)
   -- First some sanity checks that encode/decode work
-  assertEq (length xs) numElems
-  wholeBuf <- hackLiftIO (encode xs)
-  (exs, totLen) <- hackLiftIO (decodeEnd (wholeBuf `asProxyTypeOf` p))
+  length xs === numElems
+  wholeBuf <- liftIO (encode xs)
+  (exs, totLen) <- liftIO (decodeEnd (wholeBuf `asProxyTypeOf` p))
   case exs of
     Left err -> fail (show err)
     Right xs' -> do
-      assertEq xs' xs
-      assertEq totLen (byteSize xs)
-  wholeBuf' <- hackLiftIO (sliceBuffer wholeBuf 0 totLen)
-  assertEq wholeBuf' wholeBuf
+      xs' === xs
+      totLen === byteSize xs
+  wholeBuf' <- liftIO (sliceBuffer wholeBuf 0 totLen)
+  wholeBuf' === wholeBuf
   -- Shuffle list to come up with splits and test incremental
-  ys <- FP.gen (FG.shuffle (8 : fmap byteSize xs))
-  ysRef <- hackLiftIO (newIORef ys)
-  sentRef <- hackLiftIO (newIORef 0)
+  ys <- forAll (Gen.shuffle (8 : fmap byteSize xs))
+  ysRef <- liftIO (newIORef ys)
+  sentRef <- liftIO (newIORef 0)
   let cb (GetIncRequest pos _ len) = do
         sent <- readIORef sentRef
         let had = sent - pos
@@ -629,35 +616,35 @@ testGetInc n p = testProperty ("get inc (" ++ n ++ ")") $ do
           if bufLen == 0
             then Nothing
             else Just (buf `asProxyTypeOf` p)
-  (ezs, totLen', _) <- hackLiftIO (decodeInc (Just totLen) cb)
+  (ezs, totLen', _) <- liftIO (decodeInc (Just totLen) cb)
   case ezs of
     Left err -> fail (show err)
     Right zs -> do
-      assertEq zs xs
-      assertEq totLen' totLen
+      zs === xs
+      totLen' === totLen
 
 testMutPut :: (MutBinaryPutTarget z IO, MutCaseTarget z) => String -> Proxy z -> TestTree
 testMutPut n p = testGroup ("mut put (" ++ n ++ ")") (fmap (mutRunPutCase p) putCases)
 
 testMutPutOffset :: (MutBinaryPutTarget z IO, MutCaseTarget z) => String -> Proxy z -> TestTree
-testMutPutOffset n p = testCase ("mut put offset (" ++ n ++ ")") $ do
-  u <- newSink 4
-  c1 <- mutPutTargetOffset 0 (putWord8 0x12) u
-  c1 @?= 1
-  c2 <- mutPutTargetOffset 1 (putWord16LE 0x5634) u
-  c2 @?= 3
-  x <- freezeSink (u `asProxyTypeOf` p)
-  take 3 x @?= [0x12, 0x34, 0x56]
+testMutPutOffset n p = testUnit ("mut put offset (" ++ n ++ ")") $ do
+  u <- liftIO (newSink 4)
+  c1 <- liftIO (mutPutTargetOffset 0 (putWord8 0x12) u)
+  c1 === 1
+  c2 <- liftIO (mutPutTargetOffset 1 (putWord16LE 0x5634) u)
+  c2 === 3
+  x <- liftIO (freezeSink (u `asProxyTypeOf` p))
+  take 3 x === [0x12, 0x34, 0x56]
   -- Use this opportunity to test getting
-  (w, h) <- getTarget (liftA2 (,) (get @Word8) (get @Word16LE)) u
-  w @?= Right (0x12, 0x5634)
-  h @?= 3
-  (y, i) <- getTargetOffset 0 (get @Word8) u
-  y @?= Right 0x12
-  i @?= 1
-  (z, j) <- getTargetOffset 1 (get @Word16LE) u
-  z @?= Right 0x5634
-  j @?= 3
+  (w, h) <- liftIO (getTarget (liftA2 (,) (get @Word8) (get @Word16LE)) u)
+  w === Right (0x12, 0x5634)
+  h === 3
+  (y, i) <- liftIO (getTargetOffset 0 (get @Word8) u)
+  y === Right 0x12
+  i === 1
+  (z, j) <- liftIO (getTargetOffset 1 (get @Word16LE) u)
+  z === Right 0x5634
+  j === 3
 
 data TargetDef where
   TargetDef :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TargetDef
@@ -678,8 +665,8 @@ mutTargets =
   , MutTargetDef "IOVector" (Proxy :: Proxy (IOVector Word8))
   ]
 
-testDahdit :: TestTree
-testDahdit = testGroup "Dahdit" trees
+testDahdit :: TestLimit -> TestTree
+testDahdit lim = testGroup "Dahdit" trees
  where
   trees = baseTrees ++ targetTrees ++ mutTargetTrees
   baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray]
@@ -687,7 +674,7 @@ testDahdit = testGroup "Dahdit" trees
     targets >>= \(TargetDef name prox) ->
       [ testGet name prox
       , testGetOffset name prox
-      , testGetInc name prox
+      , testGetInc lim name prox
       , testPut name prox
       ]
   mutTargetTrees =
@@ -697,4 +684,4 @@ testDahdit = testGroup "Dahdit" trees
       ]
 
 main :: IO ()
-main = defaultMain testDahdit
+main = testMain testDahdit

@@ -2,6 +2,7 @@
 
 module Main (main) where
 
+import Control.Monad.IO.Class (MonadIO)
 import Dahdit (Binary (..), ByteCount (..), GetError, StaticByteSized, decodeFileEnd)
 import Dahdit.Midi.Binary
   ( MidiInt14
@@ -18,15 +19,15 @@ import Data.ByteString.Char8 qualified as BSC
 import Data.Proxy (Proxy (..))
 import Data.Sequence qualified as Seq
 import Data.Word (Word8)
+import PropUnit (MonadTest, PropertyT, testGroup, testMain)
 import System.Directory (listDirectory)
 import System.FilePath (takeExtension, (</>))
 import Test.Dahdit.Daytripper (expectBytes, expectCodecErr, expectCodecOk, expectStatic)
 import Test.Dahdit.Midi.GenDefault (genDefaultI)
-import Test.Daytripper (Expect, MonadExpect, RT, mkFileRT, mkPropRT, mkUnitRT, testRT)
-import Test.Tasty (TestTree, defaultMain, testGroup)
+import Test.Daytripper (Expect, RT, mkFileRT, mkPropRT, mkUnitRT, testRT)
 
 expectStaticOk
-  :: (MonadExpect m, Binary a, Eq a, Show a, StaticByteSized a) => Expect m a ByteString (Either GetError a)
+  :: (MonadTest m, MonadIO m, Binary a, Eq a, Show a, StaticByteSized a) => Expect m a ByteString (Either GetError a)
 expectStaticOk = expectStatic expectCodecOk
 
 genCases :: [RT]
@@ -71,9 +72,6 @@ genCases =
   , mkPropRT "Packet" expectCodecOk (genDefaultI @MO.Packet)
   ]
 
-testGenCases :: TestTree
-testGenCases = testGroup "Gen" (fmap testRT genCases)
-
 findFiles :: IO [FilePath]
 findFiles = do
   let tdDir = "testdata"
@@ -90,7 +88,7 @@ shouldFail fn =
   let xs = fmap (\p -> BSC.pack ("/test-" ++ p ++ "-")) ["illegal", "non-midi", "corrupt"]
   in  any (`BSC.isInfixOf` BSC.pack fn) xs
 
-suiteFileExpect :: (Binary a, Eq a, Show a) => FilePath -> Expect IO a ByteString (Either GetError a)
+suiteFileExpect :: (Binary a, Eq a, Show a) => FilePath -> Expect (PropertyT IO) a ByteString (Either GetError a)
 suiteFileExpect fn =
   if shouldFail fn
     then expectCodecErr
@@ -127,12 +125,13 @@ main :: IO ()
 main = do
   files <- findFiles
   fileCases <- traverse suiteFileRT files
-  let testFileCases = testGroup "File" (fmap testRT fileCases)
-      testUnitCases = testGroup "Unit" (fmap testRT unitCases)
-  defaultMain $
-    testGroup
-      "Midiot"
-      [ testGenCases
-      , testUnitCases
-      , testFileCases
-      ]
+  testMain $ \lim ->
+    let testGenCases = testGroup "Gen" (fmap (testRT lim) genCases)
+        testFileCases = testGroup "File" (fmap (testRT lim) fileCases)
+        testUnitCases = testGroup "Unit" (fmap (testRT lim) unitCases)
+    in  testGroup
+          "dahdit-midi"
+          [ testGenCases
+          , testUnitCases
+          , testFileCases
+          ]
