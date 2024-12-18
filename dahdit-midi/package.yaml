@@ -1,5 +1,5 @@
 name: dahdit-midi
-version: 0.6.0
+version: 0.7.0
 
 github: ejconlon/dahdit
 license: BSD3
@@ -17,7 +17,7 @@ extra-source-files:
 
 dependencies:
 - base >= 4.12 && < 5
-- dahdit >= 0.6 && < 0.7
+- dahdit >= 0.7 && < 0.8
 - bytestring >= 0.11 && < 0.13
 - containers >= 0.6 && < 0.7
 - data-sword >= 0.2.0.3 && < 0.3
@@ -79,8 +79,7 @@ tests:
     dependencies:
     - dahdit-midi
     - dahdit-test
-    - daytripper >= 0.4 && < 0.5
-    - prop-unit >= 0.2 && < 0.3
-    - hedgehog >= 1.5 && < 1.6
+    - daytripper >= 1.0 && < 1.1
+    - prop-unit >= 1.0.1 && < 1.1
     - directory
     - filepath

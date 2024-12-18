@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           dahdit-midi
-version:        0.6.0
+version:        0.7.0
 synopsis:       MIDI and OSC parsing/printing with dahdit
 description:    Please see the README on GitHub at <https://github.com/ejconlon/dahdit#readme>
 homepage:       https://github.com/ejconlon/dahdit#readme
@@ -66,7 +66,7 @@ library
       base >=4.12 && <5
     , bytestring >=0.11 && <0.13
     , containers ==0.6.*
-    , dahdit ==0.6.*
+    , dahdit ==0.7.*
     , data-sword >=0.2.0.3 && <0.3
     , hashable ==1.4.*
     , nanotime ==0.3.*
@@ -115,19 +115,18 @@ test-suite dahdit-midi-test
       base >=4.12 && <5
     , bytestring >=0.11 && <0.13
     , containers ==0.6.*
-    , dahdit ==0.6.*
+    , dahdit ==0.7.*
     , dahdit-midi
     , dahdit-test
     , data-sword >=0.2.0.3 && <0.3
-    , daytripper ==0.4.*
+    , daytripper ==1.0.*
     , directory
     , filepath
     , hashable ==1.4.*
-    , hedgehog ==1.5.*
     , nanotime ==0.3.*
     , newtype ==0.2.*
     , primitive >=0.7 && <0.10
-    , prop-unit ==0.2.*
+    , prop-unit >=1.0.1 && <1.1
     , text >=1.2 && <2.2
     , vector >=0.12 && <0.14
   default-language: GHC2021

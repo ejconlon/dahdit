@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           dahdit-network
-version:        0.6.0
+version:        0.7.0
 synopsis:       Network protocol helpers for Dahdit
 description:    Please see the README on GitHub at <https://github.com/ejconlon/dahdit#readme>
 homepage:       https://github.com/ejconlon/dahdit#readme
@@ -60,7 +60,7 @@ library
   build-depends:
       base >=4.12 && <5
     , bytestring >=0.11 && <0.13
-    , dahdit ==0.6.*
+    , dahdit ==0.7.*
     , network >=3.1 && <3.3
     , resourcet >=1.2 && <1.4
     , unliftio-core ==0.2.*
@@ -103,7 +103,7 @@ test-suite dahdit-network-test
       async ==2.2.*
     , base >=4.12 && <5
     , bytestring >=0.11 && <0.13
-    , dahdit ==0.6.*
+    , dahdit ==0.7.*
     , dahdit-network
     , network >=3.1 && <3.3
     , resourcet >=1.2 && <1.4

@@ -12,19 +12,19 @@ packages:
   original:
     hackage: data-sword-0.2.0.3
 - completed:
-    hackage: daytripper-0.4.0@sha256:e0c26f81ba199aebe6df4c08f09c8316ec2cd32614ba74032a12b758640872cd,3038
+    hackage: daytripper-1.0.0@sha256:ad21982bd08e4d5f542ed81020d34c4f0e8ff628b7e559a542c549ac7bbcb2c4,3031
     pantry-tree:
-      sha256: 71d0f7be3e9273ee3ab474735d49ef1206db5d6fa026591c0f13c77b8cb632d1
+      sha256: c850279a8bd2fa79fc9da7021bc8e11dc403ea231f169da249dc318299a5c7be
       size: 225
   original:
-    hackage: daytripper-0.4.0
+    hackage: daytripper-1.0.0
 - completed:
-    hackage: prop-unit-0.2.0@sha256:a2cfe8027343565ba577e3ea4c978b18c376e946cb304f39ebeff2c373af4598,2957
+    hackage: prop-unit-1.0.1@sha256:db1fdcc30294c15beff28cc62a5baf34a9d217bea3f3fa49720b406f3fc4e94b,3035
     pantry-tree:
-      sha256: b0f2b5ded48abfcb3aad0e8d0c9ea39c5117e286a0a163cd14dfb804d80a9eed
-      size: 264
+      sha256: 84c321efc37e92481c584086a5b85967b991ee5bb17b3db856221d6eef8480b1
+      size: 466
   original:
-    hackage: prop-unit-0.2.0
+    hackage: prop-unit-1.0.1
 - completed:
     hackage: nanotime-0.3.2@sha256:fe49cf850141904340401d1af79a1685009cfd7b615f8cbe3ae45105db535db6,2827
     pantry-tree:

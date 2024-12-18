@@ -1,5 +1,5 @@
 name:                dahdit
-version:             0.6.0
+version:             0.7.0
 github:              "ejconlon/dahdit"
 license:             BSD3
 author:              "Eric Conlon"
@@ -81,5 +81,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - dahdit
-    - hedgehog >= 1.5 && < 1.6
-    - prop-unit >= 0.2 && < 0.3
+    - prop-unit >= 1.0.1 && < 1.1

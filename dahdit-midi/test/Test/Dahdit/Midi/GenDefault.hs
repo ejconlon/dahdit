@@ -14,11 +14,10 @@ import Data.ByteString.Short qualified as BSS
 import Data.List.NonEmpty qualified as NE
 import Data.Proxy (Proxy (..))
 import Data.Text qualified as T
-import Hedgehog (Gen)
-import Hedgehog.Gen qualified as Gen
-import Hedgehog.Range qualified as Range
 import Nanotime (NtpTime (..))
-import PropUnit (GenDefault (..), genDefaultEnum, genDefaultGeneric)
+import PropUnit (Gen, GenDefault (..), genDefaultEnum, genDefaultGeneric)
+import PropUnit.Hedgehog.Gen qualified as Gen
+import PropUnit.Hedgehog.Range qualified as Range
 import Test.Dahdit.GenDefault
   ( DahditTag
   , genFractional

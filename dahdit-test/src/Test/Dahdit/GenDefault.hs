@@ -61,10 +61,9 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeLits (KnownNat, natVal)
-import Hedgehog (Gen)
-import Hedgehog.Gen qualified as Gen
-import Hedgehog.Range qualified as Range
-import PropUnit (GenDefault (..), genDefaultGeneric)
+import PropUnit (Gen, GenDefault (..), genDefaultGeneric)
+import PropUnit.Hedgehog.Gen qualified as Gen
+import PropUnit.Hedgehog.Range qualified as Range
 
 genPrintableChar :: Gen Char
 genPrintableChar = fmap w2c (Gen.integral (Range.constant 32 126))

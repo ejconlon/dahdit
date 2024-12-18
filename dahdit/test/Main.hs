@@ -147,9 +147,9 @@ import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
 import PropUnit (Gen, TestLimit, TestTree, forAll, testGroup, testMain, testProp, testUnit, (===))
+import qualified PropUnit.Hedgehog.Gen as Gen
+import qualified PropUnit.Hedgehog.Range as Range
 
 class (Eq z, Show z) => CaseTarget z where
   initSource :: [Word8] -> IO z

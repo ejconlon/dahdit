@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           dahdit
-version:        0.6.0
+version:        0.7.0
 synopsis:       Binary parsing and serialization with integrated size
 description:    Please see the README on GitHub at <https://github.com/ejconlon/dahdit#readme>
 category:       Data
@@ -132,10 +132,9 @@ test-suite dahdit-test
     , data-sword ==0.2.*
     , free >=5.1 && <5.3
     , ghc-typelits-knownnat ==0.7.*
-    , hedgehog ==1.5.*
     , mtl >=2.2 && <2.4
     , primitive >=0.7 && <0.10
-    , prop-unit ==0.2.*
+    , prop-unit >=1.0.1 && <1.1
     , text >=1.2 && <2.2
     , transformers >=0.5 && <0.7
     , vector >=0.12 && <0.14

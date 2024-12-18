@@ -41,7 +41,7 @@ main =
   daytripperMain $ \lim ->
     testGroup "DahditTest" $
       fmap
-        (testRT lim)
+        (testRT (Just lim))
         [ mkPropRT "DynFoo prop" expectCodecOk (genDefaultI @DynFoo)
         , mkUnitRT "DynFoo unit" (expectBytes [1, 2, 0] expectCodecOk) (DynFoo 1 2)
         , mkFileRT "DynFoo file" expectCodecOk "testdata/dynfoo.bin" (Just (DynFoo 1 2))

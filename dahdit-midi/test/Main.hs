@@ -19,7 +19,7 @@ import Data.ByteString.Char8 qualified as BSC
 import Data.Proxy (Proxy (..))
 import Data.Sequence qualified as Seq
 import Data.Word (Word8)
-import PropUnit (MonadTest, PropertyT, testGroup, testMain)
+import PropUnit (MonadTest, testGroup, testMain)
 import System.Directory (listDirectory)
 import System.FilePath (takeExtension, (</>))
 import Test.Dahdit.Daytripper (expectBytes, expectCodecErr, expectCodecOk, expectStatic)
@@ -88,7 +88,8 @@ shouldFail fn =
   let xs = fmap (\p -> BSC.pack ("/test-" ++ p ++ "-")) ["illegal", "non-midi", "corrupt"]
   in  any (`BSC.isInfixOf` BSC.pack fn) xs
 
-suiteFileExpect :: (Binary a, Eq a, Show a) => FilePath -> Expect (PropertyT IO) a ByteString (Either GetError a)
+suiteFileExpect
+  :: (Binary a, Eq a, Show a, MonadTest m, MonadIO m) => FilePath -> Expect m a ByteString (Either GetError a)
 suiteFileExpect fn =
   if shouldFail fn
     then expectCodecErr
@@ -120,15 +121,14 @@ unitCases =
       (MO.Msg "/oscillator/4/frequency" (Seq.singleton (MO.DatumFloat 440.0)))
   ]
 
--- Increase number of examples with TASTY_FALSIFY_TESTS=1000 etc
 main :: IO ()
 main = do
   files <- findFiles
   fileCases <- traverse suiteFileRT files
   testMain $ \lim ->
-    let testGenCases = testGroup "Gen" (fmap (testRT lim) genCases)
-        testFileCases = testGroup "File" (fmap (testRT lim) fileCases)
-        testUnitCases = testGroup "Unit" (fmap (testRT lim) unitCases)
+    let testGenCases = testGroup "Gen" (fmap (testRT (Just lim)) genCases)
+        testFileCases = testGroup "File" (fmap (testRT Nothing) fileCases)
+        testUnitCases = testGroup "Unit" (fmap (testRT Nothing) unitCases)
     in  testGroup
           "dahdit-midi"
           [ testGenCases

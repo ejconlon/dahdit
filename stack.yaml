@@ -11,7 +11,7 @@ packages:
 
 extra-deps:
 - data-sword-0.2.0.3
-- daytripper-0.4.0
-- prop-unit-0.2.0
+- daytripper-1.0.0
+- prop-unit-1.0.1
 - nanotime-0.3.2
 
