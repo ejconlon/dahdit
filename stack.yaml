@@ -1,4 +1,4 @@
-resolver: lts-23.0
+resolver: lts-23.14
 
 ghc-options:
   "$everything": -haddock
@@ -8,8 +8,10 @@ packages:
 - dahdit-test
 - dahdit-network
 - dahdit-midi
+- dahdit-audio
 
 extra-deps:
+- aeson-via-0.2.3
 - data-sword-0.2.0.3
 - daytripper-1.0.0
 - prop-unit-1.0.1
