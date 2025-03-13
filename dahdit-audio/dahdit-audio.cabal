@@ -34,6 +34,7 @@ library
       Dahdit.Audio.Riff
       Dahdit.Audio.Sfont
       Dahdit.Audio.Wav
+      Dahdit.Audio.Wav.Simple
   other-modules:
       Paths_dahdit_audio
   hs-source-dirs:
