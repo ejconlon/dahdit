@@ -1,5 +1,5 @@
 stack_build := "stack build --fast"
-src_dirs := "dahdit dahdit-test dahdit-network dahdit-midi"
+src_dirs := "dahdit dahdit-test dahdit-network dahdit-midi dahdit-audio"
 
 # No default tasks
 default:

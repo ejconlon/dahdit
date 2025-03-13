@@ -41,11 +41,11 @@ import Dahdit
   , sizeofLiftedPrimArray
   , staticByteSize
   )
+import Dahdit.Audio.Binary (QuietArray (..))
 import Data.Bits (Bits (..))
 import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (sizeofByteArray)
 import Data.Proxy (Proxy (..))
-import Dahdit.Audio.Binary (QuietArray (..))
 
 newtype SampleCount = SampleCount {unSampleCount :: Int}
   deriving stock (Show)

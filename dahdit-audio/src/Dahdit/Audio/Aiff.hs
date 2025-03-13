@@ -53,18 +53,6 @@ import Dahdit
   , putWord16BE
   , putWord8
   )
-import Data.ByteString.Char8 qualified as BSC
-import Data.ByteString.Short qualified as BSS
-import Data.Default (Default (..))
-import Data.Foldable (toList)
-import Data.Maybe (fromMaybe)
-import Data.Primitive.ByteArray (byteArrayFromListN, indexByteArray, sizeofByteArray)
-import Data.Proxy (Proxy (..))
-import Data.Sequence (Seq (..))
-import Data.Sequence qualified as Seq
-import Data.Word (Word8)
-import GHC.Generics (Generic)
-import GHC.TypeLits (type (*), type (+))
 import Dahdit.Audio.Binary (QuietArray (..))
 import Dahdit.Audio.Common
   ( ChunkHeaderSize
@@ -87,6 +75,18 @@ import Dahdit.Audio.Common
   , putChunkSizeBE
   )
 import Dahdit.Audio.Dsp (PcmContainer (PcmContainer), PcmMeta (PcmMeta))
+import Data.ByteString.Char8 qualified as BSC
+import Data.ByteString.Short qualified as BSS
+import Data.Default (Default (..))
+import Data.Foldable (toList)
+import Data.Maybe (fromMaybe)
+import Data.Primitive.ByteArray (byteArrayFromListN, indexByteArray, sizeofByteArray)
+import Data.Proxy (Proxy (..))
+import Data.Sequence (Seq (..))
+import Data.Sequence qualified as Seq
+import Data.Word (Word8)
+import GHC.Generics (Generic)
+import GHC.TypeLits (type (*), type (+))
 
 -- AIFF-C file parsing according to
 -- http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/AIFF/AIFF.html

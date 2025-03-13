@@ -24,14 +24,6 @@ import Dahdit
   , lengthLiftedPrimArray
   , liftedPrimArrayFromList
   )
-import Data.ByteString.Lazy qualified as BSL
-import Data.ByteString.Short qualified as BSS
-import Data.Foldable (for_, toList)
-import Data.Int (Int8)
-import Data.Maybe (fromMaybe)
-import Data.Primitive.ByteArray (indexByteArray, sizeofByteArray)
-import Data.Proxy (Proxy (..))
-import Data.Sequence qualified as Seq
 import Dahdit.Audio.Aiff (Aiff (..), AiffDataBody (..), lookupAiffDataChunk)
 import Dahdit.Audio.Aiff qualified as Aiff
 import Dahdit.Audio.Binary (QuietArray (..))
@@ -86,6 +78,14 @@ import Dahdit.Audio.Wav
   , lookupWavFormatChunk
   , wavToPcmContainer
   )
+import Data.ByteString.Lazy qualified as BSL
+import Data.ByteString.Short qualified as BSS
+import Data.Foldable (for_, toList)
+import Data.Int (Int8)
+import Data.Maybe (fromMaybe)
+import Data.Primitive.ByteArray (indexByteArray, sizeofByteArray)
+import Data.Proxy (Proxy (..))
+import Data.Sequence qualified as Seq
 import Test.Daytripper (daytripperMain)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))

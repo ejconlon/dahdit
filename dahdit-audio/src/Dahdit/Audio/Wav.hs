@@ -56,16 +56,6 @@ import Dahdit
   , putSeq
   , putWord8
   )
-import Data.ByteString.Short qualified as BSS
-import Data.Default (Default (..))
-import Data.Foldable (toList)
-import Data.Maybe (fromMaybe)
-import Data.Primitive (sizeofByteArray)
-import Data.Sequence (Seq (..))
-import Data.Sequence qualified as Seq
-import Data.String (IsString)
-import GHC.Generics (Generic)
-import GHC.TypeLits (Nat, type (*), type (+))
 import Dahdit.Audio.Binary (QuietArray (..))
 import Dahdit.Audio.Common
   ( ConvertErr
@@ -88,6 +78,16 @@ import Dahdit.Audio.Common
   )
 import Dahdit.Audio.Dsp (PcmContainer (..), PcmMeta (..), SampleCount (..))
 import Dahdit.Audio.Riff (Chunk (..), ChunkLabel (..), KnownChunk (..), KnownListChunk (..), labelRiff, peekChunkLabel)
+import Data.ByteString.Short qualified as BSS
+import Data.Default (Default (..))
+import Data.Foldable (toList)
+import Data.Maybe (fromMaybe)
+import Data.Primitive (sizeofByteArray)
+import Data.Sequence (Seq (..))
+import Data.Sequence qualified as Seq
+import Data.String (IsString)
+import GHC.Generics (Generic)
+import GHC.TypeLits (Nat, type (*), type (+))
 
 labelWave, labelFmt, labelData, labelInfo, labelAdtl, labelCue, labelNote, labelLabl, labelLtxt, labelSmpl :: Label
 labelWave = "WAVE"

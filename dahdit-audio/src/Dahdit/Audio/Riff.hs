@@ -31,10 +31,6 @@ import Dahdit
   , putSeq
   , putWord8
   )
-import Data.Default (Default)
-import Data.Proxy (Proxy (..))
-import Data.Sequence (Seq)
-import GHC.TypeLits (Nat, type (+))
 import Dahdit.Audio.Common
   ( ChunkHeaderSize
   , KnownLabel (..)
@@ -49,6 +45,10 @@ import Dahdit.Audio.Common
   , padCount
   , putChunkSizeLE
   )
+import Data.Default (Default)
+import Data.Proxy (Proxy (..))
+import Data.Sequence (Seq)
+import GHC.TypeLits (Nat, type (+))
 
 labelRiff, labelList :: Label
 labelRiff = "RIFF"

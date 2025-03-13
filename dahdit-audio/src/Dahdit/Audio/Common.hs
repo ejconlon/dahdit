@@ -53,6 +53,7 @@ import Dahdit
   , getRemainingString
   , putByteString
   )
+import Dahdit.Audio.Dsp (DspErr)
 import Data.ByteString.Short (ShortByteString)
 import Data.ByteString.Short qualified as BSS
 import Data.Proxy (Proxy (..))
@@ -61,7 +62,6 @@ import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Data.Word (Word32)
 import GHC.TypeLits (Mod, Nat, type (+))
-import Dahdit.Audio.Dsp (DspErr)
 
 rethrow :: (Exception e) => Either e a -> IO a
 rethrow = either throwIO pure

@@ -19,8 +19,6 @@ where
 import Control.Exception (throwIO)
 import Control.Monad (unless, (>=>))
 import Dahdit (Int16LE, LiftedPrim, LiftedPrimArray (..), Seq (..), decodeFile)
-import Data.Maybe (isJust)
-import Data.Sequence qualified as Seq
 import Dahdit.Audio.Aiff (Aiff, aiffGatherMarkers, aiffToPcmContainer)
 import Dahdit.Audio.Binary (QuietArray (..))
 import Dahdit.Audio.Common
@@ -56,6 +54,8 @@ import Dahdit.Audio.Wav
   , wavUseLoopPoints
   , wavUseMarkers
   )
+import Data.Maybe (isJust)
+import Data.Sequence qualified as Seq
 import System.FilePath (splitExtension)
 
 convertMod :: (LiftedPrim a, LiftedPrim b) => Mod a b -> PcmContainer -> Either ConvertErr PcmContainer

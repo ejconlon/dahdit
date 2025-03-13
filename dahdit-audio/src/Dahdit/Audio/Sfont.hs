@@ -54,15 +54,6 @@ import Dahdit
   , putSeq
   , sizeofLiftedPrimArray
   )
-import Data.ByteString.Short qualified as BSS
-import Data.Foldable (foldl')
-import Data.Int (Int8)
-import Data.Proxy (Proxy (..))
-import Data.Sequence (Seq (..))
-import Data.Sequence qualified as Seq
-import Data.Type.Equality (testEquality)
-import Data.Word (Word8)
-import GHC.Generics (Generic)
 import Dahdit.Audio.Common
   ( KnownLabel (..)
   , Label
@@ -73,6 +64,15 @@ import Dahdit.Audio.Common
   , putChunkSizeLE
   )
 import Dahdit.Audio.Riff (KnownListChunk, KnownOptChunk, labelRiff)
+import Data.ByteString.Short qualified as BSS
+import Data.Foldable (foldl')
+import Data.Int (Int8)
+import Data.Proxy (Proxy (..))
+import Data.Sequence (Seq (..))
+import Data.Sequence qualified as Seq
+import Data.Type.Equality (testEquality)
+import Data.Word (Word8)
+import GHC.Generics (Generic)
 import Type.Reflection (TypeRep, Typeable, typeRep, (:~:) (..))
 
 labelSfbk
