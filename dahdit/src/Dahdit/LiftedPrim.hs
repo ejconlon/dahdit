@@ -54,7 +54,7 @@ import Dahdit.Proxy (proxyFor)
 import Dahdit.Sizes (ByteCount (..), ElemCount (..), StaticByteSized (..))
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
-import Data.Int (Int8)
+import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Primitive.ByteArray
   ( ByteArray
   , MutableByteArray
@@ -63,7 +63,8 @@ import Data.Primitive.ByteArray
   )
 import Data.Primitive.Ptr (indexOffPtr, writeOffPtr)
 import Data.Proxy (Proxy (..))
-import Data.Word (Word8)
+import Data.ShortWord (Int24, Word24)
+import Data.Word (Word16, Word32, Word64, Word8)
 import Foreign.Ptr (Ptr)
 
 -- | This is a stripped-down version of 'Prim' that is possible for a human to implement.
@@ -311,11 +312,27 @@ instance (LiftedPrim le, EndianPair n le be, n ~ StaticSize le) => LiftedPrim (V
 
 deriving via (ViaFromIntegral 2 Word16LE Int16LE) instance LiftedPrim Int16LE
 
+deriving via (ViaFromIntegral 2 Word16LE Word16) instance LiftedPrim Word16
+
+deriving via (ViaFromIntegral 2 Word16LE Int16) instance LiftedPrim Int16
+
 deriving via (ViaFromIntegral 3 Word24LE Int24LE) instance LiftedPrim Int24LE
+
+deriving via (ViaFromIntegral 3 Word24LE Word24) instance LiftedPrim Word24
+
+deriving via (ViaFromIntegral 3 Word24LE Int24) instance LiftedPrim Int24
 
 deriving via (ViaFromIntegral 4 Word32LE Int32LE) instance LiftedPrim Int32LE
 
+deriving via (ViaFromIntegral 4 Word32LE Word32) instance LiftedPrim Word32
+
+deriving via (ViaFromIntegral 4 Word32LE Int32) instance LiftedPrim Int32
+
 deriving via (ViaFromIntegral 8 Word64LE Int64LE) instance LiftedPrim Int64LE
+
+deriving via (ViaFromIntegral 8 Word64LE Word64) instance LiftedPrim Word64
+
+deriving via (ViaFromIntegral 8 Word64LE Int64) instance LiftedPrim Int64
 
 deriving via (ViaEndianPair 2 Word16LE Word16BE) instance LiftedPrim Word16BE
 
