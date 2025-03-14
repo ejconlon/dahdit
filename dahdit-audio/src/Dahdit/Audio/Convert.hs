@@ -12,6 +12,7 @@ module Dahdit.Audio.Convert
   , neutralCrossFade
   , neutralCropLoop
   , neutralToSampleWav
+  , neutralToMonoWav
   )
 where
 
@@ -166,8 +167,13 @@ neutralIfHasMarks f ne = do
     then f ne
     else Right ne
 
+-- | Example converting to instrument sample representing a particular note (with loop marks)
 neutralToSampleWav :: SampleCount -> Int -> Neutral -> Either ConvertErr Wav
 neutralToSampleWav width note ne =
   fmap
     (neutralToWav note)
     (neutralMono ne >>= neutralDepth >>= neutralIfHasMarks (neutralCrossFade width) >>= neutralIfHasMarks neutralCropLoop)
+
+-- | Example simply converting to mono 16-bit
+neutralToMonoWav :: Neutral -> Either ConvertErr Wav
+neutralToMonoWav ne = fmap (wavFromPcmContainer . neCon) (neutralMono ne >>= neutralDepth)

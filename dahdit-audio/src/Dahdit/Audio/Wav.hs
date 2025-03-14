@@ -539,8 +539,7 @@ wavUseLoopPoints :: Int -> Int -> LoopMarkPoints -> WavSampleChunk
 wavUseLoopPoints sr note (LoopMarks _ (startId, loopStart) (_, loopEnd) _) =
   let wsbManufacturer = 0
       wsbProduct = 0
-      -- See notes on type about sample period: for 44100 sr it's 0x00005893
-      wsbSamplePeriod = if sr == 44100 then 0x00005893 else error "TODO - calculate sample period"
+      wsbSamplePeriod = fromIntegral (div 1000000000 sr)
       wsbMidiUnityNote = fromIntegral note
       wsbMidiPitchFrac = 0
       wsbSmtpeFormat = 0
