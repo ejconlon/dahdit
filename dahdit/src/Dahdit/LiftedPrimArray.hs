@@ -18,6 +18,7 @@ module Dahdit.LiftedPrimArray
   , newLiftedPrimArray
   , copyLiftedPrimArray
   , setLiftedPrimArray
+  , readLiftedPrimArray
   )
 where
 
@@ -26,6 +27,7 @@ import Control.Monad.Primitive (PrimMonad (..))
 import Dahdit.LiftedPrim
   ( LiftedPrim (..)
   , indexArrayLiftedInElems
+  , readArrayLiftedInElems
   , writeArrayLiftedInElems
   )
 import Dahdit.Proxy (proxyFor, proxyForF)
@@ -165,7 +167,7 @@ setLiftedPrimArray
   -> a
   -> m ()
 setLiftedPrimArray darr@(MutableLiftedPrimArray dbarr) doff slen sval = do
-  let elemSize = coerce (staticByteSize (proxyFor sval))
+  let elemSize = unByteCount (staticByteSize (proxyFor sval))
   arrSize <- getSizeofMutableByteArray dbarr
   let arrLen = ElemCount (div arrSize elemSize)
       setExt = min arrLen (doff + slen)
@@ -173,3 +175,10 @@ setLiftedPrimArray darr@(MutableLiftedPrimArray dbarr) doff slen sval = do
   when (setLen > 0) $ do
     for_ [0 .. setLen - 1] $ \rep -> do
       writeLiftedPrimArray darr (doff + rep) sval
+
+readLiftedPrimArray
+  :: (PrimMonad m, LiftedPrim a)
+  => MutableLiftedPrimArray (PrimState m) a
+  -> ElemCount
+  -> m a
+readLiftedPrimArray = readArrayLiftedInElems Proxy . unMutableLiftedPrimArray

@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           dahdit-audio
-version:        0.7.0
+version:        0.8.0
 synopsis:       Audio file parsing/printing with dahdit
 description:    Please see the README on GitHub at <https://github.com/ejconlon/dahdit#readme>
 homepage:       https://github.com/ejconlon/dahdit#readme
@@ -74,7 +74,7 @@ library
     , base >=4.12 && <5
     , bytestring ==0.12.*
     , containers ==0.6.*
-    , dahdit ==0.7.*
+    , dahdit ==0.8.*
     , data-default ==0.7.*
     , data-sword ==0.2.*
     , digest >=0.0.1 && <0.0.3
@@ -134,7 +134,7 @@ test-suite dahdit-audio-test
     , base >=4.12 && <5
     , bytestring ==0.12.*
     , containers ==0.6.*
-    , dahdit ==0.7.*
+    , dahdit ==0.8.*
     , dahdit-audio
     , data-default ==0.7.*
     , data-sword ==0.2.*
