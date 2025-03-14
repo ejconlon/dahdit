@@ -12,15 +12,13 @@ module Dahdit.Audio.Convert
   , neutralCrossFade
   , neutralCropLoop
   , neutralToSampleWav
-  , readPtiWav
   )
 where
 
 import Control.Exception (throwIO)
 import Control.Monad (unless, (>=>))
-import Dahdit (Int16LE, LiftedPrim, LiftedPrimArray (..), Seq (..), decodeFile)
+import Dahdit (LiftedPrim, Seq (..), decodeFile)
 import Dahdit.Audio.Aiff (Aiff, aiffGatherMarkers, aiffToPcmContainer)
-import Dahdit.Audio.Binary (QuietArray (..))
 import Dahdit.Audio.Common
   ( ConvertErr (..)
   , LoopMarkNames
@@ -42,7 +40,8 @@ import Dahdit.Audio.Dsp
   , crop
   , ensureMonoFromLeft
   , linearCrossFade
-  , reduceBitDepth
+  , reduceBitDepth24
+  , reduceBitDepth32
   )
 import Dahdit.Audio.Wav
   ( Wav
@@ -131,7 +130,10 @@ neutralDepth ne@(Neutral {..}) = do
   case pmBitsPerSample (pcMeta neCon) of
     16 -> pure ne
     24 -> do
-      con' <- convertMod reduceBitDepth neCon
+      con' <- convertMod reduceBitDepth24 neCon
+      pure $! ne {neCon = con'}
+    32 -> do
+      con' <- convertMod reduceBitDepth32 neCon
       pure $! ne {neCon = con'}
     y -> Left (ConvertErrBadBps y)
 
@@ -169,15 +171,3 @@ neutralToSampleWav width note ne =
   fmap
     (neutralToWav note)
     (neutralMono ne >>= neutralDepth >>= neutralIfHasMarks (neutralCrossFade width) >>= neutralIfHasMarks neutralCropLoop)
-
-readPtiWav :: Maybe LoopMarkNames -> FilePath -> IO (LiftedPrimArray Int16LE, Maybe LoopMarkPoints)
-readPtiWav mayNames fp = do
-  wav <- loadWav fp
-  ne <- rethrow (wavToNeutral wav mayNames)
-  let !meta = pcMeta (neCon ne)
-  unless
-    (pmNumChannels meta == 1 && pmSampleRate meta == 44100 && pmBitsPerSample meta == 16)
-    (fail ("bad pti wav: " ++ fp))
-  let !arr = LiftedPrimArray (unQuietArray (pcData (neCon ne)))
-      !points = neLoopMarks ne
-  pure (arr, points)
