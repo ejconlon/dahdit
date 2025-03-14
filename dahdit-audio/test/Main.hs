@@ -16,6 +16,7 @@ import Dahdit
   , byteSize
   , decode
   , decodeFile
+  , decodeFileEnd
   , encode
   , encodeFile
   , getExact
@@ -78,6 +79,7 @@ import Dahdit.Audio.Wav
   , lookupWavFormatChunk
   , wavToPcmContainer
   )
+import Dahdit.Audio.Wav.Simple qualified as DAWS
 import Data.ByteString.Lazy qualified as BSL
 import Data.ByteString.Short qualified as BSS
 import Data.Foldable (for_, toList)
@@ -501,11 +503,23 @@ testDspFadeWider = testCase "fade wider" $ do
 testDsp :: TestTree
 testDsp = testGroup "dsp" [testDspMono, testDspFadeOne, testDspFadeSome, testDspFadeWider]
 
+testWavSimple :: TestTree
+testWavSimple = testCase "wav simple" $ do
+  wav <- rethrow . fst =<< decodeFileEnd "testdata/drums.wav"
+  pcBefore <- rethrow (wavToPcmContainer wav)
+  simple <- rethrow (DAWS.fromComplex wav)
+  complex <- rethrow (DAWS.toComplex simple)
+  pcAfter <- rethrow (wavToPcmContainer complex)
+  -- There is more to check, but a good approximation is that
+  -- the wavs are equal as PCM containers before and after converting to
+  -- the simplified representation.
+  pcAfter @?= pcBefore
+
 testDahditAudio :: TestTree
 testDahditAudio =
   testGroup
     "dahdit-audio"
-    [testWav, testAiff, testAiff2, testSfont, testConvert, testDsp]
+    [testWav, testAiff, testAiff2, testSfont, testConvert, testDsp, testWavSimple]
 
 main :: IO ()
 main = daytripperMain (const testDahditAudio)

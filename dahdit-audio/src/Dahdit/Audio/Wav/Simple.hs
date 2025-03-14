@@ -15,7 +15,7 @@ where
 import Control.Exception (throwIO)
 import Control.Monad (unless, (>=>))
 import Dahdit.Audio.Binary (QuietArray (..), QuietLiftedArray (..))
-import Dahdit.Audio.Common (ConvertErr (..), guardChunk)
+import Dahdit.Audio.Common (ConvertErr (..), guardChunk, rethrow)
 import Dahdit.Audio.Convert (convertMod)
 import Dahdit.Audio.Dsp (DspErr (..), PcmContainer (..), PcmMeta (..), SampleCount (..), changeBitDepth)
 import Dahdit.Audio.Riff (KnownChunk (..))
@@ -70,8 +70,8 @@ toPcmContainer (WAVE hdr (WAVESamples (QuietLiftedArray larr@(LiftedPrimArray ar
 
 toComplex :: WAVE -> Either ConvertErr Wav
 toComplex wave0@(WAVE hdr _) = do
-  let bps = waveBitsPerSample hdr
   pc0 <- toPcmContainer wave0
+  let bps = waveBitsPerSample hdr
   pc1 <- case bps of
     16 -> convertMod (changeBitDepth @Int32 @Int16LE 32 16) pc0
     24 -> convertMod (changeBitDepth @Int32 @Int24LE 32 24) pc0
@@ -93,7 +93,8 @@ toComplex wave0@(WAVE hdr _) = do
 fromComplex :: Wav -> Either ConvertErr WAVE
 fromComplex wav0 = do
   pc0 <- wavToPcmContainer wav0
-  pc1 <- case pmBitsPerSample (pcMeta pc0) of
+  let bps = pmBitsPerSample (pcMeta pc0)
+  pc1 <- case bps of
     16 -> convertMod (changeBitDepth @Int16LE @Int32 16 32) pc0
     24 -> convertMod (changeBitDepth @Int24LE @Int32 24 32) pc0
     32 -> pure pc0
@@ -104,13 +105,13 @@ fromComplex wav0 = do
         WAVEHeader
           { waveNumChannels = fromIntegral (wfbNumChannels wfb)
           , waveFrameRate = fromIntegral (wfbSampleRate wfb)
-          , waveBitsPerSample = 32
+          , waveBitsPerSample = bps
           , waveFrames = Just (sizeofByteArray (unQuietArray samps1))
           }
   pure (WAVE hdr (WAVESamples (QuietLiftedArray (LiftedPrimArray (unQuietArray samps1)))))
 
 getWAVEFile :: FilePath -> IO WAVE
-getWAVEFile = decodeFileEnd >=> either throwIO pure . fst >=> either throwIO pure . fromComplex
+getWAVEFile = decodeFileEnd >=> rethrow . fst >=> rethrow . fromComplex
 
 putWAVEFile :: FilePath -> WAVE -> IO ()
 putWAVEFile fp wave = either throwIO (`encodeFile` fp) (toComplex wave)

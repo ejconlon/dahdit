@@ -5,21 +5,25 @@ src_dirs := "dahdit dahdit-test dahdit-network dahdit-midi dahdit-audio"
 default:
   just --list
 
+# Build and run tests on file change
+watch target="":
+  {{ stack_build }} --test --file-watch {{ target }}
+
 # Build and run tests
-test:
-  {{ stack_build }} --test
+test target="":
+  {{ stack_build }} --test {{ target }}
 
 # Build only
-build:
-  {{ stack_build }} --test --no-run-tests
+build target="":
+  {{ stack_build }} --test --no-run-tests {{ target }}
+
+# Enter repl
+repl target="":
+  stack ghci --test --ghci-options "-XOverloadedStrings -XOverloadedLists" {{ target }}
 
 # Clean stack work
 clean:
   stack clean --full
-
-# Enter repl
-ghci:
-  stack ghci --test
 
 # Open browser with generated docs
 docs:
@@ -40,4 +44,3 @@ lint:
 # Apply hlint suggestions
 lint-apply:
   find {{ src_dirs }} -name '*.hs' | xargs -t -I % stack exec -- hlint % --refactor --refactor-options="--inplace"
-

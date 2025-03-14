@@ -18,7 +18,6 @@ module Dahdit.Audio.Convert
   )
 where
 
-import Control.Exception (throwIO)
 import Control.Monad (unless, (>=>))
 import Dahdit (Int16LE, Int24LE, Int32LE, LiftedPrim, Seq (..), decodeFile)
 import Dahdit.Audio.Aiff (Aiff, aiffGatherMarkers, aiffToPcmContainer)
@@ -66,10 +65,10 @@ convertModGeneric :: (forall a. (LiftedPrim a, Integral a) => Mod a a) -> PcmCon
 convertModGeneric modx con = either (Left . ConvertErrDsp) Right (applyModGeneric modx con)
 
 loadAiff :: FilePath -> IO Aiff
-loadAiff = decodeFile >=> either throwIO pure . fst
+loadAiff = decodeFile >=> rethrow . fst
 
 loadWav :: FilePath -> IO Wav
-loadWav = decodeFile >=> either throwIO pure . fst
+loadWav = decodeFile >=> rethrow . fst
 
 data Neutral = Neutral
   { neCon :: !PcmContainer
