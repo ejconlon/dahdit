@@ -15,6 +15,7 @@ module Dahdit.LiftedPrimArray
   , lengthLiftedPrimArray
   , cloneLiftedPrimArray
   , replicateLiftedPrimArray
+  , newLiftedPrimArray
   )
 where
 
@@ -121,3 +122,10 @@ replicateLiftedPrimArray len val = LiftedPrimArray $ runByteArray $ do
   for_ [0 .. len - 1] $ \pos ->
     writeArrayLiftedInBytes arr (coerce pos * elemSize) val
   pure arr
+
+newLiftedPrimArray
+  :: (PrimMonad m, StaticByteSized a) => ElemCount -> Proxy a -> m (MutableLiftedPrimArray (PrimState m) a)
+newLiftedPrimArray len prox =
+  let elemSize = staticByteSize prox
+      byteLen = coerce len * elemSize
+  in  fmap MutableLiftedPrimArray (newByteArray (coerce byteLen))
