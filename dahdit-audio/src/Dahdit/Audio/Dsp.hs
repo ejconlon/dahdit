@@ -7,10 +7,7 @@ module Dahdit.Audio.Dsp
   , monoFromRight
   , monoFromAvg
   , ensureMonoFromLeft
-  , reduceBitDepth24
-  , increaseBitDepth24
-  , reduceBitDepth32
-  , increaseBitDepth32
+  , changeBitDepth
   , stereoFromMono
   , linearCrossFade
   , crop
@@ -41,7 +38,6 @@ import Dahdit
   , indexLiftedPrimArray
   , lengthLiftedPrimArray
   , proxyForF
-  , sizeofLiftedPrimArray
   , staticByteSize
   )
 import Dahdit.Audio.Binary (QuietArray (..))
@@ -49,6 +45,7 @@ import Data.Bits (Bits (..))
 import Data.Coerce (coerce)
 import Data.Primitive.ByteArray (sizeofByteArray)
 import Data.Proxy (Proxy (..))
+import Data.Word (Word64)
 
 newtype SampleCount = SampleCount {unSampleCount :: Int}
   deriving stock (Show)
@@ -137,57 +134,19 @@ ensureMonoFromSel sel = Mod $ \mm src -> do
 ensureMonoFromLeft :: (LiftedPrim a) => Mod a a
 ensureMonoFromLeft = ensureMonoFromSel selMonoLeft
 
-reduceBitDepth24 :: Mod Int24LE Int16LE
-reduceBitDepth24 = Mod $ \mm src -> do
-  let !mm' = mm {mmBitsPerSample = 16}
-  let !src24 = LiftedPrimArray (unLiftedPrimArray src) :: LiftedPrimArray Int24LE
-  let go i =
-        let x = indexLiftedPrimArray src24 i :: Int24LE
-            y = shiftR (toInteger x) 8
-        in  fromInteger y :: Int16LE
-  let !dest16 = generateLiftedPrimArray (lengthLiftedPrimArray src24) go :: LiftedPrimArray Int16LE
-  unless (2 * sizeofLiftedPrimArray src24 == 3 * sizeofLiftedPrimArray dest16) (error "Bad size (in bytes)")
-  let !dest = LiftedPrimArray (unLiftedPrimArray dest16)
-  pure (mm', dest)
-
-increaseBitDepth24 :: Mod Int16LE Int24LE
-increaseBitDepth24 = Mod $ \mm src -> do
-  let !mm' = mm {mmBitsPerSample = 24}
-  let !src16 = LiftedPrimArray (unLiftedPrimArray src) :: LiftedPrimArray Int16LE
-  let go i =
-        let x = indexLiftedPrimArray src16 i :: Int16LE
-            y = shiftL (toInteger x) 8
-        in  fromInteger y :: Int24LE
-  let !dest24 = generateLiftedPrimArray (lengthLiftedPrimArray src16) go :: LiftedPrimArray Int24LE
-  unless (2 * sizeofLiftedPrimArray dest24 == 3 * sizeofLiftedPrimArray src16) (error "Bad size (in bytes)")
-  let !dest = LiftedPrimArray (unLiftedPrimArray dest24)
-  pure (mm', dest)
-
-reduceBitDepth32 :: Mod Int32LE Int16LE
-reduceBitDepth32 = Mod $ \mm src -> do
-  let !mm' = mm {mmBitsPerSample = 16}
-  let !src32 = LiftedPrimArray (unLiftedPrimArray src) :: LiftedPrimArray Int32LE
-  let go i =
-        let x = indexLiftedPrimArray src32 i :: Int32LE
-            y = shiftR (toInteger x) 16
-        in  fromInteger y :: Int16LE
-  let !dest16 = generateLiftedPrimArray (lengthLiftedPrimArray src32) go :: LiftedPrimArray Int16LE
-  unless (sizeofLiftedPrimArray src32 == 2 * sizeofLiftedPrimArray dest16) (error "Bad size (in bytes)")
-  let !dest = LiftedPrimArray (unLiftedPrimArray dest16)
-  pure (mm', dest)
-
-increaseBitDepth32 :: Mod Int16LE Int32LE
-increaseBitDepth32 = Mod $ \mm src -> do
-  let !mm' = mm {mmBitsPerSample = 32}
-  let !src16 = LiftedPrimArray (unLiftedPrimArray src) :: LiftedPrimArray Int16LE
-  let go i =
-        let x = indexLiftedPrimArray src16 i :: Int16LE
-            y = shiftL (toInteger x) 8
-        in  fromInteger y :: Int32LE
-  let !dest32 = generateLiftedPrimArray (lengthLiftedPrimArray src16) go :: LiftedPrimArray Int32LE
-  unless (2 * sizeofLiftedPrimArray dest32 == 3 * sizeofLiftedPrimArray src16) (error "Bad size (in bytes)")
-  let !dest = LiftedPrimArray (unLiftedPrimArray dest32)
-  pure (mm', dest)
+changeBitDepth :: (LiftedPrim a, Integral a, LiftedPrim b, Num b) => Int -> Int -> Mod a b
+changeBitDepth srcBitDepth destBitDepth = Mod $ \mm0 src ->
+  let bitShift = destBitDepth - srcBitDepth
+  in  pure $
+        if bitShift == 0
+          then (mm0, LiftedPrimArray (unLiftedPrimArray src))
+          else
+            let mm1 = mm0 {mmBitsPerSample = destBitDepth}
+                dest = generateLiftedPrimArray (lengthLiftedPrimArray src) $ \i ->
+                  let x = indexLiftedPrimArray src i
+                      y = shift (fromIntegral @_ @Word64 x) bitShift
+                  in  fromIntegral y
+            in  (mm1, dest)
 
 stereoFromMono :: (LiftedPrim a) => Mod a a
 stereoFromMono = Mod $ \mm src -> do

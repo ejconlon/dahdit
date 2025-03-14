@@ -1,7 +1,9 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Dahdit.Audio.Convert
-  ( loadAiff
+  ( convertMod
+  , convertModGeneric
+  , loadAiff
   , loadWav
   , Neutral (..)
   , aiffToNeutral
@@ -18,7 +20,7 @@ where
 
 import Control.Exception (throwIO)
 import Control.Monad (unless, (>=>))
-import Dahdit (LiftedPrim, Seq (..), decodeFile)
+import Dahdit (Int16LE, Int24LE, Int32LE, LiftedPrim, Seq (..), decodeFile)
 import Dahdit.Audio.Aiff (Aiff, aiffGatherMarkers, aiffToPcmContainer)
 import Dahdit.Audio.Common
   ( ConvertErr (..)
@@ -38,11 +40,10 @@ import Dahdit.Audio.Dsp
   , SampleCount
   , applyMod
   , applyModGeneric
+  , changeBitDepth
   , crop
   , ensureMonoFromLeft
   , linearCrossFade
-  , reduceBitDepth24
-  , reduceBitDepth32
   )
 import Dahdit.Audio.Wav
   ( Wav
@@ -126,15 +127,15 @@ neutralMono ne@(Neutral {..}) = do
   con' <- convertModGeneric ensureMonoFromLeft neCon
   pure $! ne {neCon = con'}
 
-neutralDepth :: Neutral -> Either ConvertErr Neutral
-neutralDepth ne@(Neutral {..}) = do
+neutralReduceDepth :: Neutral -> Either ConvertErr Neutral
+neutralReduceDepth ne@(Neutral {..}) = do
   case pmBitsPerSample (pcMeta neCon) of
     16 -> pure ne
     24 -> do
-      con' <- convertMod reduceBitDepth24 neCon
+      con' <- convertMod (changeBitDepth @Int24LE @Int16LE 24 16) neCon
       pure $! ne {neCon = con'}
     32 -> do
-      con' <- convertMod reduceBitDepth32 neCon
+      con' <- convertMod (changeBitDepth @Int32LE @Int16LE 32 16) neCon
       pure $! ne {neCon = con'}
     y -> Left (ConvertErrBadBps y)
 
@@ -172,8 +173,12 @@ neutralToSampleWav :: SampleCount -> Int -> Neutral -> Either ConvertErr Wav
 neutralToSampleWav width note ne =
   fmap
     (neutralToWav note)
-    (neutralMono ne >>= neutralDepth >>= neutralIfHasMarks (neutralCrossFade width) >>= neutralIfHasMarks neutralCropLoop)
+    ( neutralMono ne
+        >>= neutralReduceDepth
+        >>= neutralIfHasMarks (neutralCrossFade width)
+        >>= neutralIfHasMarks neutralCropLoop
+    )
 
 -- | Example simply converting to mono 16-bit
 neutralToMonoWav :: Neutral -> Either ConvertErr Wav
-neutralToMonoWav ne = fmap (wavFromPcmContainer . neCon) (neutralMono ne >>= neutralDepth)
+neutralToMonoWav ne = fmap (wavFromPcmContainer . neCon) (neutralMono ne >>= neutralReduceDepth)
