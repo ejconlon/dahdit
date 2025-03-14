@@ -3,7 +3,7 @@ module Dahdit.Audio.Wav.Simple
   ( WAVE (..)
   , WAVEHeader (..)
   , WAVESample
-  , WAVESamples
+  , WAVESamples (..)
   , toPcmContainer
   , toComplex
   , fromComplex

@@ -126,6 +126,7 @@ import Dahdit
   , putWord8
   , replicateLiftedPrimArray
   , runCount
+  , setLiftedPrimArray
   , sizeofLiftedPrimArray
   , writeLiftedPrimArray
   )
@@ -565,6 +566,21 @@ testLiftedPrimArrayCopy = testUnit "liftedPrimArray copy" $ do
   darr7 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 3)
   darr7 === liftedPrimArrayFromList [0, 1, 1, 0]
 
+testLiftedPrimArraySet :: TestTree
+testLiftedPrimArraySet = testUnit "liftedPrimArray set" $ do
+  darr0 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 1 1)
+  darr0 === liftedPrimArrayFromList [1, 0, 0]
+  darr1 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 2 1)
+  darr1 === liftedPrimArrayFromList [1, 1, 0]
+  darr2 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 3 1)
+  darr2 === liftedPrimArrayFromList [1, 1, 1]
+  darr3 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 4 1)
+  darr3 === liftedPrimArrayFromList [1, 1, 1]
+  darr4 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 2 1)
+  darr4 === liftedPrimArrayFromList [0, 1, 1]
+  darr5 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 3 1)
+  darr5 === liftedPrimArrayFromList [0, 1, 1]
+
 testGetOffset :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetOffset n p = testUnit ("get offset (" ++ n ++ ")") $ do
   let buf = [0x12, 0x34, 0x56, 0x78]
@@ -705,7 +721,7 @@ testDahdit :: TestLimit -> TestTree
 testDahdit lim = testGroup "Dahdit" trees
  where
   trees = baseTrees ++ targetTrees ++ mutTargetTrees
-  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray, testLiftedPrimArrayCopy]
+  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray, testLiftedPrimArrayCopy, testLiftedPrimArraySet]
   targetTrees =
     targets >>= \(TargetDef name prox) ->
       [ testGet name prox

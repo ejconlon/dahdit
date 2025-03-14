@@ -17,6 +17,7 @@ module Dahdit.LiftedPrimArray
   , replicateLiftedPrimArray
   , newLiftedPrimArray
   , copyLiftedPrimArray
+  , setLiftedPrimArray
   )
 where
 
@@ -153,3 +154,22 @@ copyLiftedPrimArray darr@(MutableLiftedPrimArray dbarr) doff (LiftedPrimArray sb
       byteSext = min byteSmax (byteSoff + byteSlen)
       byteLen = min byteDext byteSext - byteSoff
   when (byteLen > 0) (copyByteArray dbarr byteDoff sbarr byteSoff byteLen)
+
+-- Can't use setByteArray because don't necessarily a have Prim instance,
+-- so instead we have to loop.
+setLiftedPrimArray
+  :: (PrimMonad m, LiftedPrim a)
+  => MutableLiftedPrimArray (PrimState m) a
+  -> ElemCount
+  -> ElemCount
+  -> a
+  -> m ()
+setLiftedPrimArray darr@(MutableLiftedPrimArray dbarr) doff slen sval = do
+  let elemSize = coerce (staticByteSize (proxyFor sval))
+  arrSize <- getSizeofMutableByteArray dbarr
+  let arrLen = ElemCount (div arrSize elemSize)
+      setExt = min arrLen (doff + slen)
+      setLen = setExt - doff
+  when (setLen > 0) $ do
+    for_ [0 .. setLen - 1] $ \rep -> do
+      writeLiftedPrimArray darr (doff + rep) sval
