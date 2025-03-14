@@ -5,7 +5,7 @@ module Main (main) where
 
 import Control.Monad (replicateM, (>=>))
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Primitive (RealWorld)
+import Control.Monad.Primitive (PrimMonad (..), RealWorld)
 import Dahdit
   ( Binary (..)
   , BinaryGetTarget (..)
@@ -15,6 +15,7 @@ import Dahdit
   , ByteString
   , DoubleBE (..)
   , DoubleLE (..)
+  , ElemCount
   , FloatBE (..)
   , FloatLE (..)
   , Generic
@@ -31,6 +32,7 @@ import Dahdit
   , Int64LE
   , LiftedPrimArray (..)
   , MutBinaryPutTarget (..)
+  , MutableLiftedPrimArray
   , Proxy (..)
   , Put
   , ShortByteString
@@ -48,9 +50,11 @@ import Dahdit
   , Word32LE (..)
   , Word64BE
   , Word64LE
+  , copyLiftedPrimArray
   , decodeEnd
   , decodeInc
   , encode
+  , freezeLiftedPrimArray
   , getByteArray
   , getByteString
   , getDoubleBE
@@ -90,6 +94,7 @@ import Dahdit
   , liftedPrimArrayFromList
   , mutPutTarget
   , mutPutTargetOffset
+  , newLiftedPrimArray
   , putByteArray
   , putByteString
   , putDoubleBE
@@ -119,14 +124,17 @@ import Dahdit
   , putWord64BE
   , putWord64LE
   , putWord8
+  , replicateLiftedPrimArray
   , runCount
   , sizeofLiftedPrimArray
+  , writeLiftedPrimArray
   )
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString (..))
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
+import Data.Foldable (for_)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Primitive.ByteArray
@@ -529,6 +537,34 @@ testLiftedPrimArray = testUnit "liftedPrimArray" $ do
   sizeofLiftedPrimArray arr === 6
   lengthLiftedPrimArray arr === 3
 
+mkDestArr :: ElemCount -> (MutableLiftedPrimArray (PrimState IO) Word8 -> IO ()) -> IO (LiftedPrimArray Word8)
+mkDestArr len f = do
+  darr <- newLiftedPrimArray len (Proxy @Word8)
+  liftIO (for_ [0 .. len - 1] (\ix -> writeLiftedPrimArray darr ix 0))
+  f darr
+  freezeLiftedPrimArray darr 0 len
+
+testLiftedPrimArrayCopy :: TestTree
+testLiftedPrimArrayCopy = testUnit "liftedPrimArray copy" $ do
+  let sarr = replicateLiftedPrimArray @Word8 2 1
+  sarr === liftedPrimArrayFromList [1, 1]
+  darr0 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 0 sarr 0 2)
+  darr0 === liftedPrimArrayFromList [1, 1, 0, 0]
+  darr1 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 2)
+  darr1 === liftedPrimArrayFromList [0, 1, 1, 0]
+  darr2 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 2 sarr 0 2)
+  darr2 === liftedPrimArrayFromList [0, 0, 1, 1]
+  darr3 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 3 sarr 0 2)
+  darr3 === liftedPrimArrayFromList [0, 0, 0, 1]
+  darr4 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 4 sarr 0 2)
+  darr4 === liftedPrimArrayFromList [0, 0, 0, 0]
+  darr5 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr (-1) sarr 0 2)
+  darr5 === liftedPrimArrayFromList [0, 0, 0, 0]
+  darr6 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 1)
+  darr6 === liftedPrimArrayFromList [0, 1, 0, 0]
+  darr7 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 3)
+  darr7 === liftedPrimArrayFromList [0, 1, 1, 0]
+
 testGetOffset :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetOffset n p = testUnit ("get offset (" ++ n ++ ")") $ do
   let buf = [0x12, 0x34, 0x56, 0x78]
@@ -669,7 +705,7 @@ testDahdit :: TestLimit -> TestTree
 testDahdit lim = testGroup "Dahdit" trees
  where
   trees = baseTrees ++ targetTrees ++ mutTargetTrees
-  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray]
+  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray, testLiftedPrimArrayCopy]
   targetTrees =
     targets >>= \(TargetDef name prox) ->
       [ testGet name prox

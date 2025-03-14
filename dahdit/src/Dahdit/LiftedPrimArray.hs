@@ -16,9 +16,11 @@ module Dahdit.LiftedPrimArray
   , cloneLiftedPrimArray
   , replicateLiftedPrimArray
   , newLiftedPrimArray
+  , copyLiftedPrimArray
   )
 where
 
+import Control.Monad (when)
 import Control.Monad.Primitive (PrimMonad (..))
 import Dahdit.LiftedPrim
   ( LiftedPrim (..)
@@ -34,8 +36,10 @@ import Data.Primitive.ByteArray
   ( ByteArray
   , MutableByteArray
   , cloneByteArray
+  , copyByteArray
   , emptyByteArray
   , freezeByteArray
+  , getSizeofMutableByteArray
   , newByteArray
   , runByteArray
   , sizeofByteArray
@@ -62,7 +66,7 @@ emptyLiftedPrimArray = LiftedPrimArray emptyByteArray
 indexLiftedPrimArray :: (LiftedPrim a) => LiftedPrimArray a -> ElemCount -> a
 indexLiftedPrimArray (LiftedPrimArray arr) = indexArrayLiftedInElems Proxy arr
 
-writeLiftedPrimArray :: (LiftedPrim a, PrimMonad m) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> a -> m ()
+writeLiftedPrimArray :: (PrimMonad m, LiftedPrim a) => MutableLiftedPrimArray (PrimState m) a -> ElemCount -> a -> m ()
 writeLiftedPrimArray (MutableLiftedPrimArray arr) = writeArrayLiftedInElems arr
 
 freezeLiftedPrimArray
@@ -129,3 +133,23 @@ newLiftedPrimArray len prox =
   let elemSize = staticByteSize prox
       byteLen = coerce len * elemSize
   in  fmap MutableLiftedPrimArray (newByteArray (coerce byteLen))
+
+copyLiftedPrimArray
+  :: (PrimMonad m, StaticByteSized a)
+  => MutableLiftedPrimArray (PrimState m) a
+  -> ElemCount
+  -> LiftedPrimArray a
+  -> ElemCount
+  -> ElemCount
+  -> m ()
+copyLiftedPrimArray darr@(MutableLiftedPrimArray dbarr) doff (LiftedPrimArray sbarr) soff slen = do
+  let elemSize = unByteCount (staticByteSize (proxyForF darr))
+      byteDoff = unElemCount doff * elemSize
+      byteSoff = unElemCount soff * elemSize
+      byteSmax = unElemCount slen * elemSize
+      byteSlen = sizeofByteArray sbarr
+  byteDmax <- getSizeofMutableByteArray dbarr
+  let byteDext = min byteDmax (byteDoff + byteSlen)
+      byteSext = min byteSmax (byteSoff + byteSlen)
+      byteLen = min byteDext byteSext - byteSoff
+  when (byteLen > 0) (copyByteArray dbarr byteDoff sbarr byteSoff byteLen)
