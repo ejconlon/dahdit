@@ -19,11 +19,13 @@ module Dahdit.LiftedPrimArray
   , copyLiftedPrimArray
   , setLiftedPrimArray
   , readLiftedPrimArray
+  , mapLiftedPrimArray
   )
 where
 
 import Control.Monad (when)
 import Control.Monad.Primitive (PrimMonad (..))
+import Control.Monad.ST.Strict (runST)
 import Dahdit.LiftedPrim
   ( LiftedPrim (..)
   , indexArrayLiftedInElems
@@ -51,7 +53,7 @@ import Data.Primitive.ByteArray
   , unsafeThawByteArray
   )
 import Data.Proxy (Proxy (..))
-import Data.STRef (modifySTRef', newSTRef, readSTRef)
+import Data.STRef.Strict (newSTRef, readSTRef, writeSTRef)
 
 newtype LiftedPrimArray a = LiftedPrimArray {unLiftedPrimArray :: ByteArray}
   deriving stock (Show)
@@ -95,7 +97,7 @@ liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
   for_ xs $ \x -> do
     off <- readSTRef offRef
     writeArrayLiftedInBytes arr off x
-    modifySTRef' offRef (elemSize +)
+    writeSTRef offRef (off + elemSize)
   pure arr
 
 liftedPrimArrayFromList :: (LiftedPrim a) => [a] -> LiftedPrimArray a
@@ -182,3 +184,17 @@ readLiftedPrimArray
   -> ElemCount
   -> m a
 readLiftedPrimArray = readArrayLiftedInElems Proxy . unMutableLiftedPrimArray
+
+mapLiftedPrimArray
+  :: forall a b
+   . (LiftedPrim a, LiftedPrim b)
+  => (a -> b)
+  -> LiftedPrimArray a
+  -> LiftedPrimArray b
+mapLiftedPrimArray f arrA = runST $ do
+  let len = lengthLiftedPrimArray arrA
+  arrB <- newLiftedPrimArray len (Proxy @b)
+  for_ [0 .. len - 1] $ \pos -> do
+    let valA = indexLiftedPrimArray arrA pos
+    writeLiftedPrimArray arrB pos (f valA)
+  freezeLiftedPrimArray arrB 0 len
