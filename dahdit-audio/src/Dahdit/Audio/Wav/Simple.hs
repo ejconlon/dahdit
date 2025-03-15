@@ -63,9 +63,10 @@ toPcmContainer (WAVE hdr (WAVESamples (QuietLiftedArray larr@(LiftedPrimArray ar
       ns = coerce (div (sizeofByteArray arr) (coerce elemSize * nc))
       bps = coerce elemSize * 8
       sr = waveFrameRate hdr
-      extraElems = rem (sizeofByteArray arr) (coerce elemSize * nc)
+      -- extraElems = rem (sizeofByteArray arr) (coerce elemSize * nc)
       pm = PcmMeta nc ns bps sr
-  unless (extraElems == 0) (Left (ConvertErrDsp DspErrBadElemSize))
+  -- TODO Necessary to assert?
+  -- unless (extraElems == 0) (Left (ConvertErrDsp DspErrBadElemSize))
   pure (PcmContainer pm (QuietArray arr))
 
 toComplex :: WAVE -> Either ConvertErr Wav
