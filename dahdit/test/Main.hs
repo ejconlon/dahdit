@@ -158,7 +158,7 @@ import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
-import PropUnit (Gen, TestLimit, TestTree, forAll, testGroup, testMain, testProp, testUnit, (===))
+import PropUnit (Gen, TestLimit, TestT, TestTree, forAll, testGroup, testMain, testProp, testUnit, (===))
 import qualified PropUnit.Hedgehog.Gen as Gen
 import qualified PropUnit.Hedgehog.Range as Range
 
@@ -544,10 +544,24 @@ testLiftedPrimArray =
     , testLiftedPrimArrayMerge
     ]
 
+mkArr :: [Word16LE] -> LiftedPrimArray Word16LE
+mkArr = liftedPrimArrayFromList @Word16LE
+
+mkDestArr :: ElemCount -> (MutableLiftedPrimArray (PrimState IO) Word16LE -> IO ()) -> IO (LiftedPrimArray Word16LE)
+mkDestArr len f = do
+  darr <- newLiftedPrimArray len (Proxy @Word16LE)
+  liftIO (for_ [0 .. len - 1] (\ix -> writeLiftedPrimArray darr ix 0))
+  f darr
+  freezeLiftedPrimArray darr 0 len
+
+assertArrEq :: LiftedPrimArray a -> IO (LiftedPrimArray a) -> TestT IO ()
+assertArrEq expected actualAct = do
+  actual <- liftIO actualAct
+  actual === expected
+
 testLiftedPrimArrayConcat :: TestTree
 testLiftedPrimArrayConcat = testUnit "concat" $ do
-  let mkArr = liftedPrimArrayFromList @Word16LE
-      mkConcat = concatLiftedPrimArray . fmap mkArr
+  let mkConcat = concatLiftedPrimArray . fmap mkArr
   mkConcat [] === mkArr []
   mkConcat [[1, 2]] === mkArr [1, 2]
   mkConcat [[1, 2], []] === mkArr [1, 2]
@@ -557,8 +571,7 @@ testLiftedPrimArrayConcat = testUnit "concat" $ do
 
 testLiftedPrimArrayMerge :: TestTree
 testLiftedPrimArrayMerge = testUnit "concat" $ do
-  let mkArr = liftedPrimArrayFromList @Word16LE
-      mkMerge = mergeLiftedPrimArray 0 (+) . fmap mkArr
+  let mkMerge = mergeLiftedPrimArray 0 (+) . fmap mkArr
   mkMerge [] === mkArr []
   mkMerge [[1, 2]] === mkArr [1, 2]
   mkMerge [[1, 2], []] === mkArr [1, 2]
@@ -569,52 +582,59 @@ testLiftedPrimArrayMerge = testUnit "concat" $ do
 testLiftedPrimArrayFromList :: TestTree
 testLiftedPrimArrayFromList = testUnit "fromList" $ do
   let arr = LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]) :: LiftedPrimArray Word16LE
-  liftedPrimArrayFromList [0xFD, 0x6E, 0xEC] === arr
+  mkArr [0xFD, 0x6E, 0xEC] === arr
   sizeofLiftedPrimArray arr === 6
   lengthLiftedPrimArray arr === 3
 
-mkDestArr :: ElemCount -> (MutableLiftedPrimArray (PrimState IO) Word8 -> IO ()) -> IO (LiftedPrimArray Word8)
-mkDestArr len f = do
-  darr <- newLiftedPrimArray len (Proxy @Word8)
-  liftIO (for_ [0 .. len - 1] (\ix -> writeLiftedPrimArray darr ix 0))
-  f darr
-  freezeLiftedPrimArray darr 0 len
-
 testLiftedPrimArrayCopy :: TestTree
 testLiftedPrimArrayCopy = testUnit "copy" $ do
-  let sarr = replicateLiftedPrimArray @Word8 2 1
-  sarr === liftedPrimArrayFromList [1, 1]
-  darr0 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 0 sarr 0 2)
-  darr0 === liftedPrimArrayFromList [1, 1, 0, 0]
-  darr1 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 2)
-  darr1 === liftedPrimArrayFromList [0, 1, 1, 0]
-  darr2 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 2 sarr 0 2)
-  darr2 === liftedPrimArrayFromList [0, 0, 1, 1]
-  darr3 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 3 sarr 0 2)
-  darr3 === liftedPrimArrayFromList [0, 0, 0, 1]
-  darr4 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 4 sarr 0 2)
-  darr4 === liftedPrimArrayFromList [0, 0, 0, 0]
-  darr5 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr (-1) sarr 0 2)
-  darr5 === liftedPrimArrayFromList [0, 0, 0, 0]
-  darr6 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 1)
-  darr6 === liftedPrimArrayFromList [0, 1, 0, 0]
-  darr7 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 3)
-  darr7 === liftedPrimArrayFromList [0, 1, 1, 0]
+  let sarr = replicateLiftedPrimArray @Word16LE 2 1
+  sarr === mkArr [1, 1]
+  assertArrEq
+    (mkArr [1, 1, 0, 0])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 0 sarr 0 2))
+  assertArrEq
+    (mkArr [0, 1, 1, 0])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 2))
+  assertArrEq
+    (mkArr [0, 0, 1, 1])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 2 sarr 0 2))
+  assertArrEq
+    (mkArr [0, 0, 0, 1])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 3 sarr 0 2))
+  assertArrEq
+    (mkArr [0, 0, 0, 0])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 4 sarr 0 2))
+  assertArrEq
+    (mkArr [0, 0, 0, 0])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr (-1) sarr 0 2))
+  assertArrEq
+    (mkArr [0, 1, 0, 0])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 1))
+  assertArrEq
+    (mkArr [0, 1, 1, 0])
+    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 3))
 
 testLiftedPrimArraySet :: TestTree
 testLiftedPrimArraySet = testUnit "set" $ do
-  darr0 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 1 1)
-  darr0 === liftedPrimArrayFromList [1, 0, 0]
-  darr1 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 2 1)
-  darr1 === liftedPrimArrayFromList [1, 1, 0]
-  darr2 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 3 1)
-  darr2 === liftedPrimArrayFromList [1, 1, 1]
-  darr3 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 4 1)
-  darr3 === liftedPrimArrayFromList [1, 1, 1]
-  darr4 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 2 1)
-  darr4 === liftedPrimArrayFromList [0, 1, 1]
-  darr5 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 3 1)
-  darr5 === liftedPrimArrayFromList [0, 1, 1]
+  assertArrEq
+    (mkArr [1, 0, 0])
+    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 1 1))
+  assertArrEq
+    (mkArr [1, 1, 0])
+    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 2 1))
+  assertArrEq
+    (mkArr [1, 1, 1])
+    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 3 1))
+  assertArrEq
+    (mkArr [1, 1, 1])
+    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 4 1))
+  assertArrEq
+    (mkArr [0, 1, 1])
+    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 2 1))
+  assertArrEq
+    (mkArr [0, 1, 1])
+    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 3 1))
 
 testGetOffset :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetOffset n p = testUnit ("get offset (" ++ n ++ ")") $ do
