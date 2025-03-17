@@ -31,6 +31,7 @@ import Control.Monad.ST.Strict (runST)
 import Dahdit.LiftedPrim
   ( LiftedPrim (..)
   , indexArrayLiftedInElems
+  , readArrayLiftedInBytes
   , readArrayLiftedInElems
   , writeArrayLiftedInElems
   )
@@ -226,37 +227,41 @@ mapLiftedPrimArray f arrA = runST $ do
     writeLiftedPrimArray arrB pos (f valA)
   unsafeFreezeLiftedPrimArray arrB
 
-concatLiftedPrimArray :: (LiftedPrim a) => [LiftedPrimArray a] -> LiftedPrimArray a
+concatLiftedPrimArray :: [LiftedPrimArray a] -> LiftedPrimArray a
 concatLiftedPrimArray = \case
   [] -> emptyLiftedPrimArray
   [s0] -> s0
-  ss@(s0 : _) -> runST $ do
-    -- TODO use byte-wise ops
-    let totLen = getSum (foldMap (Sum . lengthLiftedPrimArray) ss)
-    marr <- newLiftedPrimArray totLen (proxyForF s0)
+  ss -> LiftedPrimArray $ runByteArray $ do
+    let totLen' = getSum (foldMap (Sum . sizeofLiftedPrimArray) ss)
+    darr <- newByteArray (unByteCount totLen')
     offRef <- newSTRef 0
-    for_ ss $ \s -> do
-      let len = lengthLiftedPrimArray s
+    for_ ss $ \(LiftedPrimArray sarr) -> do
+      let len' = sizeofByteArray sarr
       off <- readSTRef offRef
-      copyLiftedPrimArray marr off s 0 len
-      writeSTRef offRef (off + len)
-    unsafeFreezeLiftedPrimArray marr
+      copyByteArray darr off sarr 0 len'
+      writeSTRef offRef (off + len')
+    pure darr
 
 -- | Combine several arrays pointwise. The first two arguments are "zero" and "plus", with
--- appropriate laws.
+-- appropriate laws for idempotency.
 mergeLiftedPrimArray :: (LiftedPrim a) => a -> (a -> a -> a) -> [LiftedPrimArray a] -> LiftedPrimArray a
 mergeLiftedPrimArray val f = \case
   [] -> emptyLiftedPrimArray
   [s0] -> s0
-  ss -> runST $ do
-    -- TODO use byte-wise ops
-    let totLen = getMax (foldMap (Max . lengthLiftedPrimArray) ss)
-    marr <- newLiftedPrimArray totLen (proxyFor val)
-    setLiftedPrimArray marr 0 totLen val
-    for_ ss $ \s -> do
-      let len = lengthLiftedPrimArray s
+  ss -> LiftedPrimArray $ runByteArray $ do
+    let prox = proxyFor val
+        totLen' = getMax (foldMap (Max . sizeofLiftedPrimArray) ss)
+        elemSize = staticByteSize prox
+        totLen = div totLen' elemSize
+    darr <- newByteArray (unByteCount totLen')
+    for_ [0 .. totLen - 1] $ \pos ->
+      writeArrayLiftedInBytes darr (pos * elemSize) val
+    for_ ss $ \s@(LiftedPrimArray sarr) -> do
+      let len' = sizeofLiftedPrimArray s
+          len = div len' elemSize
       for_ [0 .. len - 1] $ \pos -> do
-        val0 <- readLiftedPrimArray marr pos
-        let val1 = indexLiftedPrimArray s pos
-        writeLiftedPrimArray marr pos (f val0 val1)
-    unsafeFreezeLiftedPrimArray marr
+        let pos' = pos * elemSize
+        val0 <- readArrayLiftedInBytes prox darr pos'
+        let val1 = indexArrayLiftedInBytes sarr pos'
+        writeArrayLiftedInBytes darr pos' (f val0 val1)
+    pure darr

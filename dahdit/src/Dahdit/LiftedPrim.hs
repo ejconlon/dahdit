@@ -2,6 +2,8 @@
 
 module Dahdit.LiftedPrim
   ( LiftedPrim (..)
+  , readArrayLiftedInBytes
+  , readPtrLiftedInBytes
   , indexArrayLiftedInElems
   , readArrayLiftedInElems
   , writeArrayLiftedInElems
@@ -480,6 +482,6 @@ setByteArrayLifted
   :: (PrimMonad m, LiftedPrim a) => MutableByteArray (PrimState m) -> ByteCount -> ByteCount -> a -> m ()
 setByteArrayLifted arr off len val = do
   let elemSize = staticByteSize (proxyFor val)
-      elemLen = div (coerce len) elemSize
+      elemLen = div len elemSize
   for_ [0 .. elemLen - 1] $ \pos ->
     writeArrayLiftedInBytes arr (off + pos * elemSize) val

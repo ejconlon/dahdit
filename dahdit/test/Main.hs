@@ -93,6 +93,7 @@ import Dahdit
   , getWord8
   , lengthLiftedPrimArray
   , liftedPrimArrayFromList
+  , mapLiftedPrimArray
   , mergeLiftedPrimArray
   , mutPutTarget
   , mutPutTargetOffset
@@ -540,6 +541,7 @@ testLiftedPrimArray =
     [ testLiftedPrimArrayFromList
     , testLiftedPrimArrayCopy
     , testLiftedPrimArraySet
+    , testLiftedPrimArrayMap
     , testLiftedPrimArrayConcat
     , testLiftedPrimArrayMerge
     ]
@@ -559,6 +561,13 @@ assertArrEq expected actualAct = do
   actual <- liftIO actualAct
   actual === expected
 
+testLiftedPrimArrayMap :: TestTree
+testLiftedPrimArrayMap = testUnit "map" $ do
+  let mkArr32 = liftedPrimArrayFromList @Word32LE
+      mkMap = mapLiftedPrimArray @Word16LE @Word32LE ((+ 1) . fromIntegral) . mkArr
+  mkMap [] === mkArr32 []
+  mkMap [1, 2] === mkArr32 [2, 3]
+
 testLiftedPrimArrayConcat :: TestTree
 testLiftedPrimArrayConcat = testUnit "concat" $ do
   let mkConcat = concatLiftedPrimArray . fmap mkArr
@@ -570,7 +579,7 @@ testLiftedPrimArrayConcat = testUnit "concat" $ do
   mkConcat [[0], [1, 2], [3]] === mkArr [0, 1, 2, 3]
 
 testLiftedPrimArrayMerge :: TestTree
-testLiftedPrimArrayMerge = testUnit "concat" $ do
+testLiftedPrimArrayMerge = testUnit "merge" $ do
   let mkMerge = mergeLiftedPrimArray 0 (+) . fmap mkArr
   mkMerge [] === mkArr []
   mkMerge [[1, 2]] === mkArr [1, 2]
