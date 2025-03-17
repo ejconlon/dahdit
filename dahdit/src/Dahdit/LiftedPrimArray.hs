@@ -217,7 +217,7 @@ mapLiftedPrimArray f arrA = runST $ do
   for_ [0 .. len - 1] $ \pos -> do
     let valA = indexLiftedPrimArray arrA pos
     writeLiftedPrimArray arrB pos (f valA)
-  freezeLiftedPrimArray arrB 0 len
+  unsafeFreezeLiftedPrimArray arrB
 
 concatLiftedPrimArray :: (LiftedPrim a) => [LiftedPrimArray a] -> LiftedPrimArray a
 concatLiftedPrimArray = \case
@@ -233,7 +233,7 @@ concatLiftedPrimArray = \case
       off <- readSTRef offRef
       copyLiftedPrimArray marr off s 0 len
       writeSTRef offRef (off + len)
-    freezeLiftedPrimArray marr 0 totLen
+    unsafeFreezeLiftedPrimArray marr
 
 -- | Combine several arrays pointwise. The first two arguments are "zero" and "plus", with
 -- appropriate laws.
@@ -252,4 +252,4 @@ mergeLiftedPrimArray val f = \case
         val0 <- readLiftedPrimArray marr pos
         let val1 = indexLiftedPrimArray s pos
         writeLiftedPrimArray marr pos (f val0 val1)
-    freezeLiftedPrimArray marr 0 totLen
+    unsafeFreezeLiftedPrimArray marr
