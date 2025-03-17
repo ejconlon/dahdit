@@ -186,15 +186,16 @@ setLiftedPrimArray
   -> ElemCount
   -> a
   -> m ()
-setLiftedPrimArray darr@(MutableLiftedPrimArray dbarr) doff slen sval = do
-  let elemSize = unByteCount (staticByteSize (proxyFor sval))
+setLiftedPrimArray (MutableLiftedPrimArray dbarr) doff slen sval = do
+  let elemSize = staticByteSize (proxyFor sval)
   arrSize <- getSizeofMutableByteArray dbarr
-  let arrLen = ElemCount (div arrSize elemSize)
+  let arrLen = ElemCount (div arrSize (unByteCount elemSize))
       setExt = min arrLen (doff + slen)
       setLen = setExt - doff
   when (setLen > 0) $ do
-    for_ [0 .. setLen - 1] $ \rep -> do
-      writeLiftedPrimArray darr (doff + rep) sval
+    for_ [0 .. setLen - 1] $ \pos -> do
+      let pos' = ByteCount (unByteCount elemSize * unElemCount (doff + pos))
+      writeArrayLiftedInBytes dbarr pos' sval
 
 readLiftedPrimArray
   :: (PrimMonad m, LiftedPrim a)
@@ -210,6 +211,7 @@ mapLiftedPrimArray
   -> LiftedPrimArray a
   -> LiftedPrimArray b
 mapLiftedPrimArray f arrA = runST $ do
+  -- TODO use byte-wise ops
   let len = lengthLiftedPrimArray arrA
   arrB <- newLiftedPrimArray len (Proxy @b)
   for_ [0 .. len - 1] $ \pos -> do
@@ -222,6 +224,7 @@ concatLiftedPrimArray = \case
   [] -> emptyLiftedPrimArray
   [s0] -> s0
   ss@(s0 : _) -> runST $ do
+    -- TODO use byte-wise ops
     let totLen = getSum (foldMap (Sum . lengthLiftedPrimArray) ss)
     marr <- newLiftedPrimArray totLen (proxyForF s0)
     offRef <- newSTRef 0
@@ -239,6 +242,7 @@ mergeLiftedPrimArray val f = \case
   [] -> emptyLiftedPrimArray
   [s0] -> s0
   ss -> runST $ do
+    -- TODO use byte-wise ops
     let totLen = getMax (foldMap (Max . lengthLiftedPrimArray) ss)
     marr <- newLiftedPrimArray totLen (proxyFor val)
     setLiftedPrimArray marr 0 totLen val
