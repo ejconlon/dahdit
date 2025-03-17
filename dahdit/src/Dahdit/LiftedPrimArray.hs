@@ -122,7 +122,14 @@ liftedPrimArrayFromList :: (LiftedPrim a) => [a] -> LiftedPrimArray a
 liftedPrimArrayFromList xs = liftedPrimArrayFromListN (ElemCount (length xs)) xs
 
 generateLiftedPrimArray :: (LiftedPrim a) => ElemCount -> (ElemCount -> a) -> LiftedPrimArray a
-generateLiftedPrimArray n f = liftedPrimArrayFromListN n (fmap f [0 .. n - 1])
+generateLiftedPrimArray len f = LiftedPrimArray $ runByteArray $ do
+  let elemSize = staticByteSize (proxyForF f)
+      len' = unElemCount len * unByteCount elemSize
+  arr <- newByteArray len'
+  for_ [0 .. len - 1] $ \pos -> do
+    let pos' = ByteCount (unByteCount elemSize * unElemCount pos)
+    writeArrayLiftedInBytes arr pos' (f pos)
+  pure arr
 
 sizeofLiftedPrimArray :: LiftedPrimArray a -> ByteCount
 sizeofLiftedPrimArray (LiftedPrimArray arr) = ByteCount (sizeofByteArray arr)
