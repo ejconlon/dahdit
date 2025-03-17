@@ -47,9 +47,17 @@ newtype ByteCount = ByteCount {unByteCount :: Int}
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Default)
 
+instance Bounded ByteCount where
+  minBound = 0
+  maxBound = ByteCount maxBound
+
 newtype ElemCount = ElemCount {unElemCount :: Int}
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Real, Integral, Default)
+
+instance Bounded ElemCount where
+  minBound = 0
+  maxBound = ElemCount maxBound
 
 -- StaticByteSized
 

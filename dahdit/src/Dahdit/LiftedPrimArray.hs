@@ -20,6 +20,8 @@ module Dahdit.LiftedPrimArray
   , setLiftedPrimArray
   , readLiftedPrimArray
   , mapLiftedPrimArray
+  , concatLiftedPrimArray
+  , mergeLiftedPrimArray
   )
 where
 
@@ -53,6 +55,7 @@ import Data.Primitive.ByteArray
   )
 import Data.Proxy (Proxy (..))
 import Data.STRef.Strict (newSTRef, readSTRef, writeSTRef)
+import Data.Semigroup (Max (..), Sum (..))
 
 newtype LiftedPrimArray a = LiftedPrimArray {unLiftedPrimArray :: ByteArray}
   deriving stock (Show)
@@ -213,3 +216,36 @@ mapLiftedPrimArray f arrA = runST $ do
     let valA = indexLiftedPrimArray arrA pos
     writeLiftedPrimArray arrB pos (f valA)
   freezeLiftedPrimArray arrB 0 len
+
+concatLiftedPrimArray :: (LiftedPrim a) => [LiftedPrimArray a] -> LiftedPrimArray a
+concatLiftedPrimArray = \case
+  [] -> emptyLiftedPrimArray
+  [s0] -> s0
+  ss@(s0 : _) -> runST $ do
+    let totLen = getSum (foldMap (Sum . lengthLiftedPrimArray) ss)
+    marr <- newLiftedPrimArray totLen (proxyForF s0)
+    offRef <- newSTRef 0
+    for_ ss $ \s -> do
+      let len = lengthLiftedPrimArray s
+      off <- readSTRef offRef
+      copyLiftedPrimArray marr off s 0 len
+      writeSTRef offRef (off + len)
+    freezeLiftedPrimArray marr 0 totLen
+
+-- | Combine several arrays pointwise. The first two arguments are "zero" and "plus", with
+-- appropriate laws.
+mergeLiftedPrimArray :: (LiftedPrim a) => a -> (a -> a -> a) -> [LiftedPrimArray a] -> LiftedPrimArray a
+mergeLiftedPrimArray val f = \case
+  [] -> emptyLiftedPrimArray
+  [s0] -> s0
+  ss -> runST $ do
+    let totLen = getMax (foldMap (Max . lengthLiftedPrimArray) ss)
+    marr <- newLiftedPrimArray totLen (proxyFor val)
+    setLiftedPrimArray marr 0 totLen val
+    for_ ss $ \s -> do
+      let len = lengthLiftedPrimArray s
+      for_ [0 .. len - 1] $ \pos -> do
+        val0 <- readLiftedPrimArray marr pos
+        let val1 = indexLiftedPrimArray s pos
+        writeLiftedPrimArray marr pos (f val0 val1)
+    freezeLiftedPrimArray marr 0 totLen

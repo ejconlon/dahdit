@@ -50,6 +50,7 @@ import Dahdit
   , Word32LE (..)
   , Word64BE
   , Word64LE
+  , concatLiftedPrimArray
   , copyLiftedPrimArray
   , decodeEnd
   , decodeInc
@@ -92,6 +93,7 @@ import Dahdit
   , getWord8
   , lengthLiftedPrimArray
   , liftedPrimArrayFromList
+  , mergeLiftedPrimArray
   , mutPutTarget
   , mutPutTargetOffset
   , newLiftedPrimArray
@@ -532,7 +534,40 @@ testPut :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testPut n p = testGroup ("put (" ++ n ++ ")") (fmap (runPutCase p) putCases)
 
 testLiftedPrimArray :: TestTree
-testLiftedPrimArray = testUnit "liftedPrimArray" $ do
+testLiftedPrimArray =
+  testGroup
+    "liftedPrimArray"
+    [ testLiftedPrimArrayFromList
+    , testLiftedPrimArrayCopy
+    , testLiftedPrimArraySet
+    , testLiftedPrimArrayConcat
+    , testLiftedPrimArrayMerge
+    ]
+
+testLiftedPrimArrayConcat :: TestTree
+testLiftedPrimArrayConcat = testUnit "concat" $ do
+  let mkArr = liftedPrimArrayFromList @Word16LE
+      mkConcat = concatLiftedPrimArray . fmap mkArr
+  mkConcat [] === mkArr []
+  mkConcat [[1, 2]] === mkArr [1, 2]
+  mkConcat [[1, 2], []] === mkArr [1, 2]
+  mkConcat [[], [1, 2]] === mkArr [1, 2]
+  mkConcat [[1, 2], [3]] === mkArr [1, 2, 3]
+  mkConcat [[0], [1, 2], [3]] === mkArr [0, 1, 2, 3]
+
+testLiftedPrimArrayMerge :: TestTree
+testLiftedPrimArrayMerge = testUnit "concat" $ do
+  let mkArr = liftedPrimArrayFromList @Word16LE
+      mkMerge = mergeLiftedPrimArray 0 (+) . fmap mkArr
+  mkMerge [] === mkArr []
+  mkMerge [[1, 2]] === mkArr [1, 2]
+  mkMerge [[1, 2], []] === mkArr [1, 2]
+  mkMerge [[], [1, 2]] === mkArr [1, 2]
+  mkMerge [[1, 2], [3]] === mkArr [4, 2]
+  mkMerge [[0], [1, 2], [3]] === mkArr [4, 2]
+
+testLiftedPrimArrayFromList :: TestTree
+testLiftedPrimArrayFromList = testUnit "fromList" $ do
   let arr = LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]) :: LiftedPrimArray Word16LE
   liftedPrimArrayFromList [0xFD, 0x6E, 0xEC] === arr
   sizeofLiftedPrimArray arr === 6
@@ -546,7 +581,7 @@ mkDestArr len f = do
   freezeLiftedPrimArray darr 0 len
 
 testLiftedPrimArrayCopy :: TestTree
-testLiftedPrimArrayCopy = testUnit "liftedPrimArray copy" $ do
+testLiftedPrimArrayCopy = testUnit "copy" $ do
   let sarr = replicateLiftedPrimArray @Word8 2 1
   sarr === liftedPrimArrayFromList [1, 1]
   darr0 <- liftIO $ mkDestArr 4 (\darr -> copyLiftedPrimArray darr 0 sarr 0 2)
@@ -567,7 +602,7 @@ testLiftedPrimArrayCopy = testUnit "liftedPrimArray copy" $ do
   darr7 === liftedPrimArrayFromList [0, 1, 1, 0]
 
 testLiftedPrimArraySet :: TestTree
-testLiftedPrimArraySet = testUnit "liftedPrimArray set" $ do
+testLiftedPrimArraySet = testUnit "set" $ do
   darr0 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 1 1)
   darr0 === liftedPrimArrayFromList [1, 0, 0]
   darr1 <- liftIO $ mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 2 1)
@@ -721,7 +756,7 @@ testDahdit :: TestLimit -> TestTree
 testDahdit lim = testGroup "Dahdit" trees
  where
   trees = baseTrees ++ targetTrees ++ mutTargetTrees
-  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray, testLiftedPrimArrayCopy, testLiftedPrimArraySet]
+  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray]
   targetTrees =
     targets >>= \(TargetDef name prox) ->
       [ testGet name prox
