@@ -6,6 +6,7 @@ module Main (main) where
 import Control.Monad (replicateM, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Primitive (PrimMonad (..), RealWorld)
+import Control.Monad.ST.Strict (runST)
 import Dahdit
   ( Binary (..)
   , BinaryGetTarget (..)
@@ -94,6 +95,7 @@ import Dahdit
   , lengthLiftedPrimArray
   , liftedPrimArrayFromList
   , mapLiftedPrimArray
+  , mergeIntoLiftedPrimArray
   , mergeLiftedPrimArray
   , mutPutTarget
   , mutPutTargetOffset
@@ -131,6 +133,8 @@ import Dahdit
   , runCount
   , setLiftedPrimArray
   , sizeofLiftedPrimArray
+  , unsafeFreezeLiftedPrimArray
+  , unsafeThawLiftedPrimArray
   , writeLiftedPrimArray
   )
 import qualified Data.ByteString as BS
@@ -587,6 +591,22 @@ testLiftedPrimArrayMerge = testUnit "merge" $ do
   mkMerge [[], [1, 2]] === mkArr [1, 2]
   mkMerge [[1, 2], [3]] === mkArr [4, 2]
   mkMerge [[0], [1, 2], [3]] === mkArr [4, 2]
+
+testLiftedPrimArrayMergeInto :: TestTree
+testLiftedPrimArrayMergeInto = testUnit "merge into" $ do
+  let mkMerge a x b y z = runST $ do
+        w <- unsafeThawLiftedPrimArray (mkArr a)
+        mergeIntoLiftedPrimArray (+) w x (mkArr b) y z
+        unsafeFreezeLiftedPrimArray w
+  mkMerge [] 0 [] 0 0 === mkArr []
+  mkMerge [1] 0 [] 0 0 === mkArr [1]
+  mkMerge [1] 0 [2] 0 0 === mkArr [1]
+  mkMerge [1] 0 [2] 0 1 === mkArr [3]
+  mkMerge [1, 2] 0 [2, 3] 0 1 === mkArr [3, 2]
+  mkMerge [1, 2] 0 [2, 3] 0 2 === mkArr [3, 5]
+  mkMerge [1, 2] 0 [2, 3] 0 3 === mkArr [3, 5]
+  mkMerge [1, 2] 1 [2, 3] 0 2 === mkArr [1, 4]
+  mkMerge [1, 2, 3] 1 [2] 0 1 === mkArr [1, 3, 3]
 
 testLiftedPrimArrayFromList :: TestTree
 testLiftedPrimArrayFromList = testUnit "fromList" $ do

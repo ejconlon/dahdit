@@ -22,6 +22,7 @@ module Dahdit.LiftedPrimArray
   , mapLiftedPrimArray
   , concatLiftedPrimArray
   , mergeLiftedPrimArray
+  , mergeIntoLiftedPrimArray
   )
 where
 
@@ -265,3 +266,26 @@ mergeLiftedPrimArray val f = \case
         let val1 = indexArrayLiftedInBytes sarr pos'
         writeArrayLiftedInBytes darr pos' (f val0 val1)
     pure darr
+
+mergeIntoLiftedPrimArray
+  :: (PrimMonad m, LiftedPrim a)
+  => (a -> a -> a)
+  -> MutableLiftedPrimArray (PrimState m) a
+  -> ElemCount
+  -> LiftedPrimArray a
+  -> ElemCount
+  -> ElemCount
+  -> m ()
+mergeIntoLiftedPrimArray f dest@(MutableLiftedPrimArray darr) doff (LiftedPrimArray sarr) soff slen = do
+  let prox = proxyForF dest
+      elemSize = staticByteSize prox
+  dsz <- getSizeofMutableByteArray darr
+  let dtot = ElemCount (div dsz (unByteCount elemSize))
+      stot = ElemCount (div (sizeofByteArray sarr) (unByteCount elemSize))
+      sext = min (soff + slen) stot
+      len = min (dtot - doff) (sext - soff)
+  for_ [0 .. len - 1] $ \pos -> do
+    let pos' = ByteCount (unElemCount pos * unByteCount elemSize)
+    val0 <- readArrayLiftedInBytes prox darr pos'
+    let val1 = indexArrayLiftedInBytes sarr pos'
+    writeArrayLiftedInBytes darr pos' (f val0 val1)
