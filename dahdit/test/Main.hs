@@ -52,6 +52,7 @@ import Dahdit
   , Word64BE
   , Word64LE
   , concatLiftedPrimArray
+  , constantLiftedPrimArray
   , copyLiftedPrimArray
   , decodeEnd
   , decodeInc
@@ -549,6 +550,7 @@ testLiftedPrimArray =
     , testLiftedPrimArrayConcat
     , testLiftedPrimArrayMerge
     , testLiftedPrimArrayMergeInto
+    , testLiftedPrimArrayReplicate
     ]
 
 mkArr :: [Word16LE] -> LiftedPrimArray Word16LE
@@ -572,6 +574,15 @@ testLiftedPrimArrayMap = testUnit "map" $ do
       mkMap = mapLiftedPrimArray @Word16LE @Word32LE ((+ 1) . fromIntegral) . mkArr
   mkMap [] === mkArr32 []
   mkMap [1, 2] === mkArr32 [2, 3]
+
+testLiftedPrimArrayReplicate :: TestTree
+testLiftedPrimArrayReplicate = testUnit "replicate" $ do
+  let mkRep n = replicateLiftedPrimArray n . mkArr
+  mkRep 0 [] === mkArr []
+  mkRep 1 [] === mkArr []
+  mkRep 0 [1, 2] === mkArr []
+  mkRep 1 [1, 2] === mkArr [1, 2]
+  mkRep 2 [1, 2] === mkArr [1, 2, 1, 2]
 
 testLiftedPrimArrayConcat :: TestTree
 testLiftedPrimArrayConcat = testUnit "concat" $ do
@@ -617,7 +628,7 @@ testLiftedPrimArrayFromList = testUnit "fromList" $ do
 
 testLiftedPrimArrayCopy :: TestTree
 testLiftedPrimArrayCopy = testUnit "copy" $ do
-  let sarr = replicateLiftedPrimArray @Word16LE 2 1
+  let sarr = constantLiftedPrimArray @Word16LE 2 1
   sarr === mkArr [1, 1]
   assertArrEq
     (mkArr [1, 1, 0, 0])

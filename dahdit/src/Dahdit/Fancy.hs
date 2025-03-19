@@ -31,7 +31,7 @@ import Dahdit.Funs
   , unsafePutStaticSeqN
   )
 import Dahdit.LiftedPrim (LiftedPrim)
-import Dahdit.LiftedPrimArray (LiftedPrimArray, replicateLiftedPrimArray)
+import Dahdit.LiftedPrimArray (LiftedPrimArray, constantLiftedPrimArray)
 import Dahdit.Proxy (proxyForNatF)
 import Dahdit.Sizes (ByteCount (..), StaticByteSized (..), byteSizeViaStatic)
 import Data.ByteString.Internal (c2w)
@@ -171,7 +171,7 @@ newtype StaticArray (n :: Nat) a = StaticArray {unStaticArray :: LiftedPrimArray
   deriving newtype (Eq)
 
 instance (KnownNat n, LiftedPrim a, Default a) => Default (StaticArray n a) where
-  def = StaticArray (replicateLiftedPrimArray (fromInteger (natVal (Proxy :: Proxy n))) def)
+  def = StaticArray (constantLiftedPrimArray (fromInteger (natVal (Proxy :: Proxy n))) def)
 
 instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) where
   type StaticSize (StaticArray n a) = n * StaticSize a

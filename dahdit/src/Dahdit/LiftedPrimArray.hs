@@ -14,6 +14,7 @@ module Dahdit.LiftedPrimArray
   , sizeofLiftedPrimArray
   , lengthLiftedPrimArray
   , cloneLiftedPrimArray
+  , constantLiftedPrimArray
   , replicateLiftedPrimArray
   , newLiftedPrimArray
   , uninitLiftedPrimArray
@@ -152,15 +153,25 @@ cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
       len' = unElemCount len * unByteCount elemSize
   in  LiftedPrimArray (cloneByteArray arr off' len')
 
-replicateLiftedPrimArray :: (LiftedPrim a) => ElemCount -> a -> LiftedPrimArray a
-replicateLiftedPrimArray len val = LiftedPrimArray $ runByteArray $ do
+constantLiftedPrimArray :: (LiftedPrim a) => ElemCount -> a -> LiftedPrimArray a
+constantLiftedPrimArray len val = LiftedPrimArray $ runByteArray $ do
   let elemSize = staticByteSize (proxyFor val)
       len' = unElemCount len * unByteCount elemSize
-  arr <- newByteArray len'
+  darr <- newByteArray len'
   for_ [0 .. len - 1] $ \pos -> do
     let pos' = ByteCount (unElemCount pos * unByteCount elemSize)
-    writeArrayLiftedInBytes arr pos' val
-  pure arr
+    writeArrayLiftedInBytes darr pos' val
+  pure darr
+
+replicateLiftedPrimArray :: Int -> LiftedPrimArray a -> LiftedPrimArray a
+replicateLiftedPrimArray n (LiftedPrimArray sarr) = LiftedPrimArray $ runByteArray $ do
+  let srcSize = sizeofByteArray sarr
+      len' = n * srcSize
+  darr <- newByteArray len'
+  for_ [0 .. n - 1] $ \i -> do
+    let pos' = i * srcSize
+    copyByteArray darr pos' sarr 0 srcSize
+  pure darr
 
 uninitLiftedPrimArray
   :: (PrimMonad m, StaticByteSized a) => ElemCount -> Proxy a -> m (MutableLiftedPrimArray (PrimState m) a)
