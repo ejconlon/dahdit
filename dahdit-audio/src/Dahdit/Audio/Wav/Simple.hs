@@ -106,7 +106,7 @@ fromComplex wav0 = do
           { waveNumChannels = fromIntegral (wfbNumChannels wfb)
           , waveFrameRate = fromIntegral (wfbSampleRate wfb)
           , waveBitsPerSample = bps
-          , waveFrames = Just (sizeofByteArray (unQuietArray samps1))
+          , waveFrames = Just (div (sizeofByteArray (unQuietArray samps1)) 4)
           }
   pure (WAVE hdr (WAVESamples (QuietLiftedArray (LiftedPrimArray (unQuietArray samps1)))))
 
