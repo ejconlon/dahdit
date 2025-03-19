@@ -16,6 +16,7 @@ module Dahdit.LiftedPrimArray
   , cloneLiftedPrimArray
   , replicateLiftedPrimArray
   , newLiftedPrimArray
+  , uninitLiftedPrimArray
   , copyLiftedPrimArray
   , setLiftedPrimArray
   , readLiftedPrimArray
@@ -26,7 +27,6 @@ module Dahdit.LiftedPrimArray
   )
 where
 
-import Control.Monad (when)
 import Control.Monad.Primitive (PrimMonad (..))
 import Control.Monad.ST.Strict (runST)
 import Dahdit.LiftedPrim
@@ -46,8 +46,8 @@ import Data.Primitive.ByteArray
   , cloneByteArray
   , copyByteArray
   , emptyByteArray
+  , fillByteArray
   , freezeByteArray
-  , getSizeofMutableByteArray
   , newByteArray
   , runByteArray
   , sizeofByteArray
@@ -109,10 +109,10 @@ unsafeThawLiftedPrimArray :: (PrimMonad m) => LiftedPrimArray a -> m (MutableLif
 unsafeThawLiftedPrimArray (LiftedPrimArray arr) = fmap MutableLiftedPrimArray (unsafeThawByteArray arr)
 
 liftedPrimArrayFromListN :: (LiftedPrim a) => ElemCount -> [a] -> LiftedPrimArray a
-liftedPrimArrayFromListN n xs = LiftedPrimArray $ runByteArray $ do
+liftedPrimArrayFromListN len xs = LiftedPrimArray $ runByteArray $ do
   let elemSize = staticByteSize (proxyForF xs)
-      len = unElemCount n * unByteCount elemSize
-  arr <- newByteArray len
+      len' = unElemCount len * unByteCount elemSize
+  arr <- newByteArray len'
   offRef <- newSTRef 0
   for_ xs $ \x -> do
     off <- readSTRef offRef
@@ -137,10 +137,10 @@ sizeofLiftedPrimArray :: LiftedPrimArray a -> ByteCount
 sizeofLiftedPrimArray (LiftedPrimArray arr) = ByteCount (sizeofByteArray arr)
 
 lengthLiftedPrimArray :: (LiftedPrim a) => LiftedPrimArray a -> ElemCount
-lengthLiftedPrimArray pa@(LiftedPrimArray arr) =
+lengthLiftedPrimArray pa =
   let elemSize = staticByteSize (proxyForF pa)
-      arrSize = sizeofByteArray arr
-  in  ElemCount (div arrSize (unByteCount elemSize))
+      arrSize = sizeofLiftedPrimArray pa
+  in  ElemCount (div (unByteCount arrSize) (unByteCount elemSize))
 
 cloneLiftedPrimArray :: (LiftedPrim a) => LiftedPrimArray a -> ElemCount -> ElemCount -> LiftedPrimArray a
 cloneLiftedPrimArray pa@(LiftedPrimArray arr) off len =
@@ -159,12 +159,21 @@ replicateLiftedPrimArray len val = LiftedPrimArray $ runByteArray $ do
     writeArrayLiftedInBytes arr pos' val
   pure arr
 
-newLiftedPrimArray
+uninitLiftedPrimArray
   :: (PrimMonad m, StaticByteSized a) => ElemCount -> Proxy a -> m (MutableLiftedPrimArray (PrimState m) a)
-newLiftedPrimArray len prox =
+uninitLiftedPrimArray len prox =
   let elemSize = staticByteSize prox
       len' = unElemCount len * unByteCount elemSize
   in  fmap MutableLiftedPrimArray (newByteArray len')
+
+newLiftedPrimArray
+  :: (PrimMonad m, StaticByteSized a) => ElemCount -> Proxy a -> m (MutableLiftedPrimArray (PrimState m) a)
+newLiftedPrimArray len prox = do
+  let elemSize = staticByteSize prox
+      len' = unElemCount len * unByteCount elemSize
+  arr <- newByteArray len'
+  fillByteArray arr 0 len' 0
+  pure (MutableLiftedPrimArray arr)
 
 copyLiftedPrimArray
   :: (PrimMonad m, StaticByteSized a)
@@ -178,13 +187,8 @@ copyLiftedPrimArray darr@(MutableLiftedPrimArray dbarr) doff (LiftedPrimArray sb
   let elemSize = unByteCount (staticByteSize (proxyForF darr))
       byteDoff = unElemCount doff * elemSize
       byteSoff = unElemCount soff * elemSize
-      byteSmax = unElemCount slen * elemSize
-      byteSlen = sizeofByteArray sbarr
-  byteDmax <- getSizeofMutableByteArray dbarr
-  let byteDext = min byteDmax (byteDoff + byteSlen)
-      byteSext = min byteSmax (byteSoff + byteSlen)
-      byteLen = min byteDext byteSext - byteSoff
-  when (byteLen > 0) (copyByteArray dbarr byteDoff sbarr byteSoff byteLen)
+      byteSlen = unElemCount slen * elemSize
+  copyByteArray dbarr byteDoff sbarr byteSoff byteSlen
 
 -- Can't use setByteArray because don't necessarily a have Prim instance,
 -- so instead we have to loop.
@@ -195,16 +199,11 @@ setLiftedPrimArray
   -> ElemCount
   -> a
   -> m ()
-setLiftedPrimArray (MutableLiftedPrimArray dbarr) doff slen sval = do
-  let elemSize = staticByteSize (proxyFor sval)
-  arrSize <- getSizeofMutableByteArray dbarr
-  let arrLen = ElemCount (div arrSize (unByteCount elemSize))
-      setExt = min arrLen (doff + slen)
-      setLen = setExt - doff
-  when (setLen > 0) $ do
-    for_ [0 .. setLen - 1] $ \pos -> do
-      let pos' = ByteCount (unByteCount elemSize * unElemCount (doff + pos))
-      writeArrayLiftedInBytes dbarr pos' sval
+setLiftedPrimArray (MutableLiftedPrimArray dbarr) doff len val = do
+  let elemSize = staticByteSize (proxyFor val)
+  for_ [0 .. len - 1] $ \pos -> do
+    let pos' = ByteCount (unByteCount elemSize * unElemCount (doff + pos))
+    writeArrayLiftedInBytes dbarr pos' val
 
 readLiftedPrimArray
   :: (PrimMonad m, LiftedPrim a)
@@ -222,7 +221,7 @@ mapLiftedPrimArray
 mapLiftedPrimArray f arrA = runST $ do
   -- TODO use byte-wise ops
   let len = lengthLiftedPrimArray arrA
-  arrB <- newLiftedPrimArray len (Proxy @b)
+  arrB <- uninitLiftedPrimArray len (Proxy @b)
   for_ [0 .. len - 1] $ \pos -> do
     let valA = indexLiftedPrimArray arrA pos
     writeLiftedPrimArray arrB pos (f valA)
@@ -279,13 +278,9 @@ mergeIntoLiftedPrimArray
 mergeIntoLiftedPrimArray f dest@(MutableLiftedPrimArray darr) doff (LiftedPrimArray sarr) soff slen = do
   let prox = proxyForF dest
       elemSize = staticByteSize prox
-  dsz <- getSizeofMutableByteArray darr
-  let dtot = ElemCount (div dsz (unByteCount elemSize))
-      stot = ElemCount (div (sizeofByteArray sarr) (unByteCount elemSize))
-      sext = min (soff + slen) stot
-      len = min (dtot - doff) (sext - soff)
-  for_ [0 .. len - 1] $ \pos -> do
-    let pos' = ByteCount (unElemCount pos * unByteCount elemSize)
-    val0 <- readArrayLiftedInBytes prox darr pos'
-    let val1 = indexArrayLiftedInBytes sarr pos'
-    writeArrayLiftedInBytes darr pos' (f val0 val1)
+  for_ [0 .. slen - 1] $ \pos -> do
+    let dpos' = ByteCount (unElemCount (doff + pos) * unByteCount elemSize)
+        spos' = ByteCount (unElemCount (soff + pos) * unByteCount elemSize)
+    val0 <- readArrayLiftedInBytes prox darr dpos'
+    let val1 = indexArrayLiftedInBytes sarr spos'
+    writeArrayLiftedInBytes darr dpos' (f val0 val1)

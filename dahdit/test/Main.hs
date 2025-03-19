@@ -548,6 +548,7 @@ testLiftedPrimArray =
     , testLiftedPrimArrayMap
     , testLiftedPrimArrayConcat
     , testLiftedPrimArrayMerge
+    , testLiftedPrimArrayMergeInto
     ]
 
 mkArr :: [Word16LE] -> LiftedPrimArray Word16LE
@@ -604,9 +605,8 @@ testLiftedPrimArrayMergeInto = testUnit "merge into" $ do
   mkMerge [1] 0 [2] 0 1 === mkArr [3]
   mkMerge [1, 2] 0 [2, 3] 0 1 === mkArr [3, 2]
   mkMerge [1, 2] 0 [2, 3] 0 2 === mkArr [3, 5]
-  mkMerge [1, 2] 0 [2, 3] 0 3 === mkArr [3, 5]
-  mkMerge [1, 2] 1 [2, 3] 0 2 === mkArr [1, 4]
-  mkMerge [1, 2, 3] 1 [2] 0 1 === mkArr [1, 3, 3]
+  mkMerge [1, 2, 3] 1 [2] 0 1 === mkArr [1, 4, 3]
+  mkMerge [1, 2, 3] 1 [2, 3] 0 2 === mkArr [1, 4, 6]
 
 testLiftedPrimArrayFromList :: TestTree
 testLiftedPrimArrayFromList = testUnit "fromList" $ do
@@ -629,20 +629,8 @@ testLiftedPrimArrayCopy = testUnit "copy" $ do
     (mkArr [0, 0, 1, 1])
     (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 2 sarr 0 2))
   assertArrEq
-    (mkArr [0, 0, 0, 1])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 3 sarr 0 2))
-  assertArrEq
-    (mkArr [0, 0, 0, 0])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 4 sarr 0 2))
-  assertArrEq
-    (mkArr [0, 0, 0, 0])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr (-1) sarr 0 2))
-  assertArrEq
     (mkArr [0, 1, 0, 0])
     (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 1))
-  assertArrEq
-    (mkArr [0, 1, 1, 0])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 3))
 
 testLiftedPrimArraySet :: TestTree
 testLiftedPrimArraySet = testUnit "set" $ do
@@ -656,14 +644,8 @@ testLiftedPrimArraySet = testUnit "set" $ do
     (mkArr [1, 1, 1])
     (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 3 1))
   assertArrEq
-    (mkArr [1, 1, 1])
-    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 4 1))
-  assertArrEq
     (mkArr [0, 1, 1])
     (mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 2 1))
-  assertArrEq
-    (mkArr [0, 1, 1])
-    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 3 1))
 
 testGetOffset :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetOffset n p = testUnit ("get offset (" ++ n ++ ")") $ do
