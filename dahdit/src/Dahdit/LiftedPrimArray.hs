@@ -19,6 +19,7 @@ module Dahdit.LiftedPrimArray
   , uninitLiftedPrimArray
   , copyLiftedPrimArray
   , setLiftedPrimArray
+  , zeroLiftedPrimArray
   , readLiftedPrimArray
   , mapLiftedPrimArray
   , concatLiftedPrimArray
@@ -50,6 +51,7 @@ import Data.Primitive.ByteArray
   , freezeByteArray
   , newByteArray
   , runByteArray
+  , setByteArray
   , sizeofByteArray
   , thawByteArray
   , unsafeFreezeByteArray
@@ -58,6 +60,7 @@ import Data.Primitive.ByteArray
 import Data.Proxy (Proxy (..))
 import Data.STRef.Strict (newSTRef, readSTRef, writeSTRef)
 import Data.Semigroup (Max (..), Sum (..))
+import Data.Word (Word8)
 
 newtype LiftedPrimArray a = LiftedPrimArray {unLiftedPrimArray :: ByteArray}
   deriving stock (Show)
@@ -204,6 +207,18 @@ setLiftedPrimArray (MutableLiftedPrimArray dbarr) doff len val = do
   for_ [0 .. len - 1] $ \pos -> do
     let pos' = ByteCount (unByteCount elemSize * unElemCount (doff + pos))
     writeArrayLiftedInBytes dbarr pos' val
+
+zeroLiftedPrimArray
+  :: (PrimMonad m, StaticByteSized a)
+  => MutableLiftedPrimArray (PrimState m) a
+  -> ElemCount
+  -> ElemCount
+  -> m ()
+zeroLiftedPrimArray mpa@(MutableLiftedPrimArray dbarr) off len = do
+  let elemSize = staticByteSize (proxyForF mpa)
+      off' = unElemCount off * unByteCount elemSize
+      len' = unElemCount len * unByteCount elemSize
+  setByteArray @Word8 dbarr off' len' 0
 
 readLiftedPrimArray
   :: (PrimMonad m, LiftedPrim a)
