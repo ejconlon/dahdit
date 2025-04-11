@@ -22,12 +22,10 @@ import Dahdit
   , getExact
   , getSkip
   , getTarget
-  , lengthLiftedPrimArray
-  , liftedPrimArrayFromList
   )
 import Dahdit.Audio.Aiff (Aiff (..), AiffDataBody (..), lookupAiffDataChunk)
 import Dahdit.Audio.Aiff qualified as Aiff
-import Dahdit.Audio.Binary (QuietArray (..))
+import Dahdit.Audio.Binary (QuietByteArray (..))
 import Dahdit.Audio.Common
   ( LoopMarks (..)
   , UnparsedBody (..)
@@ -86,6 +84,7 @@ import Data.Foldable (for_, toList)
 import Data.Int (Int8)
 import Data.Maybe (fromMaybe)
 import Data.Primitive.ByteArray (indexByteArray, sizeofByteArray)
+import Data.Primitive.PrimArray (primArrayFromList, sizeofPrimArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence qualified as Seq
 import Test.Daytripper (daytripperMain)
@@ -176,7 +175,7 @@ testWavData = testCase "data" $ do
     getSkip drumDataOffset
     chunk <- get
     case chunk of
-      WavChunkData (KnownChunk (WavDataBody (QuietArray arr))) -> pure arr
+      WavChunkData (KnownChunk (WavDataBody (QuietByteArray arr))) -> pure arr
       _ -> fail "expected data"
   fromIntegral (sizeofByteArray arr) @?= drumDataLen * 2 -- x2 for 2-byte samples
 
@@ -197,7 +196,7 @@ testWavWhole = testCase "whole" $ do
   (wav, _) <- decodeThrow bs
   fmtChunk <- rethrow (guardChunk "format" (lookupWavFormatChunk wav))
   fmtChunk @?= drumFmtChunk
-  KnownChunk (WavDataBody (QuietArray arr)) <- rethrow (guardChunk "data" (lookupWavDataChunk wav))
+  KnownChunk (WavDataBody (QuietByteArray arr)) <- rethrow (guardChunk "data" (lookupWavDataChunk wav))
   fromIntegral (sizeofByteArray arr) @?= drumDataLen * 2 -- x2 for 2-byte samples
   Seq.length (wavChunks wav) @?= 4
 
@@ -251,7 +250,7 @@ testSfontWhole = testCase "whole" $ do
   case maySdta of
     Nothing -> fail "Missing sdta"
     Just sdta -> do
-      lengthLiftedPrimArray (sdtaHighBits sdta) @?= 1365026
+      sizeofPrimArray (sdtaHighBits sdta) @?= 1365026
       sdtaLowBits sdta @?= Nothing
   Seq.length pdtaBlocks @?= 9
 
@@ -326,19 +325,19 @@ testConvertDx = testCase "DX" $ do
 
 aifSamples :: Aiff -> [Word8]
 aifSamples aif =
-  let Aiff.KnownChunk (AiffDataBody _ _ (QuietArray wavData)) = fromMaybe (error "no data") (lookupAiffDataChunk aif)
+  let Aiff.KnownChunk (AiffDataBody _ _ (QuietByteArray wavData)) = fromMaybe (error "no data") (lookupAiffDataChunk aif)
       !sz = sizeofByteArray wavData
   in  fmap (indexByteArray wavData) [0 .. sz - 1]
 
 wavSamples :: Wav -> [Word8]
 wavSamples wav =
-  let KnownChunk (WavDataBody (QuietArray wavData)) = fromMaybe (error "no data") (lookupWavDataChunk wav)
+  let KnownChunk (WavDataBody (QuietByteArray wavData)) = fromMaybe (error "no data") (lookupWavDataChunk wav)
       !sz = sizeofByteArray wavData
   in  fmap (indexByteArray wavData) [0 .. sz - 1]
 
 neutralSamples :: Neutral -> [Word8]
 neutralSamples ne =
-  let !wavData = unQuietArray (pcData (neCon ne))
+  let !wavData = unQuietByteArray (pcData (neCon ne))
       !sz = sizeofByteArray wavData
   in  fmap (indexByteArray wavData) [0 .. sz - 1]
 
@@ -454,8 +453,8 @@ testConvert = testGroup "convert" [testConvertDx, testConvertSin, testConvertLoo
 
 testDspMono :: TestTree
 testDspMono = testCase "mono" $ do
-  let !larr1 = liftedPrimArrayFromList @Int16LE [0, 1, 2, 3, 4, 5]
-      !larr2 = liftedPrimArrayFromList @Int16LE [0, 2, 4]
+  let !larr1 = primArrayFromList @Int16LE [0, 1, 2, 3, 4, 5]
+      !larr2 = primArrayFromList @Int16LE [0, 2, 4]
       !mm1 = ModMeta {mmNumChannels = 2, mmBitsPerSample = 16, mmSampleRate = 44100}
       !mm2 = mm1 {mmNumChannels = 1}
   (!mmx, !larrx) <- rethrow (runMod monoFromLeft mm1 larr1)
@@ -464,12 +463,12 @@ testDspMono = testCase "mono" $ do
 
 testDspFadeOne :: TestTree
 testDspFadeOne = testCase "fade one" $ do
-  let !larr1 = liftedPrimArrayFromList @Int8 [5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1]
+  let !larr1 = primArrayFromList @Int8 [5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1]
       --                                                               ^                       ^
       !width = 1
       !loopStart = 7
       !loopEnd = 15
-      !larr2 = liftedPrimArrayFromList @Int8 [5, 5, 5, 5, 5, 5, 5, 3, 5, 1, 1, 1, 1, 1, 5, 3, 1]
+      !larr2 = primArrayFromList @Int8 [5, 5, 5, 5, 5, 5, 5, 3, 5, 1, 1, 1, 1, 1, 5, 3, 1]
       --                                                               ^                       ^
       !mm = ModMeta {mmNumChannels = 1, mmBitsPerSample = 8, mmSampleRate = 44100}
   (!mmx, !larrx) <- rethrow (runMod (linearCrossFade width loopStart loopEnd) mm larr1)
@@ -478,11 +477,11 @@ testDspFadeOne = testCase "fade one" $ do
 
 testDspFadeSome :: TestTree
 testDspFadeSome = testCase "fade some" $ do
-  let !larr1 = liftedPrimArrayFromList @Int8 [5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1]
+  let !larr1 = primArrayFromList @Int8 [5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1]
       !width = 3
       !loopStart = 7
       !loopEnd = 15
-      !larr2 = liftedPrimArrayFromList @Int8 [5, 5, 5, 5, 5, 4, 3, 3, 3, 1, 1, 1, 5, 4, 3, 3, 2]
+      !larr2 = primArrayFromList @Int8 [5, 5, 5, 5, 5, 4, 3, 3, 3, 1, 1, 1, 5, 4, 3, 3, 2]
       !mm = ModMeta {mmNumChannels = 1, mmBitsPerSample = 8, mmSampleRate = 44100}
   (!mmx, !larrx) <- rethrow (runMod (linearCrossFade width loopStart loopEnd) mm larr1)
   mmx @?= mm
@@ -490,11 +489,11 @@ testDspFadeSome = testCase "fade some" $ do
 
 testDspFadeWider :: TestTree
 testDspFadeWider = testCase "fade wider" $ do
-  let !larr1 = liftedPrimArrayFromList @Int16LE [5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1]
+  let !larr1 = primArrayFromList @Int16LE [5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1]
       !width = 3
       !loopStart = 7
       !loopEnd = 15
-      !larr2 = liftedPrimArrayFromList @Int16LE [5, 5, 5, 5, 5, 4, 3, 3, 3, 1, 1, 1, 5, 4, 3, 3, 2]
+      !larr2 = primArrayFromList @Int16LE [5, 5, 5, 5, 5, 4, 3, 3, 3, 1, 1, 1, 5, 4, 3, 3, 2]
       !mm = ModMeta {mmNumChannels = 1, mmBitsPerSample = 16, mmSampleRate = 44100}
   (!mmx, !larrx) <- rethrow (runMod (linearCrossFade width loopStart loopEnd) mm larr1)
   mmx @?= mm

@@ -250,9 +250,9 @@ testByteSize =
     , testUnit "Int8" (byteSize @Int8 0 === 1)
     , testUnit "Word16" (byteSize @Word16 0 === 2)
     , testUnit "Int16" (byteSize @Int16 0 === 2)
-    -- , testUnit "Word24" (byteSize @Word24 0 === 3)
-    -- , testUnit "Int24" (byteSize @Int24 0 === 3)
-    , testUnit "Word32" (byteSize @Word32 0 === 4)
+    , -- , testUnit "Word24" (byteSize @Word24 0 === 3)
+      -- , testUnit "Int24" (byteSize @Int24 0 === 3)
+      testUnit "Word32" (byteSize @Word32 0 === 4)
     , testUnit "Int32" (byteSize @Int32 0 === 4)
     , testUnit "Word64" (byteSize @Word64 0 === 8)
     , testUnit "Int64" (byteSize @Int64 0 === 8)
@@ -264,9 +264,9 @@ testByteSize =
     , testUnit "Int" (byteSize @Int 0 === 8)
     , testUnit "Word16LE" (byteSize @Word16LE 0 === 2)
     , testUnit "Int16LE" (byteSize @Int16LE 0 === 2)
-    -- , testUnit "Word24LE" (byteSize @Word24LE 0 === 3)
-    -- , testUnit "Int24LE" (byteSize @Int24LE 0 === 3)
-    , testUnit "Word32LE" (byteSize @Word32LE 0 === 4)
+    , -- , testUnit "Word24LE" (byteSize @Word24LE 0 === 3)
+      -- , testUnit "Int24LE" (byteSize @Int24LE 0 === 3)
+      testUnit "Word32LE" (byteSize @Word32LE 0 === 4)
     , testUnit "Int32LE" (byteSize @Int32LE 0 === 4)
     , testUnit "Word64LE" (byteSize @Word64LE 0 === 8)
     , testUnit "Int64LE" (byteSize @Int64LE 0 === 8)
@@ -274,9 +274,9 @@ testByteSize =
     , testUnit "DoubleLE" (byteSize (DoubleLE (castWord64ToDouble 0)) === 8)
     , testUnit "Word16BE" (byteSize @Word16BE 0 === 2)
     , testUnit "Int16BE" (byteSize @Int16BE 0 === 2)
-    -- , testUnit "Word24BE" (byteSize @Word24BE 0 === 3)
-    -- , testUnit "Int24BE" (byteSize @Int24BE 0 === 3)
-    , testUnit "Word32BE" (byteSize @Word32BE 0 === 4)
+    , -- , testUnit "Word24BE" (byteSize @Word24BE 0 === 3)
+      -- , testUnit "Int24BE" (byteSize @Int24BE 0 === 3)
+      testUnit "Word32BE" (byteSize @Word32BE 0 === 4)
     , testUnit "Int32BE" (byteSize @Int32BE 0 === 4)
     , testUnit "Word64BE" (byteSize @Word64BE 0 === 8)
     , testUnit "Int64BE" (byteSize @Int64BE 0 === 8)
@@ -299,9 +299,9 @@ testStaticByteSize =
     , testUnit "Int8" (staticByteSize @Int8 Proxy === 1)
     , testUnit "Word16" (staticByteSize @Word16 Proxy === 2)
     , testUnit "Int16" (staticByteSize @Int16 Proxy === 2)
-    -- , testUnit "Word24" (staticByteSize @Word24 Proxy === 3)
-    -- , testUnit "Int24" (staticByteSize @Int24 Proxy === 3)
-    , testUnit "Word32" (staticByteSize @Word32 Proxy === 4)
+    , -- , testUnit "Word24" (staticByteSize @Word24 Proxy === 3)
+      -- , testUnit "Int24" (staticByteSize @Int24 Proxy === 3)
+      testUnit "Word32" (staticByteSize @Word32 Proxy === 4)
     , testUnit "Int32" (staticByteSize @Int32 Proxy === 4)
     , testUnit "Word64" (staticByteSize @Word64 Proxy === 8)
     , testUnit "Int64" (staticByteSize @Int64 Proxy === 8)
@@ -313,9 +313,9 @@ testStaticByteSize =
     , testUnit "Int" (staticByteSize @Int Proxy === 8)
     , testUnit "Word16LE" (staticByteSize @Word16LE Proxy === 2)
     , testUnit "Int16LE" (staticByteSize @Int16LE Proxy === 2)
-    -- , testUnit "Word24LE" (staticByteSize @Word24LE Proxy === 3)
-    -- , testUnit "Int24LE" (staticByteSize @Int24LE Proxy === 3)
-    , testUnit "Word32LE" (staticByteSize @Word32LE Proxy === 4)
+    , -- , testUnit "Word24LE" (staticByteSize @Word24LE Proxy === 3)
+      -- , testUnit "Int24LE" (staticByteSize @Int24LE Proxy === 3)
+      testUnit "Word32LE" (staticByteSize @Word32LE Proxy === 4)
     , testUnit "Int32LE" (staticByteSize @Int32LE Proxy === 4)
     , testUnit "Word64LE" (staticByteSize @Word64LE Proxy === 8)
     , testUnit "Int64LE" (staticByteSize @Int64LE Proxy === 8)
@@ -323,9 +323,9 @@ testStaticByteSize =
     , testUnit "DoubleLE" (staticByteSize @DoubleLE Proxy === 8)
     , testUnit "Word16BE" (staticByteSize @Word16BE Proxy === 2)
     , testUnit "Int16BE" (staticByteSize @Int16BE Proxy === 2)
-    -- , testUnit "Word24BE" (staticByteSize @Word24BE Proxy === 3)
-    -- , testUnit "Int24BE" (staticByteSize @Int24BE Proxy === 3)
-    , testUnit "Word32BE" (staticByteSize @Word32BE Proxy === 4)
+    , -- , testUnit "Word24BE" (staticByteSize @Word24BE Proxy === 3)
+      -- , testUnit "Int24BE" (staticByteSize @Int24BE Proxy === 3)
+      testUnit "Word32BE" (staticByteSize @Word32BE Proxy === 4)
     , testUnit "Int32BE" (staticByteSize @Int32BE Proxy === 4)
     , testUnit "Word64BE" (staticByteSize @Word64BE Proxy === 8)
     , testUnit "Int64BE" (staticByteSize @Int64BE Proxy === 8)
@@ -349,11 +349,11 @@ getCases =
   , GetCase "Int16LE" getInt16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
   , GetCase "Word16BE" getWord16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB]
   , GetCase "Int16BE" getInt16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB]
-  -- , GetCase "Word24LE" getWord24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
-  -- , GetCase "Int24LE" getInt24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
-  -- , GetCase "Word24BE" getWord24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
-  -- , GetCase "Int24BE" getInt24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
-  , GetCase "Word32LE" getWord32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+  , -- , GetCase "Word24LE" getWord24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+    -- , GetCase "Int24LE" getInt24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+    -- , GetCase "Word24BE" getWord24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
+    -- , GetCase "Int24BE" getInt24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
+    GetCase "Word32LE" getWord32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
   , GetCase "Int32LE" getInt32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
   , GetCase "Word32BE" getWord32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD]
   , GetCase "Int32BE" getInt32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD]
@@ -443,11 +443,11 @@ putCases =
   , PutCase "Int16LE" (putInt16LE 0x5DEC) [0xEC, 0x5D]
   , PutCase "Word16BE" (putWord16BE 0x5DEC) [0x5D, 0xEC]
   , PutCase "Int16BE" (putInt16BE 0x5DEC) [0x5D, 0xEC]
-  -- , PutCase "Word24LE" (putWord24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
-  -- , PutCase "Int24LE" (putInt24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
-  -- , PutCase "Word24BE" (putWord24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
-  -- , PutCase "Int24BE" (putInt24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
-  , PutCase "Word32LE" (putWord32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D]
+  , -- , PutCase "Word24LE" (putWord24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
+    -- , PutCase "Int24LE" (putInt24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
+    -- , PutCase "Word24BE" (putWord24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
+    -- , PutCase "Int24BE" (putInt24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
+    PutCase "Word32LE" (putWord32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D]
   , PutCase "Int32LE" (putInt32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D]
   , PutCase "Word32BE" (putWord32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD]
   , PutCase "Int32BE" (putInt32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD]

@@ -59,7 +59,8 @@ import Data.Primitive (Prim)
 import Data.Sequence qualified as Seq
 import System.FilePath (splitExtension)
 
-convertMod :: (StaticByteSized a, Prim b, StaticByteSized b) => Mod a b -> PcmContainer -> Either ConvertErr PcmContainer
+convertMod
+  :: (StaticByteSized a, Prim b, StaticByteSized b) => Mod a b -> PcmContainer -> Either ConvertErr PcmContainer
 convertMod modx con = either (Left . ConvertErrDsp) Right (applyMod modx con)
 
 convertModGeneric
