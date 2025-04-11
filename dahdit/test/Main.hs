@@ -147,6 +147,7 @@ import GHC.Float (castWord32ToFloat, castWord64ToDouble)
 import PropUnit (Gen, TestLimit, TestTree, forAll, testGroup, testMain, testProp, testUnit, (===))
 import qualified PropUnit.Hedgehog.Gen as Gen
 import qualified PropUnit.Hedgehog.Range as Range
+import System.ByteOrder (Bytes(..))
 
 class (Eq z, Show z) => CaseTarget z where
   initSource :: [Word8] -> IO z
@@ -359,7 +360,7 @@ getCases =
   , GetCase "Int64LE" getInt64LE (Just (8, 0, 0x5DEC6EFD12345678)) [0x78, 0x56, 0x34, 0x12, 0xFD, 0x6E, 0xEC, 0x5D]
   , GetCase "Int64BE" getInt64BE (Just (8, 0, 0x5DEC6EFD12345678)) [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
   , GetCase "FloatLE" getFloatLE (Just (4, 0, FloatLE (castWord32ToFloat 0x5DEC6EFD))) [0xFD, 0x6E, 0xEC, 0x5D]
-  , GetCase "FloatBE" getFloatBE (Just (4, 0, FloatBE (castWord32ToFloat 0x5DEC6EFD))) [0x5D, 0xEC, 0x6E, 0xFD]
+  , GetCase "FloatBE" getFloatBE (Just (4, 0, FloatBE (castWord32ToFloat (toBigEndian 0x5DEC6EFD)))) [0x5D, 0xEC, 0x6E, 0xFD]
   , GetCase
       "DoubleLE"
       getDoubleLE
@@ -368,12 +369,13 @@ getCases =
   , GetCase
       "DoubleBE"
       getDoubleBE
-      (Just (8, 0, DoubleBE (castWord64ToDouble 0x5DEC6EFD12345678)))
+      (Just (8, 0, DoubleBE (castWord64ToDouble (toBigEndian 0x5DEC6EFD12345678))))
       [0x5D, 0xEC, 0x6E, 0xFD, 0x12, 0x34, 0x56, 0x78]
   , GetCase "ShortByteString" (getByteString 2) (Just (2, 1, BSS.pack [0xEC, 0x5D])) [0xEC, 0x5D, 0xBB]
   , GetCase "Text" (getText 2) (Just (2, 1, "hi")) [0x68, 0x69, 0xBB]
   , GetCase "Two Word8" ((,) <$> getWord8 <*> getWord8) (Just (2, 0, (0x5D, 0xBB))) [0x5D, 0xBB]
   , GetCase "Two Word16LE" ((,) <$> getWord16LE <*> getWord16LE) (Just (4, 0, (0x5DEC, 0x4020))) [0xEC, 0x5D, 0x20, 0x40]
+  , GetCase "Two Word16BE" ((,) <$> getWord16BE <*> getWord16BE) (Just (4, 0, (0x5DEC, 0x4020))) [0x5D, 0xEC, 0x40, 0x20]
   , GetCase "Seq" (getSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "StaticSeq" (getStaticSeq 2 getWord16LE) (Just (4, 0, Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , GetCase
