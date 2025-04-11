@@ -5,8 +5,7 @@ module Main (main) where
 
 import Control.Monad (replicateM, (>=>))
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Primitive (PrimMonad (..), RealWorld)
-import Control.Monad.ST.Strict (runST)
+import Control.Monad.Primitive (RealWorld)
 import Dahdit
   ( Binary (..)
   , BinaryGetTarget (..)
@@ -16,7 +15,6 @@ import Dahdit
   , ByteString
   , DoubleBE (..)
   , DoubleLE (..)
-  , ElemCount
   , FloatBE (..)
   , FloatLE (..)
   , Generic
@@ -25,8 +23,8 @@ import Dahdit
   , GetIncRequest (..)
   , Int16BE
   , Int16LE
-  , Int24BE
-  , Int24LE
+  -- , Int24BE
+  -- , Int24LE
   , Int32BE
   , Int32LE
   , Int64BE
@@ -43,8 +41,8 @@ import Dahdit
   , ViaStaticGeneric (..)
   , Word16BE
   , Word16LE (..)
-  , Word24BE
-  , Word24LE
+  -- , Word24BE
+  -- , Word24LE
   , Word32BE
   , Word32LE (..)
   , Word64BE
@@ -61,8 +59,8 @@ import Dahdit
   , getFloatLE
   , getInt16BE
   , getInt16LE
-  , getInt24BE
-  , getInt24LE
+  -- , getInt24BE
+  -- , getInt24LE
   , getInt32BE
   , getInt32LE
   , getInt64BE
@@ -80,8 +78,8 @@ import Dahdit
   , getWithin
   , getWord16BE
   , getWord16LE
-  , getWord24BE
-  , getWord24LE
+  -- , getWord24BE
+  -- , getWord24LE
   , getWord32BE
   , getWord32LE
   , getWord64BE
@@ -97,8 +95,8 @@ import Dahdit
   , putFloatLE
   , putInt16BE
   , putInt16LE
-  , putInt24BE
-  , putInt24LE
+  -- , putInt24BE
+  -- , putInt24LE
   , putInt32BE
   , putInt32LE
   , putInt64BE
@@ -111,8 +109,8 @@ import Dahdit
   , putText
   , putWord16BE
   , putWord16LE
-  , putWord24BE
-  , putWord24LE
+  -- , putWord24BE
+  -- , putWord24LE
   , putWord32BE
   , putWord32LE
   , putWord64BE
@@ -125,7 +123,6 @@ import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString (..))
 import qualified Data.ByteString.Short as BSS
 import Data.Coerce (coerce)
-import Data.Foldable (for_)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Primitive.ByteArray
@@ -136,11 +133,11 @@ import Data.Primitive.ByteArray
   , getSizeofMutableByteArray
   , newByteArray
   )
-import Data.Primitive.PrimArray (PrimArray, primArrayFromList)
+import Data.Primitive.PrimArray (primArrayFromList)
 import Data.Proxy (asProxyTypeOf)
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
-import Data.ShortWord (Int24, Word24)
+-- import Data.ShortWord (Int24, Word24)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
 import Data.Vector.Storable.Mutable (IOVector)
