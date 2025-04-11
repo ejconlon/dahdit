@@ -56,7 +56,7 @@ import Dahdit
   , putSeq
   , putWord8
   )
-import Dahdit.Audio.Binary (QuietArray (..))
+import Dahdit.Audio.Binary (QuietByteArray (..))
 import Dahdit.Audio.Common
   ( ConvertErr
   , CountSize
@@ -176,7 +176,7 @@ instance KnownLabel WavFormatBody where
 
 type WavFormatChunk = KnownChunk WavFormatBody
 
-newtype WavDataBody = WavDataBody {unWavDataBody :: QuietArray}
+newtype WavDataBody = WavDataBody {unWavDataBody :: QuietByteArray}
   deriving stock (Show)
   deriving newtype (Eq, Default)
 
@@ -184,9 +184,9 @@ instance KnownLabel WavDataBody where
   knownLabel _ = labelData
 
 instance Binary WavDataBody where
-  byteSize (WavDataBody (QuietArray arr)) = fromIntegral (sizeofByteArray arr)
-  get = fmap (WavDataBody . QuietArray) getRemainingByteArray
-  put (WavDataBody (QuietArray arr)) = putByteArray arr
+  byteSize (WavDataBody (QuietByteArray arr)) = fromIntegral (sizeofByteArray arr)
+  get = fmap (WavDataBody . QuietByteArray) getRemainingByteArray
+  put (WavDataBody (QuietByteArray arr)) = putByteArray arr
 
 type WavDataChunk = KnownChunk WavDataBody
 
@@ -499,7 +499,7 @@ lookupWavAdtlChunk w =
 wavToPcmContainer :: Wav -> Either ConvertErr PcmContainer
 wavToPcmContainer wav = do
   KnownChunk fmtBody <- guardChunk "format" (lookupWavFormatChunk wav)
-  KnownChunk (WavDataBody qa@(QuietArray arr)) <- guardChunk "data" (lookupWavDataChunk wav)
+  KnownChunk (WavDataBody qa@(QuietByteArray arr)) <- guardChunk "data" (lookupWavDataChunk wav)
   let !nc = fromIntegral (wfbNumChannels fmtBody)
       !bps = fromIntegral (wfbBitsPerSample fmtBody)
       !sr = fromIntegral (wfbSampleRate fmtBody)

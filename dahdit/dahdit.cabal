@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.37.0.
+-- This file has been generated from package.yaml by hpack version 0.38.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -35,13 +35,11 @@ library
       Dahdit.Funs
       Dahdit.Generic
       Dahdit.Iface
-      Dahdit.Internal
-      Dahdit.LiftedPrim
-      Dahdit.LiftedPrimArray
       Dahdit.Mem
       Dahdit.Nums
       Dahdit.Proxy
       Dahdit.Run
+      Dahdit.ShortWord
       Dahdit.Sizes
   other-modules:
       Paths_dahdit
@@ -76,6 +74,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie
   build-depends:
       base >=4.12 && <5
+    , byte-order ==0.1.*
     , bytestring >=0.11 && <0.13
     , containers ==0.6.*
     , data-default ==0.7.*
@@ -125,6 +124,7 @@ test-suite dahdit-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -fwrite-ide-info -hiedir=.hie -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
+    , byte-order ==0.1.*
     , bytestring >=0.11 && <0.13
     , containers ==0.6.*
     , dahdit

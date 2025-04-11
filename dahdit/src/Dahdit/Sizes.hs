@@ -9,7 +9,6 @@ module Dahdit.Sizes
   )
 where
 
-import Dahdit.Internal (ViaEndianPair (..), ViaFromIntegral (..))
 import Dahdit.Nums
   ( DoubleBE
   , DoubleLE
@@ -173,33 +172,45 @@ instance StaticByteSized DoubleLE where
   type StaticSize DoubleLE = 8
   staticByteSize _ = 8
 
-instance (StaticByteSized x, n ~ StaticSize x) => StaticByteSized (ViaFromIntegral n x y) where
-  type StaticSize (ViaFromIntegral n x y) = n
-  staticByteSize _ = staticByteSize (Proxy :: Proxy x)
+instance StaticByteSized Word16BE where
+  type StaticSize Word16BE = 2
+  staticByteSize _ = 2
 
-instance (StaticByteSized le, n ~ StaticSize le) => StaticByteSized (ViaEndianPair n le be) where
-  type StaticSize (ViaEndianPair n le be) = n
-  staticByteSize _ = staticByteSize (Proxy :: Proxy le)
+instance StaticByteSized Int16BE where
+  type StaticSize Int16BE = 2
+  staticByteSize _ = 2
 
-deriving via (ViaEndianPair 2 Word16LE Word16BE) instance StaticByteSized Word16BE
+instance StaticByteSized Word24BE where
+  type StaticSize Word24BE = 3
+  staticByteSize _ = 3
 
-deriving via (ViaEndianPair 2 Int16LE Int16BE) instance StaticByteSized Int16BE
+instance StaticByteSized Int24BE where
+  type StaticSize Int24BE = 3
+  staticByteSize _ = 3
 
-deriving via (ViaEndianPair 3 Word24LE Word24BE) instance StaticByteSized Word24BE
+instance StaticByteSized Word32BE where
+  type StaticSize Word32BE = 4
+  staticByteSize _ = 4
 
-deriving via (ViaEndianPair 3 Int24LE Int24BE) instance StaticByteSized Int24BE
+instance StaticByteSized Int32BE where
+  type StaticSize Int32BE = 4
+  staticByteSize _ = 4
 
-deriving via (ViaEndianPair 4 Word32LE Word32BE) instance StaticByteSized Word32BE
+instance StaticByteSized Word64BE where
+  type StaticSize Word64BE = 8
+  staticByteSize _ = 8
 
-deriving via (ViaEndianPair 4 Int32LE Int32BE) instance StaticByteSized Int32BE
+instance StaticByteSized Int64BE where
+  type StaticSize Int64BE = 8
+  staticByteSize _ = 8
 
-deriving via (ViaEndianPair 8 Word64LE Word64BE) instance StaticByteSized Word64BE
+instance StaticByteSized FloatBE where
+  type StaticSize FloatBE = 4
+  staticByteSize _ = 4
 
-deriving via (ViaEndianPair 8 Int64LE Int64BE) instance StaticByteSized Int64BE
-
-deriving via (ViaEndianPair 4 FloatLE FloatBE) instance StaticByteSized FloatBE
-
-deriving via (ViaEndianPair 8 DoubleLE DoubleBE) instance StaticByteSized DoubleBE
+instance StaticByteSized DoubleBE where
+  type StaticSize DoubleBE = 8
+  staticByteSize _ = 8
 
 staticByteSizeFoldable :: (Foldable f, StaticByteSized a) => f a -> ByteCount
 staticByteSizeFoldable fa = staticByteSize (proxyForF fa) * coerce (length fa)

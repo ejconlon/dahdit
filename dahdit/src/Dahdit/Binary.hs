@@ -220,6 +220,8 @@ instance Binary DoubleBE where
   get = getDoubleBE
   put = putDoubleBE
 
+-- Assuming we are on little-endian arch...
+
 deriving via Word16LE instance Binary Word16
 
 deriving via Int16LE instance Binary Int16

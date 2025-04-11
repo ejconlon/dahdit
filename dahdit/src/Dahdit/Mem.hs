@@ -18,14 +18,14 @@ module Dahdit.Mem
 where
 
 import Control.Monad.Primitive (MonadPrim, PrimMonad (..), RealWorld)
-import Dahdit.LiftedPrim (LiftedPrim (..), setByteArrayLifted)
 import Dahdit.Proxy (proxyFor)
-import Dahdit.Sizes (ByteCount (..), staticByteSize)
+import Dahdit.Sizes (ByteCount (..), StaticByteSized, staticByteSize)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BSI
 import Data.ByteString.Short.Internal (ShortByteString (..))
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
+import Data.Primitive (Prim (..))
 import Data.Primitive.ByteArray
   ( ByteArray (..)
   , MutableByteArray
@@ -33,18 +33,21 @@ import Data.Primitive.ByteArray
   , copyByteArray
   , copyByteArrayToPtr
   , freezeByteArray
+  , indexByteArray
   , newByteArray
+  , setByteArray
   , unsafeFreezeByteArray
   , unsafeThawByteArray
+  , writeByteArray
   )
-import Data.Primitive.Ptr (copyPtrToMutableByteArray)
+import Data.Primitive.Ptr (copyPtrToMutableByteArray, indexOffPtr, writeOffPtr)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
 import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word8)
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
-import Foreign.Ptr (Ptr, plusPtr)
+import Foreign.Ptr (Ptr, castPtr, plusPtr)
 
 data MemPtr s = MemPtr
   { mpForeign :: !(ForeignPtr Word8)
@@ -76,11 +79,11 @@ instance MutableMem (VS.Vector Word8) (IOVector Word8) IO where
   unsafeFreezeMem = VS.unsafeFreeze
 
 class (PrimMonad m) => ReadMem r m where
-  indexMemInBytes :: (LiftedPrim a) => r -> ByteCount -> m a
+  indexMemInBytes :: (Prim a) => r -> ByteCount -> m a
   cloneArrayMemInBytes :: r -> ByteCount -> ByteCount -> m ByteArray
 
 instance (PrimMonad m) => ReadMem ByteArray m where
-  indexMemInBytes arr off = pure (indexArrayLiftedInBytes arr off)
+  indexMemInBytes arr off = pure (indexByteArray arr (coerce off))
   cloneArrayMemInBytes arr off len = pure (cloneByteArray arr (coerce off) (coerce len))
 
 cloneMemPtr :: MemPtr RealWorld -> ByteCount -> ByteCount -> IO ByteArray
@@ -92,7 +95,7 @@ cloneMemPtr mem off len = do
   unsafeFreezeByteArray marr
 
 instance ReadMem (MemPtr RealWorld) IO where
-  indexMemInBytes mem off = withMemPtr mem (\ptr -> pure (indexPtrLiftedInBytes ptr off))
+  indexMemInBytes mem off = withMemPtr mem (\ptr -> pure (indexOffPtr (castPtr ptr) (unByteCount off)))
   cloneArrayMemInBytes = cloneMemPtr
 
 readSBSMem :: (ReadMem r m) => r -> ByteCount -> ByteCount -> m ShortByteString
@@ -113,29 +116,29 @@ mutViewVecMem :: IOVector Word8 -> MemPtr RealWorld
 mutViewVecMem mvec = let (fp, off, len) = VSM.unsafeToForeignPtr mvec in MemPtr fp (coerce off) (coerce len)
 
 class (PrimMonad m) => WriteMem q m where
-  writeMemInBytes :: (LiftedPrim a) => a -> q (PrimState m) -> ByteCount -> m ()
+  writeMemInBytes :: (Prim a, StaticByteSized a) => a -> q (PrimState m) -> ByteCount -> m ()
   copyArrayMemInBytes :: ByteArray -> ByteCount -> ByteCount -> q (PrimState m) -> ByteCount -> m ()
-  setMemInBytes :: (LiftedPrim a) => ByteCount -> a -> q (PrimState m) -> ByteCount -> m ()
+  setMemInBytes :: (Prim a, StaticByteSized a) => ByteCount -> a -> q (PrimState m) -> ByteCount -> m ()
 
 instance (PrimMonad m) => WriteMem MutableByteArray m where
-  writeMemInBytes val mem off = writeArrayLiftedInBytes mem off val
+  writeMemInBytes val mem off = writeByteArray mem (coerce off) val
   copyArrayMemInBytes arr arrOff arrLen mem off = copyByteArray mem (coerce off) arr (coerce arrOff) (coerce arrLen)
-  setMemInBytes len val mem off = setByteArrayLifted mem off len val
+  setMemInBytes len val mem off = setByteArray mem (coerce off) (coerce len) val
 
 copyPtr :: (PrimMonad m) => ByteArray -> ByteCount -> ByteCount -> Ptr Word8 -> ByteCount -> m ()
 copyPtr arr arrOff arrLen ptr off =
   let wptr = coerce (plusPtr ptr (coerce off)) :: Ptr Word8
   in  copyByteArrayToPtr wptr arr (coerce arrOff) (coerce arrLen)
 
-setPtr :: (PrimMonad m, LiftedPrim a) => ByteCount -> a -> Ptr Word8 -> ByteCount -> m ()
+setPtr :: (PrimMonad m, Prim a, StaticByteSized a) => ByteCount -> a -> Ptr Word8 -> ByteCount -> m ()
 setPtr len val ptr off = do
   let elemSize = staticByteSize (proxyFor val)
       elemLen = div (coerce len) elemSize
-  for_ [0 .. elemLen - 1] $ \pos ->
-    writePtrLiftedInBytes ptr (off + pos * elemSize) val
+      ptr' = castPtr ptr
+  for_ [0 .. elemLen - 1] (\pos -> writeOffPtr ptr' (unByteCount (off + pos * elemSize)) val)
 
 instance WriteMem MemPtr IO where
-  writeMemInBytes val mem off = withMemPtr mem (\ptr -> writePtrLiftedInBytes ptr off val)
+  writeMemInBytes val mem off = withMemPtr mem (\ptr -> writeOffPtr (castPtr ptr) (unByteCount off) val)
   copyArrayMemInBytes arr arrOff arrLen mem off = withMemPtr mem (\ptr -> copyPtr arr arrOff arrLen ptr off)
   setMemInBytes len val mem off = withMemPtr mem (\ptr -> setPtr len val ptr off)
 

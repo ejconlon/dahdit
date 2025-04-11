@@ -32,7 +32,6 @@ import Dahdit
   , ByteCount (..)
   , Get
   , Int16LE (..)
-  , LiftedPrimArray
   , Put
   , ShortByteString
   , StaticByteSized (..)
@@ -43,16 +42,15 @@ import Dahdit
   , Word32LE
   , byteSizeViaStatic
   , getExact
-  , getLiftedPrimArray
+  , getPrimArray
   , getRemainingSeq
   , getRemainingSize
   , getRemainingStaticSeq
   , getRemainingString
   , getSkip
   , putByteString
-  , putLiftedPrimArray
+  , putPrimArray
   , putSeq
-  , sizeofLiftedPrimArray
   )
 import Dahdit.Audio.Common
   ( KnownLabel (..)
@@ -67,6 +65,8 @@ import Dahdit.Audio.Riff (KnownListChunk, KnownOptChunk, labelRiff)
 import Data.ByteString.Short qualified as BSS
 import Data.Foldable (foldl')
 import Data.Int (Int8)
+import Data.Primitive.ByteArray (ByteArray (..), sizeofByteArray)
+import Data.Primitive.PrimArray (PrimArray (..))
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq (..))
 import Data.Sequence qualified as Seq
@@ -265,25 +265,25 @@ instance Binary Info where
       InfoReserved _ bs -> putByteString bs
 
 data Sdta = Sdta
-  { sdtaHighBits :: !(LiftedPrimArray Int16LE)
-  , sdtaLowBits :: !(Maybe (LiftedPrimArray Word8))
+  { sdtaHighBits :: !(PrimArray Int16LE)
+  , sdtaLowBits :: !(Maybe (PrimArray Word8))
   }
   deriving stock (Eq, Show)
 
 instance KnownLabel Sdta where
   knownLabel _ = labelSdta
 
-getHighBits :: SampleCount -> Get (LiftedPrimArray Int16LE)
-getHighBits numSamples = getLiftedPrimArray (Proxy :: Proxy Int16LE) (fromIntegral numSamples)
+getHighBits :: SampleCount -> Get (PrimArray Int16LE)
+getHighBits numSamples = getPrimArray (Proxy :: Proxy Int16LE) (fromIntegral numSamples)
 
-getLowBits :: SampleCount -> Get (LiftedPrimArray Word8)
-getLowBits numSamples = getLiftedPrimArray (Proxy :: Proxy Word8) (fromIntegral numSamples)
+getLowBits :: SampleCount -> Get (PrimArray Word8)
+getLowBits numSamples = getPrimArray (Proxy :: Proxy Word8) (fromIntegral numSamples)
 
 instance Binary Sdta where
-  byteSize (Sdta high mlow) = sizeHigh + sizeLow
+  byteSize (Sdta (PrimArray hba) mlow) = sizeHigh + sizeLow
    where
-    sizeHigh = chunkHeaderSize + sizeofLiftedPrimArray high
-    sizeLow = maybe 0 (\low -> chunkHeaderSize + sizeofLiftedPrimArray low) mlow
+    sizeHigh = chunkHeaderSize + ByteCount (sizeofByteArray (ByteArray hba))
+    sizeLow = maybe 0 (\(PrimArray lba) -> chunkHeaderSize + ByteCount (sizeofByteArray (ByteArray lba))) mlow
 
   get = do
     chunkSize <- getRemainingSize
@@ -303,16 +303,16 @@ instance Binary Sdta where
           pure $! Sdta highBits (Just lowBits)
       | numExtra == 0 -> pure $! Sdta highBits Nothing
       | otherwise -> fail "invalid sdata chunk/sample sizes"
-  put (Sdta highBits mayLowBits) = do
+  put (Sdta high@(PrimArray hba) mlow) = do
     put labelSmpl
-    putChunkSizeLE (sizeofLiftedPrimArray highBits)
-    putLiftedPrimArray highBits
-    case mayLowBits of
+    putChunkSizeLE (ByteCount (sizeofByteArray (ByteArray hba)))
+    putPrimArray high
+    case mlow of
       Nothing -> pure ()
-      Just lowBits -> do
+      Just low@(PrimArray lba) -> do
         put labelSm24
-        putChunkSizeLE (sizeofLiftedPrimArray lowBits)
-        putLiftedPrimArray lowBits
+        putChunkSizeLE (ByteCount (sizeofByteArray (ByteArray lba)))
+        putPrimArray low
 
 newtype SdtaChunk = SdtaChunk {unSdtaChunk :: KnownOptChunk Sdta}
   deriving stock (Show)

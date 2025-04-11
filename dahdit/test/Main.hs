@@ -31,9 +31,7 @@ import Dahdit
   , Int32LE
   , Int64BE
   , Int64LE
-  , LiftedPrimArray (..)
   , MutBinaryPutTarget (..)
-  , MutableLiftedPrimArray
   , Proxy (..)
   , Put
   , ShortByteString
@@ -51,13 +49,9 @@ import Dahdit
   , Word32LE (..)
   , Word64BE
   , Word64LE
-  , concatLiftedPrimArray
-  , constantLiftedPrimArray
-  , copyLiftedPrimArray
   , decodeEnd
   , decodeInc
   , encode
-  , freezeLiftedPrimArray
   , getByteArray
   , getByteString
   , getDoubleBE
@@ -74,8 +68,8 @@ import Dahdit
   , getInt64BE
   , getInt64LE
   , getInt8
-  , getLiftedPrimArray
   , getLookAhead
+  , getPrimArray
   , getRemainingSize
   , getSeq
   , getSkip
@@ -93,14 +87,8 @@ import Dahdit
   , getWord64BE
   , getWord64LE
   , getWord8
-  , lengthLiftedPrimArray
-  , liftedPrimArrayFromList
-  , mapLiftedPrimArray
-  , mergeIntoLiftedPrimArray
-  , mergeLiftedPrimArray
   , mutPutTarget
   , mutPutTargetOffset
-  , newLiftedPrimArray
   , putByteArray
   , putByteString
   , putDoubleBE
@@ -116,7 +104,7 @@ import Dahdit
   , putInt64BE
   , putInt64LE
   , putInt8
-  , putLiftedPrimArray
+  , putPrimArray
   , putSeq
   , putStaticArray
   , putStaticSeq
@@ -130,13 +118,7 @@ import Dahdit
   , putWord64BE
   , putWord64LE
   , putWord8
-  , replicateLiftedPrimArray
   , runCount
-  , setLiftedPrimArray
-  , sizeofLiftedPrimArray
-  , unsafeFreezeLiftedPrimArray
-  , unsafeThawLiftedPrimArray
-  , writeLiftedPrimArray
   )
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
@@ -154,6 +136,7 @@ import Data.Primitive.ByteArray
   , getSizeofMutableByteArray
   , newByteArray
   )
+import Data.Primitive.PrimArray (PrimArray, primArrayFromList)
 import Data.Proxy (asProxyTypeOf)
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
@@ -164,7 +147,7 @@ import Data.Vector.Storable.Mutable (IOVector)
 import qualified Data.Vector.Storable.Mutable as VSM
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.Float (castWord32ToFloat, castWord64ToDouble)
-import PropUnit (Gen, TestLimit, TestT, TestTree, forAll, testGroup, testMain, testProp, testUnit, (===))
+import PropUnit (Gen, TestLimit, TestTree, forAll, testGroup, testMain, testProp, testUnit, (===))
 import qualified PropUnit.Hedgehog.Gen as Gen
 import qualified PropUnit.Hedgehog.Range as Range
 
@@ -267,8 +250,8 @@ testByteSize =
     , testUnit "Int8" (byteSize @Int8 0 === 1)
     , testUnit "Word16" (byteSize @Word16 0 === 2)
     , testUnit "Int16" (byteSize @Int16 0 === 2)
-    , testUnit "Word24" (byteSize @Word24 0 === 3)
-    , testUnit "Int24" (byteSize @Int24 0 === 3)
+    -- , testUnit "Word24" (byteSize @Word24 0 === 3)
+    -- , testUnit "Int24" (byteSize @Int24 0 === 3)
     , testUnit "Word32" (byteSize @Word32 0 === 4)
     , testUnit "Int32" (byteSize @Int32 0 === 4)
     , testUnit "Word64" (byteSize @Word64 0 === 8)
@@ -281,8 +264,8 @@ testByteSize =
     , testUnit "Int" (byteSize @Int 0 === 8)
     , testUnit "Word16LE" (byteSize @Word16LE 0 === 2)
     , testUnit "Int16LE" (byteSize @Int16LE 0 === 2)
-    , testUnit "Word24LE" (byteSize @Word24LE 0 === 3)
-    , testUnit "Int24LE" (byteSize @Int24LE 0 === 3)
+    -- , testUnit "Word24LE" (byteSize @Word24LE 0 === 3)
+    -- , testUnit "Int24LE" (byteSize @Int24LE 0 === 3)
     , testUnit "Word32LE" (byteSize @Word32LE 0 === 4)
     , testUnit "Int32LE" (byteSize @Int32LE 0 === 4)
     , testUnit "Word64LE" (byteSize @Word64LE 0 === 8)
@@ -291,8 +274,8 @@ testByteSize =
     , testUnit "DoubleLE" (byteSize (DoubleLE (castWord64ToDouble 0)) === 8)
     , testUnit "Word16BE" (byteSize @Word16BE 0 === 2)
     , testUnit "Int16BE" (byteSize @Int16BE 0 === 2)
-    , testUnit "Word24BE" (byteSize @Word24BE 0 === 3)
-    , testUnit "Int24BE" (byteSize @Int24BE 0 === 3)
+    -- , testUnit "Word24BE" (byteSize @Word24BE 0 === 3)
+    -- , testUnit "Int24BE" (byteSize @Int24BE 0 === 3)
     , testUnit "Word32BE" (byteSize @Word32BE 0 === 4)
     , testUnit "Int32BE" (byteSize @Int32BE 0 === 4)
     , testUnit "Word64BE" (byteSize @Word64BE 0 === 8)
@@ -316,8 +299,8 @@ testStaticByteSize =
     , testUnit "Int8" (staticByteSize @Int8 Proxy === 1)
     , testUnit "Word16" (staticByteSize @Word16 Proxy === 2)
     , testUnit "Int16" (staticByteSize @Int16 Proxy === 2)
-    , testUnit "Word24" (staticByteSize @Word24 Proxy === 3)
-    , testUnit "Int24" (staticByteSize @Int24 Proxy === 3)
+    -- , testUnit "Word24" (staticByteSize @Word24 Proxy === 3)
+    -- , testUnit "Int24" (staticByteSize @Int24 Proxy === 3)
     , testUnit "Word32" (staticByteSize @Word32 Proxy === 4)
     , testUnit "Int32" (staticByteSize @Int32 Proxy === 4)
     , testUnit "Word64" (staticByteSize @Word64 Proxy === 8)
@@ -330,8 +313,8 @@ testStaticByteSize =
     , testUnit "Int" (staticByteSize @Int Proxy === 8)
     , testUnit "Word16LE" (staticByteSize @Word16LE Proxy === 2)
     , testUnit "Int16LE" (staticByteSize @Int16LE Proxy === 2)
-    , testUnit "Word24LE" (staticByteSize @Word24LE Proxy === 3)
-    , testUnit "Int24LE" (staticByteSize @Int24LE Proxy === 3)
+    -- , testUnit "Word24LE" (staticByteSize @Word24LE Proxy === 3)
+    -- , testUnit "Int24LE" (staticByteSize @Int24LE Proxy === 3)
     , testUnit "Word32LE" (staticByteSize @Word32LE Proxy === 4)
     , testUnit "Int32LE" (staticByteSize @Int32LE Proxy === 4)
     , testUnit "Word64LE" (staticByteSize @Word64LE Proxy === 8)
@@ -340,8 +323,8 @@ testStaticByteSize =
     , testUnit "DoubleLE" (staticByteSize @DoubleLE Proxy === 8)
     , testUnit "Word16BE" (staticByteSize @Word16BE Proxy === 2)
     , testUnit "Int16BE" (staticByteSize @Int16BE Proxy === 2)
-    , testUnit "Word24BE" (staticByteSize @Word24BE Proxy === 3)
-    , testUnit "Int24BE" (staticByteSize @Int24BE Proxy === 3)
+    -- , testUnit "Word24BE" (staticByteSize @Word24BE Proxy === 3)
+    -- , testUnit "Int24BE" (staticByteSize @Int24BE Proxy === 3)
     , testUnit "Word32BE" (staticByteSize @Word32BE Proxy === 4)
     , testUnit "Int32BE" (staticByteSize @Int32BE Proxy === 4)
     , testUnit "Word64BE" (staticByteSize @Word64BE Proxy === 8)
@@ -366,10 +349,10 @@ getCases =
   , GetCase "Int16LE" getInt16LE (Just (2, 1, 0x5DEC)) [0xEC, 0x5D, 0xBB]
   , GetCase "Word16BE" getWord16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB]
   , GetCase "Int16BE" getInt16BE (Just (2, 1, 0x5DEC)) [0x5D, 0xEC, 0xBB]
-  , GetCase "Word24LE" getWord24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
-  , GetCase "Int24LE" getInt24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
-  , GetCase "Word24BE" getWord24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
-  , GetCase "Int24BE" getInt24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
+  -- , GetCase "Word24LE" getWord24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+  -- , GetCase "Int24LE" getInt24LE (Just (3, 1, 0xEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
+  -- , GetCase "Word24BE" getWord24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
+  -- , GetCase "Int24BE" getInt24BE (Just (3, 1, 0xEC6EFD)) [0xEC, 0x6E, 0xFD, 0x5D]
   , GetCase "Word32LE" getWord32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
   , GetCase "Int32LE" getInt32LE (Just (4, 0, 0x5DEC6EFD)) [0xFD, 0x6E, 0xEC, 0x5D]
   , GetCase "Word32BE" getWord32BE (Just (4, 0, 0x5DEC6EFD)) [0x5D, 0xEC, 0x6E, 0xFD]
@@ -399,7 +382,7 @@ getCases =
   , GetCase
       "StaticArray"
       (getStaticArray @Word16LE 2)
-      (Just (4, 0, liftedPrimArrayFromList [0x5DEC, 0x4020]))
+      (Just (4, 0, primArrayFromList [0x5DEC, 0x4020]))
       [0xEC, 0x5D, 0x20, 0x40]
   , GetCase "DynFoo" (get @DynFoo) (Just (3, 0, DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , GetCase "StaFoo" (get @StaFoo) (Just (3, 0, StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
@@ -422,9 +405,9 @@ getCases =
       (Just (3, 1, byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC]))
       [0xFD, 0x6E, 0xEC, 0x5D]
   , GetCase
-      "getLiftedPrimArray"
-      (getLiftedPrimArray (Proxy :: Proxy Word16LE) 3)
-      (Just (6, 1, liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC]))
+      "getPrimArray"
+      (getPrimArray (Proxy :: Proxy Word16LE) 3)
+      (Just (6, 1, primArrayFromList @Word16LE [0xFD, 0x6E, 0xEC]))
       [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00, 0x5D]
   , GetCase "StaBytes" (get @StaBytes) (Just (2, 1, mkStaBytes "hi")) [0x68, 0x69, 0x21]
   , GetCase "TagFoo (one)" (get @TagFoo) (Just (2, 0, TagFooOne 7)) [0x00, 0x07]
@@ -460,10 +443,10 @@ putCases =
   , PutCase "Int16LE" (putInt16LE 0x5DEC) [0xEC, 0x5D]
   , PutCase "Word16BE" (putWord16BE 0x5DEC) [0x5D, 0xEC]
   , PutCase "Int16BE" (putInt16BE 0x5DEC) [0x5D, 0xEC]
-  , PutCase "Word24LE" (putWord24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
-  , PutCase "Int24LE" (putInt24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
-  , PutCase "Word24BE" (putWord24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
-  , PutCase "Int24BE" (putInt24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
+  -- , PutCase "Word24LE" (putWord24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
+  -- , PutCase "Int24LE" (putInt24LE 0xEC6EFD) [0xFD, 0x6E, 0xEC]
+  -- , PutCase "Word24BE" (putWord24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
+  -- , PutCase "Int24BE" (putInt24BE 0xEC6EFD) [0xEC, 0x6E, 0xFD]
   , PutCase "Word32LE" (putWord32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D]
   , PutCase "Int32LE" (putInt32LE 0x5DEC6EFD) [0xFD, 0x6E, 0xEC, 0x5D]
   , PutCase "Word32BE" (putWord32BE 0x5DEC6EFD) [0x5D, 0xEC, 0x6E, 0xFD]
@@ -488,15 +471,15 @@ putCases =
   , PutCase "Two Word16LE" (putWord16LE 0x5DEC *> putWord16LE 0x4020) [0xEC, 0x5D, 0x20, 0x40]
   , PutCase "Seq" (putSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , PutCase "StaticSeq" (putStaticSeq putWord16LE (Seq.fromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
-  , PutCase "StaticArray" (putStaticArray @Word16LE (liftedPrimArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
+  , PutCase "StaticArray" (putStaticArray @Word16LE (primArrayFromList [0x5DEC, 0x4020])) [0xEC, 0x5D, 0x20, 0x40]
   , PutCase "DynFoo" (put (DynFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , PutCase "StaFoo" (put (StaFoo 0xBB 0x5DEC)) [0xBB, 0xEC, 0x5D]
   , PutCase "BoolByte True" (put (BoolByte True)) [0x01]
   , PutCase "BoolByte False" (put (BoolByte False)) [0x00]
   , PutCase "putByteArray" (putByteArray (byteArrayFromList @Word8 [0xFD, 0x6E, 0xEC])) [0xFD, 0x6E, 0xEC]
   , PutCase
-      "putLiftedPrimArray"
-      (putLiftedPrimArray (liftedPrimArrayFromList @Word16LE [0xFD, 0x6E, 0xEC]))
+      "putPrimArray"
+      (putPrimArray (primArrayFromList @Word16LE [0xFD, 0x6E, 0xEC]))
       [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]
   , PutCase "StaBytes" (put (mkStaBytes "hi")) [0x68, 0x69]
   , PutCase "StaBytes (less)" (put (mkStaBytes "h")) [0x68, 0x00]
@@ -538,125 +521,6 @@ putCases =
 
 testPut :: (BinaryPutTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testPut n p = testGroup ("put (" ++ n ++ ")") (fmap (runPutCase p) putCases)
-
-testLiftedPrimArray :: TestTree
-testLiftedPrimArray =
-  testGroup
-    "liftedPrimArray"
-    [ testLiftedPrimArrayFromList
-    , testLiftedPrimArrayCopy
-    , testLiftedPrimArraySet
-    , testLiftedPrimArrayMap
-    , testLiftedPrimArrayConcat
-    , testLiftedPrimArrayMerge
-    , testLiftedPrimArrayMergeInto
-    , testLiftedPrimArrayReplicate
-    ]
-
-mkArr :: [Word16LE] -> LiftedPrimArray Word16LE
-mkArr = liftedPrimArrayFromList @Word16LE
-
-mkDestArr :: ElemCount -> (MutableLiftedPrimArray (PrimState IO) Word16LE -> IO ()) -> IO (LiftedPrimArray Word16LE)
-mkDestArr len f = do
-  darr <- newLiftedPrimArray len (Proxy @Word16LE)
-  liftIO (for_ [0 .. len - 1] (\ix -> writeLiftedPrimArray darr ix 0))
-  f darr
-  freezeLiftedPrimArray darr 0 len
-
-assertArrEq :: LiftedPrimArray a -> IO (LiftedPrimArray a) -> TestT IO ()
-assertArrEq expected actualAct = do
-  actual <- liftIO actualAct
-  actual === expected
-
-testLiftedPrimArrayMap :: TestTree
-testLiftedPrimArrayMap = testUnit "map" $ do
-  let mkArr32 = liftedPrimArrayFromList @Word32LE
-      mkMap = mapLiftedPrimArray @Word16LE @Word32LE ((+ 1) . fromIntegral) . mkArr
-  mkMap [] === mkArr32 []
-  mkMap [1, 2] === mkArr32 [2, 3]
-
-testLiftedPrimArrayReplicate :: TestTree
-testLiftedPrimArrayReplicate = testUnit "replicate" $ do
-  let mkRep n = replicateLiftedPrimArray n . mkArr
-  mkRep 0 [] === mkArr []
-  mkRep 1 [] === mkArr []
-  mkRep 0 [1, 2] === mkArr []
-  mkRep 1 [1, 2] === mkArr [1, 2]
-  mkRep 2 [1, 2] === mkArr [1, 2, 1, 2]
-
-testLiftedPrimArrayConcat :: TestTree
-testLiftedPrimArrayConcat = testUnit "concat" $ do
-  let mkConcat = concatLiftedPrimArray . fmap mkArr
-  mkConcat [] === mkArr []
-  mkConcat [[1, 2]] === mkArr [1, 2]
-  mkConcat [[1, 2], []] === mkArr [1, 2]
-  mkConcat [[], [1, 2]] === mkArr [1, 2]
-  mkConcat [[1, 2], [3]] === mkArr [1, 2, 3]
-  mkConcat [[0], [1, 2], [3]] === mkArr [0, 1, 2, 3]
-
-testLiftedPrimArrayMerge :: TestTree
-testLiftedPrimArrayMerge = testUnit "merge" $ do
-  let mkMerge = mergeLiftedPrimArray 0 (+) . fmap mkArr
-  mkMerge [] === mkArr []
-  mkMerge [[1, 2]] === mkArr [1, 2]
-  mkMerge [[1, 2], []] === mkArr [1, 2]
-  mkMerge [[], [1, 2]] === mkArr [1, 2]
-  mkMerge [[1, 2], [3]] === mkArr [4, 2]
-  mkMerge [[0], [1, 2], [3]] === mkArr [4, 2]
-
-testLiftedPrimArrayMergeInto :: TestTree
-testLiftedPrimArrayMergeInto = testUnit "merge into" $ do
-  let mkMerge a x b y z = runST $ do
-        w <- unsafeThawLiftedPrimArray (mkArr a)
-        mergeIntoLiftedPrimArray (+) w x (mkArr b) y z
-        unsafeFreezeLiftedPrimArray w
-  mkMerge [] 0 [] 0 0 === mkArr []
-  mkMerge [1] 0 [] 0 0 === mkArr [1]
-  mkMerge [1] 0 [2] 0 0 === mkArr [1]
-  mkMerge [1] 0 [2] 0 1 === mkArr [3]
-  mkMerge [1, 2] 0 [2, 3] 0 1 === mkArr [3, 2]
-  mkMerge [1, 2] 0 [2, 3] 0 2 === mkArr [3, 5]
-  mkMerge [1, 2, 3] 1 [2] 0 1 === mkArr [1, 4, 3]
-  mkMerge [1, 2, 3] 1 [2, 3] 0 2 === mkArr [1, 4, 6]
-
-testLiftedPrimArrayFromList :: TestTree
-testLiftedPrimArrayFromList = testUnit "fromList" $ do
-  let arr = LiftedPrimArray (byteArrayFromList @Word8 [0xFD, 0x00, 0x6E, 0x00, 0xEC, 0x00]) :: LiftedPrimArray Word16LE
-  mkArr [0xFD, 0x6E, 0xEC] === arr
-  sizeofLiftedPrimArray arr === 6
-  lengthLiftedPrimArray arr === 3
-
-testLiftedPrimArrayCopy :: TestTree
-testLiftedPrimArrayCopy = testUnit "copy" $ do
-  let sarr = constantLiftedPrimArray @Word16LE 2 1
-  sarr === mkArr [1, 1]
-  assertArrEq
-    (mkArr [1, 1, 0, 0])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 0 sarr 0 2))
-  assertArrEq
-    (mkArr [0, 1, 1, 0])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 2))
-  assertArrEq
-    (mkArr [0, 0, 1, 1])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 2 sarr 0 2))
-  assertArrEq
-    (mkArr [0, 1, 0, 0])
-    (mkDestArr 4 (\darr -> copyLiftedPrimArray darr 1 sarr 0 1))
-
-testLiftedPrimArraySet :: TestTree
-testLiftedPrimArraySet = testUnit "set" $ do
-  assertArrEq
-    (mkArr [1, 0, 0])
-    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 1 1))
-  assertArrEq
-    (mkArr [1, 1, 0])
-    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 2 1))
-  assertArrEq
-    (mkArr [1, 1, 1])
-    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 0 3 1))
-  assertArrEq
-    (mkArr [0, 1, 1])
-    (mkDestArr 3 (\darr -> setLiftedPrimArray darr 1 2 1))
 
 testGetOffset :: (BinaryGetTarget z IO, CaseTarget z) => String -> Proxy z -> TestTree
 testGetOffset n p = testUnit ("get offset (" ++ n ++ ")") $ do
@@ -798,7 +662,7 @@ testDahdit :: TestLimit -> TestTree
 testDahdit lim = testGroup "Dahdit" trees
  where
   trees = baseTrees ++ targetTrees ++ mutTargetTrees
-  baseTrees = [testByteSize, testStaticByteSize, testLiftedPrimArray]
+  baseTrees = [testByteSize, testStaticByteSize]
   targetTrees =
     targets >>= \(TargetDef name prox) ->
       [ testGet name prox

@@ -7,6 +7,8 @@ module Dahdit
   , Seq (..)
   , ByteArray
   , Generic
+  , Prim
+  , PrimArray
   , Proxy (..)
   , GetError (..)
   , prettyGetError
@@ -20,8 +22,6 @@ module Dahdit
   , module Dahdit.Funs
   , module Dahdit.Generic
   , module Dahdit.Iface
-  , module Dahdit.LiftedPrim
-  , module Dahdit.LiftedPrimArray
   , module Dahdit.Nums
   , module Dahdit.Proxy
   , module Dahdit.Sizes
@@ -35,8 +35,6 @@ import Dahdit.Free (Get, Put, PutM)
 import Dahdit.Funs hiding (unsafePutStaticArrayN, unsafePutStaticSeqN)
 import Dahdit.Generic
 import Dahdit.Iface
-import Dahdit.LiftedPrim
-import Dahdit.LiftedPrimArray
 import Dahdit.Nums
 import Dahdit.Proxy
 import Dahdit.Run (GetError (..), GetIncCb, GetIncRequest (..), prettyGetError, runCount)
@@ -44,7 +42,9 @@ import Dahdit.Sizes
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.Int (Int8)
+import Data.Primitive (Prim)
 import Data.Primitive.ByteArray (ByteArray)
+import Data.Primitive.PrimArray (PrimArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq (..))
 import Data.Vector.Storable (Vector)

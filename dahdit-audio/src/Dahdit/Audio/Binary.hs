@@ -1,24 +1,28 @@
 module Dahdit.Audio.Binary
-  ( QuietArray (..)
-  , QuietLiftedArray (..)
+  ( QuietByteArray (..)
+  , QuietPrimArray (..)
   )
 where
 
-import Dahdit (LiftedPrim, LiftedPrimArray, sizeofLiftedPrimArray)
 import Data.Default (Default (..))
+import Data.Primitive (Prim)
 import Data.Primitive.ByteArray (ByteArray, emptyByteArray, sizeofByteArray)
+import Data.Primitive.PrimArray (PrimArray, emptyPrimArray, sizeofPrimArray)
 
-newtype QuietArray = QuietArray {unQuietArray :: ByteArray}
-  deriving newtype (Eq)
+newtype QuietByteArray = QuietByteArray {unQuietByteArray :: ByteArray}
+  deriving newtype (Eq, Ord)
 
-instance Show QuietArray where
-  show (QuietArray arr) = "QuietArray{" ++ show (sizeofByteArray arr) ++ "}"
+instance Show QuietByteArray where
+  show (QuietByteArray arr) = "QuietByteArray{" ++ show (sizeofByteArray arr) ++ "}"
 
-instance Default QuietArray where
-  def = QuietArray emptyByteArray
+instance Default QuietByteArray where
+  def = QuietByteArray emptyByteArray
 
-newtype QuietLiftedArray a = QuietLiftedArray {unQuietLiftedArray :: LiftedPrimArray a}
-  deriving newtype (Eq, Default)
+newtype QuietPrimArray a = QuietPrimArray {unQuietPrimArray :: PrimArray a}
+  deriving newtype (Eq, Ord)
 
-instance (LiftedPrim a) => Show (QuietLiftedArray a) where
-  show (QuietLiftedArray arr) = "QuietLiftedArray{" ++ show (sizeofLiftedPrimArray arr) ++ "}"
+instance (Prim a) => Show (QuietPrimArray a) where
+  show (QuietPrimArray arr) = "QuietPrimArray{" ++ show (sizeofPrimArray arr) ++ "}"
+
+instance Default (QuietPrimArray a) where
+  def = QuietPrimArray emptyPrimArray

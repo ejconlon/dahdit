@@ -45,7 +45,6 @@ import Dahdit.Free
   , PutStaticSeqF (..)
   , ScopeMode (..)
   )
-import Dahdit.LiftedPrimArray (LiftedPrimArray (..), sizeofLiftedPrimArray)
 import Dahdit.Mem (ReadMem (..), WriteMem (..), readSBSMem, writeSBSMem)
 import Dahdit.Nums
   ( DoubleBE
@@ -75,7 +74,9 @@ import Data.Coerce (coerce)
 import Data.Foldable (for_, toList)
 import Data.Int (Int8)
 import Data.Maybe (fromJust)
+import Data.Primitive.ByteArray (ByteArray (..))
 import Data.Primitive.MutVar (MutVar, modifyMutVar', newMutVar, readMutVar, writeMutVar)
+import Data.Primitive.PrimArray (PrimArray (..), sizeofPrimArray)
 import Data.Sequence (Seq (..))
 import qualified Data.Sequence as Seq
 import Data.Text (Text)
@@ -310,8 +311,8 @@ readStaticSeq gss@(GetStaticSeqF ec g k) = do
 readStaticArray :: (MonadPrim s m, ReadMem r m) => GetStaticArrayF (GetIncM s r m a) -> GetIncM s r m a
 readStaticArray gsa@(GetStaticArrayF _ _ k) = do
   let bc = getStaticArraySize gsa
-  sa <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
-  k (LiftedPrimArray sa)
+  ByteArray ba <- readBytes "static vector" bc (\mem off -> cloneArrayMemInBytes mem off bc)
+  k (PrimArray ba)
 
 readLookAhead :: (MonadPrim s m, ReadMem r m) => GetLookAheadF (GetIncM s r m a) -> GetIncM s r m a
 readLookAhead (GetLookAheadF g k) = do
@@ -430,12 +431,12 @@ writeStaticSeq (PutStaticSeqF n mz p s k) = do
   k
 
 writeStaticArray :: (WriteMem q m) => PutStaticArrayF (PutEff q m a) -> PutEff q m a
-writeStaticArray psa@(PutStaticArrayF needElems mz a@(LiftedPrimArray ba) k) = do
+writeStaticArray psa@(PutStaticArrayF needElems mz pa@(PrimArray ba) k) = do
   let elemSize = putStaticArrayElemSize psa
-      haveElems = sizeofLiftedPrimArray a
-      useElems = min haveElems (coerce needElems)
+      haveElems = ElemCount (sizeofPrimArray pa)
+      useElems = min haveElems needElems
       useBc = elemSize * coerce useElems
-  writeBytes useBc (copyArrayMemInBytes ba 0 useBc)
+  writeBytes useBc (copyArrayMemInBytes (ByteArray ba) 0 useBc)
   let needBc = putStaticArraySize psa
   unless (useBc == needBc) $ do
     let extraBc = needBc - useBc

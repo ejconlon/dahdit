@@ -19,7 +19,7 @@ module Dahdit.Audio.Convert
 where
 
 import Control.Monad (unless, (>=>))
-import Dahdit (Int16LE, Int24LE, Int32LE, LiftedPrim, Seq (..), decodeFile)
+import Dahdit (Int16LE, Int24LE, Int32LE, Seq (..), StaticByteSized, decodeFile)
 import Dahdit.Audio.Aiff (Aiff, aiffGatherMarkers, aiffToPcmContainer)
 import Dahdit.Audio.Common
   ( ConvertErr (..)
@@ -55,13 +55,15 @@ import Dahdit.Audio.Wav
   , wavUseMarkers
   )
 import Data.Maybe (isJust)
+import Data.Primitive (Prim)
 import Data.Sequence qualified as Seq
 import System.FilePath (splitExtension)
 
-convertMod :: (LiftedPrim a, LiftedPrim b) => Mod a b -> PcmContainer -> Either ConvertErr PcmContainer
+convertMod :: (StaticByteSized a, Prim b, StaticByteSized b) => Mod a b -> PcmContainer -> Either ConvertErr PcmContainer
 convertMod modx con = either (Left . ConvertErrDsp) Right (applyMod modx con)
 
-convertModGeneric :: (forall a. (LiftedPrim a, Integral a) => Mod a a) -> PcmContainer -> Either ConvertErr PcmContainer
+convertModGeneric
+  :: (forall a. (Prim a, StaticByteSized a, Integral a) => Mod a a) -> PcmContainer -> Either ConvertErr PcmContainer
 convertModGeneric modx con = either (Left . ConvertErrDsp) Right (applyModGeneric modx con)
 
 loadAiff :: FilePath -> IO Aiff
