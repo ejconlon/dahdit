@@ -44,3 +44,15 @@ lint:
 # Apply hlint suggestions
 lint-apply:
   find {{ src_dirs }} -name '*.hs' | xargs -t -I % stack exec -- hlint % --refactor --refactor-options="--inplace"
+
+# Use this to run all dahdit tests
+test-dahdit:
+  TASTY_NUM_THREADS=1 {{ stack_build }} --test dahdit
+
+# Use this to run a specific test
+test-dahdit-pat pat:
+  TASTY_NUM_THREADS=1 {{ stack_build }} --test dahdit --ta="--pattern" --ta="\"{{pat}}\""
+
+# Use this to replay a failed test
+test-dahdit-replay pat replay:
+  TASTY_NUM_THREADS=1 {{ stack_build }} --test dahdit --ta="--pattern" --ta="\"{{pat}}\"" --ta="--hedgehog-replay" --ta="\"{{replay}}\""
