@@ -6,6 +6,8 @@ module Dahdit.Sizes
   , StaticByteSized (..)
   , staticByteSizeFoldable
   , byteSizeViaStatic
+  , primByteSize
+  , primByteSizeOf
   )
 where
 
@@ -35,6 +37,7 @@ import Dahdit.Proxy (proxyFor, proxyForF)
 import Data.Coerce (coerce)
 import Data.Default (Default)
 import Data.Int (Int16, Int32, Int64, Int8)
+import Data.Primitive (Prim, sizeOf, sizeOfType)
 import Data.Proxy (Proxy (..))
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word16, Word32, Word64, Word8)
@@ -60,6 +63,7 @@ instance Bounded ElemCount where
 
 -- StaticByteSized
 
+-- | For types with 'Prim' instances, this will match 'sizeOfType'.
 class (KnownNat (StaticSize a)) => StaticByteSized a where
   type StaticSize a :: Nat
   staticByteSize :: Proxy a -> ByteCount
@@ -217,3 +221,9 @@ staticByteSizeFoldable fa = staticByteSize (proxyForF fa) * coerce (length fa)
 
 byteSizeViaStatic :: (StaticByteSized a) => a -> ByteCount
 byteSizeViaStatic = staticByteSize . proxyFor
+
+primByteSize :: (Prim a) => a -> ByteCount
+primByteSize = ByteCount . sizeOf
+
+primByteSizeOf :: forall a. (Prim a) => Proxy a -> ByteCount
+primByteSizeOf _ = ByteCount (sizeOfType @a)

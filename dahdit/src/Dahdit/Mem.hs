@@ -20,8 +20,7 @@ module Dahdit.Mem
 where
 
 import Control.Monad.Primitive (MonadPrim, PrimMonad (..), RealWorld)
-import Dahdit.Proxy (proxyFor)
-import Dahdit.Sizes (ByteCount (..), StaticByteSized, staticByteSize)
+import Dahdit.Sizes (ByteCount (..))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BSI
 import Data.ByteString.Short.Internal (ShortByteString (..))
@@ -34,13 +33,12 @@ import Data.Primitive.ByteArray
   , copyByteArray
   , copyByteArrayToPtr
   , freezeByteArray
-  , indexByteArray
   , newByteArray
   , setByteArray
   , unsafeFreezeByteArray
   , unsafeThawByteArray
-  , writeByteArray
   )
+import Data.Primitive.ByteArray.Unaligned (PrimUnaligned, indexUnalignedByteArray, writeUnalignedByteArray)
 import Data.Primitive.Ptr (copyPtrToMutableByteArray, indexOffPtr, writeOffPtr)
 import Data.Vector.Storable (Vector)
 import qualified Data.Vector.Storable as VS
@@ -80,11 +78,11 @@ instance MutableMem (VS.Vector Word8) (IOVector Word8) IO where
   unsafeFreezeMem = VS.unsafeFreeze
 
 class (PrimMonad m) => ReadMem r m where
-  indexMemInBytes :: (Prim a) => r -> ByteCount -> m a
+  indexMemInBytes :: (Prim a, PrimUnaligned a) => r -> ByteCount -> m a
   cloneArrayMemInBytes :: r -> ByteCount -> ByteCount -> m ByteArray
 
 instance (PrimMonad m) => ReadMem ByteArray m where
-  indexMemInBytes arr off = pure (indexByteArray arr (unByteCount off))
+  indexMemInBytes arr off = pure (indexUnalignedByteArray arr (unByteCount off))
   cloneArrayMemInBytes arr off len = pure (cloneByteArray arr (unByteCount off) (unByteCount len))
 
 cloneMemPtr :: MemPtr RealWorld -> ByteCount -> ByteCount -> IO ByteArray
@@ -98,8 +96,8 @@ cloneMemPtr mem off len = do
 instance ReadMem (MemPtr RealWorld) IO where
   indexMemInBytes :: forall a. (Prim a) => MemPtr RealWorld -> ByteCount -> IO a
   indexMemInBytes mem off = withMemPtr mem $ \ptr ->
-    let off' = sizeOfType @a * unByteCount off
-    in  pure (indexOffPtr (castPtr ptr) off')
+    let wptr = plusPtr ptr (unByteCount off)
+    in  pure (indexOffPtr wptr 0)
   cloneArrayMemInBytes = cloneMemPtr
 
 readSBSMem :: (ReadMem r m) => r -> ByteCount -> ByteCount -> m ShortByteString
@@ -120,12 +118,12 @@ mutViewVecMem :: IOVector Word8 -> MemPtr RealWorld
 mutViewVecMem mvec = let (fp, off, len) = VSM.unsafeToForeignPtr mvec in MemPtr fp (ByteCount off) (ByteCount len)
 
 class (PrimMonad m) => WriteMem q m where
-  writeMemInBytes :: (Prim a, StaticByteSized a) => a -> q (PrimState m) -> ByteCount -> m ()
+  writeMemInBytes :: (Prim a, PrimUnaligned a) => a -> q (PrimState m) -> ByteCount -> m ()
   copyArrayMemInBytes :: ByteArray -> ByteCount -> ByteCount -> q (PrimState m) -> ByteCount -> m ()
-  setMemInBytes :: (Prim a, StaticByteSized a) => ByteCount -> a -> q (PrimState m) -> ByteCount -> m ()
+  setMemInBytes :: (Prim a, PrimUnaligned a) => ByteCount -> a -> q (PrimState m) -> ByteCount -> m ()
 
 instance (PrimMonad m) => WriteMem MutableByteArray m where
-  writeMemInBytes val mem off = writeByteArray mem (unByteCount off) val
+  writeMemInBytes val mem off = writeUnalignedByteArray mem (unByteCount off) val
   copyArrayMemInBytes arr arrOff arrLen mem off = copyByteArray mem (unByteCount off) arr (unByteCount arrOff) (unByteCount arrLen)
   setMemInBytes len val mem off = setByteArray mem (unByteCount off) (unByteCount len) val
 
@@ -134,18 +132,18 @@ copyPtr arr arrOff arrLen ptr off =
   let wptr = castPtr (plusPtr ptr (unByteCount off)) :: Ptr Word8
   in  copyByteArrayToPtr wptr arr (unByteCount arrOff) (unByteCount arrLen)
 
-setPtr :: (PrimMonad m, Prim a, StaticByteSized a) => ByteCount -> a -> Ptr Word8 -> ByteCount -> m ()
-setPtr len val ptr off = do
-  let elemSize = staticByteSize (proxyFor val)
+setPtr :: forall m a. (PrimMonad m, Prim a) => ByteCount -> a -> Ptr Word8 -> ByteCount -> m ()
+setPtr (ByteCount len) val ptr (ByteCount off) = do
+  let elemSize = sizeOfType @a
       elemLen = div len elemSize
-      ptr' = castPtr ptr
-  for_ [0 .. elemLen - 1] (\pos -> writeOffPtr ptr' (unByteCount (off + pos * elemSize)) val)
+  for_ [0 .. elemLen - 1] $ \pos ->
+    let wptr = plusPtr ptr (off + pos * elemSize)
+    in  writeOffPtr wptr 0 val
 
 instance WriteMem MemPtr IO where
-  writeMemInBytes :: forall a. (Prim a) => a -> MemPtr RealWorld -> ByteCount -> IO ()
   writeMemInBytes val mem off = withMemPtr mem $ \ptr ->
-    let off' = sizeOfType @a * unByteCount off
-    in  writeOffPtr (castPtr ptr) off' val
+    let wptr = plusPtr ptr (unByteCount off)
+    in  writeOffPtr wptr 0 val
   copyArrayMemInBytes arr arrOff arrLen mem off = withMemPtr mem (\ptr -> copyPtr arr arrOff arrLen ptr off)
   setMemInBytes len val mem off = withMemPtr mem (\ptr -> setPtr len val ptr off)
 

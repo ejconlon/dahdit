@@ -10,6 +10,7 @@ module Dahdit.ShortWord () where
 import Data.Bits (Bits (..), shiftR)
 import Data.Default (Default (..))
 import Data.Primitive (Prim (..))
+import Data.Primitive.ByteArray.Unaligned (PrimUnaligned (..))
 import Data.ShortWord (Int24, Word24)
 import Data.Word (Word8)
 import GHC.Exts (Int (..), Int#, addIntC#, mulIntMayOflo#)
@@ -77,6 +78,22 @@ x3p2 =
         let !(# x, _ #) = addIntC# two (mulIntMayOflo# three i)
         in  x
 {-# INLINE x3p2 #-}
+
+p1 :: Int# -> Int#
+p1 =
+  let !(I# one) = 1
+  in  \i ->
+        let !(# x, _ #) = addIntC# one i
+        in  x
+{-# INLINE p1 #-}
+
+p2 :: Int# -> Int#
+p2 =
+  let !(I# two) = 2
+  in  \i ->
+        let !(# x, _ #) = addIntC# two i
+        in  x
+{-# INLINE p2 #-}
 
 instance Default Word24 where
   def = 0
@@ -170,4 +187,46 @@ instance Prim Int24 where
         !s0 = writeOffAddr# a (x3 i) b0 s
         !s1 = writeOffAddr# a (x3p1 i) b1 s0
         !s2 = writeOffAddr# a (x3p2 i) b2 s1
+    in  s2
+
+instance PrimUnaligned Word24 where
+  indexUnalignedByteArray# a i =
+    let !b0 = indexByteArray# a i
+        !b1 = indexByteArray# a (p1 i)
+        !b2 = indexByteArray# a (p2 i)
+        !w = mkWord24 b0 b1 b2
+    in  w
+  readUnalignedByteArray# a i s =
+    let !(# s0, b0 #) = readByteArray# a i s
+        !(# s1, b1 #) = readByteArray# a (p1 i) s0
+        !(# s2, b2 #) = readByteArray# a (p2 i) s1
+        !w = mkWord24 b0 b1 b2
+        !t = (# s2, w #)
+    in  t
+  writeUnalignedByteArray# a i w s =
+    let !(# b0, b1, b2 #) = unMkWord24 w
+        !s0 = writeByteArray# a i b0 s
+        !s1 = writeByteArray# a (p1 i) b1 s0
+        !s2 = writeByteArray# a (p2 i) b2 s1
+    in  s2
+
+instance PrimUnaligned Int24 where
+  indexUnalignedByteArray# a i =
+    let !b0 = indexByteArray# a i
+        !b1 = indexByteArray# a (p1 i)
+        !b2 = indexByteArray# a (p2 i)
+        !w = mkInt24 b0 b1 b2
+    in  w
+  readUnalignedByteArray# a i s =
+    let !(# s0, b0 #) = readByteArray# a i s
+        !(# s1, b1 #) = readByteArray# a (p1 i) s0
+        !(# s2, b2 #) = readByteArray# a (p2 i) s1
+        !w = mkInt24 b0 b1 b2
+        !t = (# s2, w #)
+    in  t
+  writeUnalignedByteArray# a i w s =
+    let !(# b0, b1, b2 #) = unMkInt24 w
+        !s0 = writeByteArray# a i b0 s
+        !s1 = writeByteArray# a (p1 i) b1 s0
+        !s2 = writeByteArray# a (p2 i) b2 s1
     in  s2

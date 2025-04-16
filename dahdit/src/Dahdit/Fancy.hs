@@ -39,6 +39,7 @@ import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Primitive (Prim)
 import Data.Primitive.ByteArray (ByteArray (..), byteArrayFromListN)
+import Data.Primitive.ByteArray.Unaligned (PrimUnaligned)
 import Data.Primitive.PrimArray (PrimArray, replicatePrimArray)
 import Data.Proxy (Proxy (..))
 import Data.Sequence (Seq)
@@ -176,7 +177,7 @@ instance (KnownNat n, Prim a, Default a) => Default (StaticArray n a) where
 instance (KnownNat n, StaticByteSized a) => StaticByteSized (StaticArray n a) where
   type StaticSize (StaticArray n a) = n * StaticSize a
 
-instance (KnownNat n, Prim a, StaticByteSized a, Default a) => Binary (StaticArray n a) where
+instance (KnownNat n, Prim a, PrimUnaligned a, StaticByteSized a, Default a) => Binary (StaticArray n a) where
   byteSize = byteSizeViaStatic
   get = fmap StaticArray (getStaticArray (fromInteger (natVal (Proxy :: Proxy n))))
   put = unsafePutStaticArrayN (fromInteger (natVal (Proxy :: Proxy n))) (Just def) . unStaticArray

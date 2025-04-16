@@ -69,7 +69,7 @@ import Dahdit.Nums
   , Word64LE
   )
 import Dahdit.Proxy (proxyForF)
-import Dahdit.Sizes (ByteCount (..), ElemCount (..), staticByteSize)
+import Dahdit.Sizes (ByteCount (..), ElemCount (..), primByteSizeOf, staticByteSize)
 import Data.Coerce (coerce)
 import Data.Foldable (for_, toList)
 import Data.Int (Int8)
@@ -89,16 +89,16 @@ getStaticSeqSize :: GetStaticSeqF a -> ByteCount
 getStaticSeqSize (GetStaticSeqF ec g _) = staticByteSize (proxyForF g) * coerce ec
 
 getStaticArraySize :: GetStaticArrayF a -> ByteCount
-getStaticArraySize (GetStaticArrayF n prox _) = staticByteSize prox * coerce n
+getStaticArraySize (GetStaticArrayF n prox _) = primByteSizeOf prox * coerce n
 
 putStaticSeqSize :: PutStaticSeqF a -> ByteCount
 putStaticSeqSize (PutStaticSeqF n _ _ s _) = staticByteSize (proxyForF s) * coerce n
 
 putStaticArrayElemSize :: PutStaticArrayF a -> ByteCount
-putStaticArrayElemSize (PutStaticArrayF _ _ a _) = staticByteSize (proxyForF a)
+putStaticArrayElemSize (PutStaticArrayF _ _ zs _) = primByteSizeOf (proxyForF zs)
 
 putStaticArraySize :: PutStaticArrayF a -> ByteCount
-putStaticArraySize (PutStaticArrayF n _ a _) = staticByteSize (proxyForF a) * coerce n
+putStaticArraySize (PutStaticArrayF n _ zs _) = primByteSizeOf (proxyForF zs) * coerce n
 
 -- Get:
 
