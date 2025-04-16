@@ -53,7 +53,6 @@ import Dahdit
   , putWord16BE
   , putWord8
   )
-import Dahdit.Audio.Binary (QuietByteArray (..))
 import Dahdit.Audio.Common
   ( ChunkHeaderSize
   , ConvertErr
@@ -240,22 +239,22 @@ putCommonChunk = \case
 data AiffDataBody = AiffDataBody
   { adbOffset :: !Word32BE
   , adbBlockSize :: !Word32BE
-  , adbSoundData :: !QuietByteArray
+  , adbSoundData :: !ByteArray
   }
   deriving stock (Eq, Show, Generic)
 
 instance Binary AiffDataBody where
-  byteSize (AiffDataBody _ _ (QuietByteArray arr)) = 8 + fromIntegral (sizeofByteArray arr)
+  byteSize (AiffDataBody _ _ arr) = 8 + fromIntegral (sizeofByteArray arr)
   get = do
     adbOffset <- get
     unless (adbOffset == 0) (fail "need zero offset")
     adbBlockSize <- get
-    adbSoundData <- fmap QuietByteArray getRemainingByteArray
+    adbSoundData <- getRemainingByteArray
     pure $! AiffDataBody {..}
   put (AiffDataBody {..}) = do
     put adbOffset
     put adbBlockSize
-    putByteArray (unQuietByteArray adbSoundData)
+    putByteArray adbSoundData
 
 instance KnownLabel AiffDataBody where
   knownLabel _ = labelSsnd
@@ -399,9 +398,9 @@ swapDataEndian variant chunks =
     VariantAiff -> fromMaybe chunks $ do
       let aiff = Aiff variant chunks
       KnownChunk comBody <- lookupAiffCommonChunk aiff
-      KnownChunk (AiffDataBody x y (QuietByteArray arr)) <- lookupAiffDataChunk aiff
+      KnownChunk (AiffDataBody x y arr) <- lookupAiffDataChunk aiff
       let arr' = swapArrayEndian (fromIntegral (aceSampleSize comBody)) arr
-      let datChunk' = KnownChunk (AiffDataBody x y (QuietByteArray arr'))
+      let datChunk' = KnownChunk (AiffDataBody x y arr')
       Just $! flip fmap chunks $ \c ->
         case c of
           AiffChunkData _ -> AiffChunkData datChunk'

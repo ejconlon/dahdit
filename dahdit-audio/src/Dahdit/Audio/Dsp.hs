@@ -35,7 +35,6 @@ import Dahdit
   , proxyForF
   , staticByteSize
   )
-import Dahdit.Audio.Binary (QuietByteArray (..))
 import Data.Bits (Bits (..))
 import Data.Coerce (coerce)
 import Data.Primitive (Prim)
@@ -233,7 +232,7 @@ data PcmMeta = PcmMeta
 
 data PcmContainer = PcmContainer
   { pcMeta :: !PcmMeta
-  , pcData :: !QuietByteArray
+  , pcData :: !ByteArray
   }
   deriving stock (Eq, Show)
 
@@ -241,7 +240,7 @@ pmToMm :: PcmMeta -> ModMeta
 pmToMm (PcmMeta {..}) = ModMeta {mmNumChannels = pmNumChannels, mmBitsPerSample = pmBitsPerSample, mmSampleRate = pmSampleRate}
 
 toLifted :: (StaticByteSized a) => Proxy a -> PcmContainer -> Either DspErr (ModMeta, PrimArray a)
-toLifted prox (PcmContainer pm (QuietByteArray arr@(ByteArray ba))) = do
+toLifted prox (PcmContainer pm arr@(ByteArray ba)) = do
   let !elemSize = staticByteSize prox
   let !actualNs = div (sizeofByteArray arr) (unByteCount elemSize * pmNumChannels pm)
   unless
@@ -260,7 +259,7 @@ fromLifted mm arr@(PrimArray ba) = do
       !extraElems = rem (sizeofPrimArray arr) nc
   unless (extraElems == 0) (Left DspErrBadElemSize)
   let !pm = PcmMeta nc (SampleCount ns) bps sr
-  Right $! PcmContainer pm (QuietByteArray (ByteArray ba))
+  Right $! PcmContainer pm (ByteArray ba)
 
 proxyFromFirst :: m a b -> Proxy a
 proxyFromFirst _ = Proxy

@@ -25,7 +25,6 @@ import Dahdit
   )
 import Dahdit.Audio.Aiff (Aiff (..), AiffDataBody (..), lookupAiffDataChunk)
 import Dahdit.Audio.Aiff qualified as Aiff
-import Dahdit.Audio.Binary (QuietByteArray (..))
 import Dahdit.Audio.Common
   ( LoopMarks (..)
   , UnparsedBody (..)
@@ -175,7 +174,7 @@ testWavData = testCase "data" $ do
     getSkip drumDataOffset
     chunk <- get
     case chunk of
-      WavChunkData (KnownChunk (WavDataBody (QuietByteArray arr))) -> pure arr
+      WavChunkData (KnownChunk (WavDataBody arr)) -> pure arr
       _ -> fail "expected data"
   fromIntegral (sizeofByteArray arr) @?= drumDataLen * 2 -- x2 for 2-byte samples
 
@@ -196,7 +195,7 @@ testWavWhole = testCase "whole" $ do
   (wav, _) <- decodeThrow bs
   fmtChunk <- rethrow (guardChunk "format" (lookupWavFormatChunk wav))
   fmtChunk @?= drumFmtChunk
-  KnownChunk (WavDataBody (QuietByteArray arr)) <- rethrow (guardChunk "data" (lookupWavDataChunk wav))
+  KnownChunk (WavDataBody arr) <- rethrow (guardChunk "data" (lookupWavDataChunk wav))
   fromIntegral (sizeofByteArray arr) @?= drumDataLen * 2 -- x2 for 2-byte samples
   Seq.length (wavChunks wav) @?= 4
 
@@ -325,19 +324,19 @@ testConvertDx = testCase "DX" $ do
 
 aifSamples :: Aiff -> [Word8]
 aifSamples aif =
-  let Aiff.KnownChunk (AiffDataBody _ _ (QuietByteArray wavData)) = fromMaybe (error "no data") (lookupAiffDataChunk aif)
+  let Aiff.KnownChunk (AiffDataBody _ _ wavData) = fromMaybe (error "no data") (lookupAiffDataChunk aif)
       !sz = sizeofByteArray wavData
   in  fmap (indexByteArray wavData) [0 .. sz - 1]
 
 wavSamples :: Wav -> [Word8]
 wavSamples wav =
-  let KnownChunk (WavDataBody (QuietByteArray wavData)) = fromMaybe (error "no data") (lookupWavDataChunk wav)
+  let KnownChunk (WavDataBody wavData) = fromMaybe (error "no data") (lookupWavDataChunk wav)
       !sz = sizeofByteArray wavData
   in  fmap (indexByteArray wavData) [0 .. sz - 1]
 
 neutralSamples :: Neutral -> [Word8]
 neutralSamples ne =
-  let !wavData = unQuietByteArray (pcData (neCon ne))
+  let !wavData = pcData (neCon ne)
       !sz = sizeofByteArray wavData
   in  fmap (indexByteArray wavData) [0 .. sz - 1]
 

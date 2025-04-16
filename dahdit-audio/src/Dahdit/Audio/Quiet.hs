@@ -1,4 +1,4 @@
-module Dahdit.Audio.Binary
+module Dahdit.Audio.Quiet
   ( QuietByteArray (..)
   , QuietPrimArray (..)
   )

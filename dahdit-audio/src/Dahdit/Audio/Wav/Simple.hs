@@ -14,7 +14,6 @@ where
 
 import Control.Exception (throwIO)
 import Control.Monad (unless, (>=>))
-import Dahdit.Audio.Binary (QuietByteArray (..), QuietPrimArray (..))
 import Dahdit.Audio.Common (ConvertErr (..), guardChunk, rethrow)
 import Dahdit.Audio.Convert (convertMod)
 import Dahdit.Audio.Dsp (DspErr (..), PcmContainer (..), PcmMeta (..), SampleCount (..), changeBitDepth)
@@ -46,7 +45,7 @@ data WAVEHeader = WAVEHeader
 
 type WAVESample = Int32
 
-newtype WAVESamples = WAVESamples {unWAVESamples :: QuietPrimArray Int32}
+newtype WAVESamples = WAVESamples {unWAVESamples :: PrimArray Int32}
   deriving stock (Eq, Show)
 
 data WAVE = WAVE
@@ -56,7 +55,7 @@ data WAVE = WAVE
   deriving stock (Eq, Show)
 
 toPcmContainer :: WAVE -> Either ConvertErr PcmContainer
-toPcmContainer (WAVE hdr (WAVESamples (QuietPrimArray arr@(PrimArray ba)))) = do
+toPcmContainer (WAVE hdr (WAVESamples arr@(PrimArray ba))) = do
   let elemSize = staticByteSize (proxyForF arr)
       nc = waveNumChannels hdr
       ns = div (sizeofPrimArray arr) nc
@@ -65,7 +64,7 @@ toPcmContainer (WAVE hdr (WAVESamples (QuietPrimArray arr@(PrimArray ba)))) = do
       extraElems = rem (sizeofPrimArray arr) nc
       pm = PcmMeta nc (SampleCount ns) bps sr
   unless (extraElems == 0) (Left (ConvertErrDsp DspErrBadElemSize))
-  pure (PcmContainer pm (QuietByteArray (ByteArray ba)))
+  pure (PcmContainer pm (ByteArray ba))
 
 toComplex :: WAVE -> Either ConvertErr Wav
 toComplex wave0@(WAVE hdr _) = do
@@ -99,7 +98,7 @@ fromComplex wav0 = do
     32 -> pure pc0
     y -> Left (ConvertErrBadBps y)
   KnownChunk wfb <- guardChunk "format" (lookupWavFormatChunk wav0)
-  let !(QuietByteArray samps@(ByteArray ba)) = pcData pc1
+  let !samps@(ByteArray ba) = pcData pc1
       hdr =
         WAVEHeader
           { waveNumChannels = fromIntegral (wfbNumChannels wfb)
@@ -108,7 +107,7 @@ fromComplex wav0 = do
           , waveFrames = Just (div (sizeofByteArray samps) 4)
           }
 
-  pure (WAVE hdr (WAVESamples (QuietPrimArray (PrimArray ba))))
+  pure (WAVE hdr (WAVESamples (PrimArray ba)))
 
 getWAVEFile :: FilePath -> IO WAVE
 getWAVEFile = decodeFileEnd >=> rethrow . fst >=> rethrow . fromComplex

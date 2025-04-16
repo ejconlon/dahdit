@@ -56,7 +56,6 @@ import Dahdit
   , putSeq
   , putWord8
   )
-import Dahdit.Audio.Binary (QuietByteArray (..))
 import Dahdit.Audio.Common
   ( ConvertErr
   , CountSize
@@ -83,6 +82,7 @@ import Data.Default (Default (..))
 import Data.Foldable (toList)
 import Data.Maybe (fromMaybe)
 import Data.Primitive (sizeofByteArray)
+import Data.Primitive.ByteArray (ByteArray)
 import Data.Sequence (Seq (..))
 import Data.Sequence qualified as Seq
 import Data.String (IsString)
@@ -176,17 +176,17 @@ instance KnownLabel WavFormatBody where
 
 type WavFormatChunk = KnownChunk WavFormatBody
 
-newtype WavDataBody = WavDataBody {unWavDataBody :: QuietByteArray}
+newtype WavDataBody = WavDataBody {unWavDataBody :: ByteArray}
   deriving stock (Show)
-  deriving newtype (Eq, Default)
+  deriving newtype (Eq)
 
 instance KnownLabel WavDataBody where
   knownLabel _ = labelData
 
 instance Binary WavDataBody where
-  byteSize (WavDataBody (QuietByteArray arr)) = fromIntegral (sizeofByteArray arr)
-  get = fmap (WavDataBody . QuietByteArray) getRemainingByteArray
-  put (WavDataBody (QuietByteArray arr)) = putByteArray arr
+  byteSize (WavDataBody arr) = fromIntegral (sizeofByteArray arr)
+  get = fmap WavDataBody getRemainingByteArray
+  put (WavDataBody arr) = putByteArray arr
 
 type WavDataChunk = KnownChunk WavDataBody
 
@@ -499,13 +499,13 @@ lookupWavAdtlChunk w =
 wavToPcmContainer :: Wav -> Either ConvertErr PcmContainer
 wavToPcmContainer wav = do
   KnownChunk fmtBody <- guardChunk "format" (lookupWavFormatChunk wav)
-  KnownChunk (WavDataBody qa@(QuietByteArray arr)) <- guardChunk "data" (lookupWavDataChunk wav)
+  KnownChunk (WavDataBody arr) <- guardChunk "data" (lookupWavDataChunk wav)
   let !nc = fromIntegral (wfbNumChannels fmtBody)
       !bps = fromIntegral (wfbBitsPerSample fmtBody)
       !sr = fromIntegral (wfbSampleRate fmtBody)
       !ns = SampleCount (div (sizeofByteArray arr) (nc * div bps 8))
       !meta = PcmMeta nc ns bps sr
-  pure $! PcmContainer meta qa
+  pure $! PcmContainer meta arr
 
 wavFromPcmContainer :: PcmContainer -> Wav
 wavFromPcmContainer (PcmContainer (PcmMeta {..}) arr) =
